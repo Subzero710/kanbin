@@ -20,20 +20,20 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitLabMergeRequestFiltersHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPENED",
-    "assignee": {
-      "type": "org.jetbrains.plugins.gitlab.mergerequest.ui.filters.GitLabMergeRequestsFiltersValue.MergeRequestsMemberFilterValue.MergeRequestsAssigneeFilterValue",
-      "username": "william.trinh",
-      "fullname": "William Trinh"
+  <component name="GitLabMergeRequestFiltersHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPENED&quot;,
+    &quot;assignee&quot;: {
+      &quot;type&quot;: &quot;org.jetbrains.plugins.gitlab.mergerequest.ui.filters.GitLabMergeRequestsFiltersValue.MergeRequestsMemberFilterValue.MergeRequestsAssigneeFilterValue&quot;,
+      &quot;username&quot;: &quot;william.trinh&quot;,
+      &quot;fullname&quot;: &quot;William Trinh&quot;
     }
   }
-}]]></component>
+}</component>
   <component name="GitLabMergeRequestsSettings"><![CDATA[{
   "selectedUrlAndAccountId": {
-    "first": "https://gitlab.cluster.ensisa.uha.fr/william.trinh/kanbin-projest-parent.git",
-    "second": "67c9ab16-7fbf-4d91-a102-15639203cec6"
+    "first": "https://gitlab.cluster.ensisa.uha.fr/groupe2526/kanbin.git",
+    "second": "726c8aa8-de0c-4d09-9a80-1f60e0bb0f19"
   }
 }]]></component>
   <component name="ProjectColorInfo">{
@@ -50,7 +50,8 @@
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "git-widget-placeholder": "master",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "main",
     "ignore.virus.scanning.warn.message": "true",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "D:/ENSISA/2e annee/Génie logiciel/Projet/code/kanbin-projest-parent",
@@ -59,9 +60,9 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "Modules",
+    "project.structure.last.edited": "Project",
     "project.structure.proportion": "0.0",
-    "project.structure.side.proportion": "0.0",
+    "project.structure.side.proportion": "0.2",
     "settings.editor.selected.configurable": "advanced.settings",
     "vue.rearranger.settings.migration": "true"
   }
@@ -82,8 +83,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.26199.169" />
-        <option value="bundled-js-predefined-d6986cc7102b-9c94529fcfe0-JavaScript-IU-252.26199.169" />
+        <option value="bundled-jdk-9823dce3aa75-bf35d07a577b-intellij.indexing.shared.core-IU-252.26830.84" />
+        <option value="bundled-js-predefined-d6986cc7102b-3aa1da707db6-JavaScript-IU-252.26830.84" />
       </set>
     </attachedChunks>
   </component>
@@ -102,6 +103,7 @@
       <workItem from="1761027915493" duration="143000" />
       <workItem from="1761028120596" duration="3470000" />
       <workItem from="1761043468150" duration="570000" />
+      <workItem from="1761211396340" duration="38000" />
     </task>
     <servers />
   </component>
