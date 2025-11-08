@@ -1,5 +1,6 @@
 package fr.uha.ensisa.gl.kanbin.projest;
 
+import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
 import fr.uha.ensisa.gl.kanbin.projest.repo.mem.IssueRepoMem;
 import org.junit.jupiter.api.Test;
 
