@@ -2,6 +2,9 @@ package fr.uha.ensisa.gl.kanbin.config;
 
 import java.util.concurrent.TimeUnit;
 
+import fr.uha.ensisa.gl.kanbin.projest.repo.BoardRepo;
+import fr.uha.ensisa.gl.kanbin.projest.repo.RepoFactory;
+import fr.uha.ensisa.gl.kanbin.projest.repo.mem.RepoFactoryMem;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -71,4 +74,10 @@ public class MvcConfiguration implements WebMvcConfigurer {
 	public MultipartResolver multipartResolver(){
 		return new StandardServletMultipartResolver();
 	}
+
+    @Bean
+    public RepoFactory getRepoFactory() { return new RepoFactoryMem(); } // doc GL
+
+    @Bean
+    public BoardRepo boardRepo(RepoFactory f) { return f.getBoardRepo(); }
 }
