@@ -4,6 +4,9 @@
     gap: 1rem;
     align-items: start;
 }
+.main-wrapper{
+    padding: 1rem 2rem 1rem 2rem;
+}
 .kb-col {
     background: #fff;
     border: 1px solid #dee2e6;

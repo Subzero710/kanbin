@@ -5,16 +5,18 @@
     <title>Kanban Board</title>
 </head>
 <body>
-<h1 class="page-title">Kanban</h1>
-<div class="board" id="board">
-    <section class="kb-col" th:each="c : ${columns}" th:attr="data-col=${c.key}">
-        <header class="kb-col-header">
-            <span th:text="${c.title}">Column</span>
-        </header>
-        <div class="kb-col-body">
-            <div class="kb-empty">Aucune carte</div>
-        </div>
-    </section>
+<div class="main-wrapper">
+    <h1 class="page-title">Kanban</h1>
+    <div class="board" id="board">
+        <section class="kb-col" th:each="c : ${columns}" th:attr="data-col=${c.key}">
+            <header class="kb-col-header">
+                <span th:text="${c.title}">Column</span>
+            </header>
+            <div class="kb-col-body">
+                <div class="kb-empty">Aucune carte</div>
+            </div>
+        </section>
+    </div>
 </div>
 
 <div th:replace="../fragments/template :: footer"></div>
