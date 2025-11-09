@@ -3,6 +3,8 @@ package fr.uha.ensisa.gl.kanbin.projest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
+import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
 import org.junit.jupiter.api.Test;
 
 public class IssueTest {

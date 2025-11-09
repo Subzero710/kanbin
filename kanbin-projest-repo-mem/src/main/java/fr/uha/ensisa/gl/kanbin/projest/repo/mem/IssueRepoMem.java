@@ -4,7 +4,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
-import fr.uha.ensisa.gl.kanbin.projest.Issue;
+import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
 import fr.uha.ensisa.gl.kanbin.projest.repo.IssueRepo;
 
 public class IssueRepoMem implements IssueRepo {

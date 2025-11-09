@@ -1,4 +1,4 @@
-package fr.uha.ensisa.gl.kanbin.projest;
+package fr.uha.ensisa.gl.kanbin.projest.model;
 
 import java.util.random.RandomGenerator;
 

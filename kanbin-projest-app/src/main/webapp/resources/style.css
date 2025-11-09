@@ -1,0 +1,30 @@
+.board {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    align-items: start;
+}
+.main-wrapper{
+    padding: 1rem 2rem 1rem 2rem;
+}
+.kb-col {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: .5rem;
+    min-height: 60vh;
+    display: flex;
+    flex-direction: column;
+}
+.kb-col-header {
+    padding: .6rem .8rem;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+}
+.kb-col-body   {
+    padding: .8rem;
+    flex: 1;
+}
+.kb-empty      {
+    color: #6c757d;
+    font-size: .9rem;
+}
