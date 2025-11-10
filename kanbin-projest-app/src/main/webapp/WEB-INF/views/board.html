@@ -6,6 +6,10 @@
 </head>
 <body>
 <div class="main-wrapper">
+    <form th:action="@{/board/add-column}" method="post" accept-charset="UTF-8" style="margin-bottom: 20px;">
+        <input type="text" name="title" placeholder="Titre de la nouvelle colonne" required/>
+        <input type="submit" value="Ajouter Colonne"/>
+    </form>
     <h1 class="page-title">Kanban</h1>
     <div class="board" id="board">
         <section class="kb-col" th:each="c : ${columns}" th:attr="data-col=${c.key}">
