@@ -1,8 +1,5 @@
 package fr.uha.ensisa.gl.kanbin.controller;
 
-import fr.uha.ensisa.gl.kanbin.projest.model.Board;
-import fr.uha.ensisa.gl.kanbin.projest.model.Column;
-import fr.uha.ensisa.gl.kanbin.projest.repo.BoardRepo;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -56,6 +53,15 @@ public class HomeController {
         // Le Dev 1 a inclus cette méthode directement dans son BoardRepoMem.
         boards.addColumn(board.getId(), newColumn);
 
+        return "redirect:/board";
+    }
+
+    @PostMapping("/board/remove-column")
+    public String removeColumn(@RequestParam("columnId") long columnId) {
+        Board board = boards.findAll().stream().findFirst()
+                .orElseGet(() -> boards.save(new Board("Default")));
+        board.removeColumn(columnId);
+        boards.save(board);
         return "redirect:/board";
     }
 }
