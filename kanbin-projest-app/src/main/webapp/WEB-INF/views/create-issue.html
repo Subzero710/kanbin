@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head th:include="../fragments/template :: head(~{::title})">
+    <title>Créer une nouvelle Story</title>
+</head>
+<body>
+<div class="container mt-5">
+    <h1 class="mb-4">Créer une nouvelle Story</h1>
+
+    <form th:action="@{/issues}" th:object="${issue}" method="post">
+        <div class="mb-3">
+            <label for="issueTitle" class="form-label">Titre de la Story</label>
+            <input type="text"
+                   class="form-control"
+                   id="issueTitle"
+                   th:field="*{title}"
+                   required
+                   placeholder="Ex: Implémenter la validation du formulaire"
+                   maxlength="255">
+            <div class="form-text">Donnez un titre clair à votre story.</div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Créer la Story</button>
+        <a th:href="@{/issues}" class="btn btn-secondary">Annuler et Retour à la Liste</a>
+    </form>
+
+</div>
+<div th:replace="../fragments/template :: footer"></div>
+</body>
+</html>

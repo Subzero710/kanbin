@@ -11,15 +11,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
 
 @Controller
-public class HomeController {
+public class BoardController {
     private final BoardRepo boards;
-
-    public HomeController(BoardRepo boards) {
+    public BoardController(BoardRepo boards) {
         this.boards = boards;
     }
+
     @GetMapping("/board")
     public ModelAndView board() {
-        // prendre le premier board existant, sinon en créer un
         Board b = boards.findAll().stream().findFirst()
                 .orElseGet(() -> boards.save(new Board("Default")));
         var mv = new ModelAndView("board");
@@ -27,35 +26,14 @@ public class HomeController {
         mv.addObject("columns", b.getColumns());
         return mv;
     }
-    @RequestMapping(value="/")
-    public String home(){
-        return "redirect:/hello";
-    }
-
-    @RequestMapping(value="/hello")
-    public ModelAndView hello(@RequestParam(required=false, defaultValue="World") String name) {
-        ModelAndView ret = new ModelAndView("home");
-        // Adds an objet to be used in home.jsp
-        ret.addObject("name", name);
-        return ret;
-    }
 
     @PostMapping("/board/add-column")
     public String addColumn(@RequestParam("title") String title) {
-        // Trouver le Board actif (le premier créé)
         Board board = boards.findAll().stream().findFirst()
                 .orElseGet(() -> boards.save(new Board("Default")));
-
-        // 2. Créer l'objet Column.
         String key = title.toLowerCase().replaceAll("\\s+", "-");
-
-        // Le constructeur (key, title) est utilisé. Le BoardRepoMem attribuera l'ID (id=0 initial)
         Column newColumn = new Column(key, title);
-
-        // 3. Appeler la méthode métier du repository pour ajouter et sauvegarder
-        // Le Dev 1 a inclus cette méthode directement dans son BoardRepoMem.
         boards.addColumn(board.getId(), newColumn);
-
         return "redirect:/board";
     }
 }

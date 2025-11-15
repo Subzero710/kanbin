@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head th:include="../fragments/template :: head(~{::title})">
+    <title>Liste des Stories</title>
+</head>
+<body>
+<div class="container mt-5">
+    <h1 class="mb-4">Stories du Projet Kanban</h1>
+
+    <div th:if="${message}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <span th:text="${message}">Message de succès !</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
+    <a th:href="@{/issues/new}" class="btn btn-success mb-3">
+        Ajouter une nouvelle Story ➕
+    </a>
+
+    <table class="table table-striped table-hover">
+        <thead class="table-dark">
+        <tr>
+            <th>ID</th>
+            <th>Titre</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="issue : ${issues}">
+            <td th:text="${issue.id}">1</td>
+            <td th:text="${issue.title}">Titre de l'Issue</td>
+            <td>
+                <form th:action="@{/issues/{id}/delete(id=${issue.id})}" method="post">
+                    <button type="submit" class="btn btn-danger btn-sm"
+                            onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette Story ?')">
+                        Supprimer 🗑️
+                    </button>
+                </form>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+
+    <a th:href="@{/hello}" class="btn btn-secondary mt-3">Aller à la page /hello (test)</a>
+</div>
+
+<div th:replace="../fragments/template :: footer"></div>
+</body>
+</html>
