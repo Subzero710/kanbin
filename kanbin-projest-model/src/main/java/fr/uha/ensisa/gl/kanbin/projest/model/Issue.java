@@ -1,23 +1,22 @@
 package fr.uha.ensisa.gl.kanbin.projest.model;
 
-import java.util.random.RandomGenerator;
-
 public class Issue {
 
-    private final long id;
+    private long id;
     private String title;
 
-    public Issue(String title) {
-        this.id = RandomGenerator.getDefault().nextInt();
+    public Issue() {
+        this.id = 0;
+        this.title = null;
+    }
+
+    public Issue(long id, String title) {
+        this.id = id;
         this.title = title;
     }
 
-    public Object getTitle() {
-        return this.title;
-    }
-
-    public long getId(){
-        return this.id;
-    }
-
+    public String getTitle() { return this.title; }
+    public long getId(){ return this.id; }
+    public void setTitle(String title) { this.title = title; }
+    public void setId(long id) { this.id = id; }
 }
