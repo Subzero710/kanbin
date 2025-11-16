@@ -1,0 +1,52 @@
+image: maven:3-eclipse-temurin-21-alpine # default container image to use for tasks
+
+# task setting up maven properties
+before_script:
+    - echo '<settings 
+            xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+            https://maven.apache.org/xsd/settings-1.0.0.xsd">
+            <mirrors>
+                <mirror>
+                    <id>ensisa</id>
+                    <name>Nexus ENSISA</name>
+                    <url>https://nexus.cluster.ensisa.uha.fr/repository/maven-public/</url>
+                    <mirrorOf>*</mirrorOf>
+                </mirror>
+            </mirrors>
+        </settings>' > settings.xml
+
+# Various reusable properties
+variables:
+    MAVEN_CLI_OPTS: "--batch-mode -s settings.xml -Dmaven.repo.local=libs"
+
+# Folders to be reused from jobs to jobs
+cache:
+    key: default-cache
+    paths:
+        - "libs" # jars downloaded and installed by Maven
+        - "**/target" # results of Maven commands
+
+# List of stages
+stages:
+    - build
+    - test
+
+# Task: Compiling
+compile:
+    stage: build
+    script: # many commands can appear here (as an array)
+        - mvn $MAVEN_CLI_OPTS clean compile
+        
+# Task: testing
+test:
+    stage: test
+    script:
+        - mvn $MAVEN_CLI_OPTS test
+    artifacts: # results of the stage
+        paths:
+            - "**/target/surefire-reports/*"
+        reports:
+            junit:
+                - "**/target/surefire-reports/TEST-*.xml"
