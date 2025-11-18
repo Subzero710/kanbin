@@ -1,8 +1,10 @@
 .board {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(150px, 1fr));
-    gap: 1rem;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
     align-items: start;
+    gap: 1rem;
+    min-height: 60vh;
 }
 .main-wrapper{
     padding: 1rem 2rem 1rem 2rem;
@@ -14,6 +16,8 @@
     min-height: 60vh;
     display: flex;
     flex-direction: column;
+    flex-shrink: 0;
+    width: 240px;
 }
 .kb-col-header {
     padding: .6rem .8rem;
