@@ -67,7 +67,6 @@ public class BoardController {
         mv.addObject("issuesByColumn", issuesByColumn);
         return mv;
     }
-
     @RequestMapping(value="/")
     public String home(){
         return "redirect:/hello";
