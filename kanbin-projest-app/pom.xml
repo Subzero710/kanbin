@@ -14,15 +14,15 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <name>kanbin-projest-app</name>
-    <url>http://maven.apache.org/pom.html</url>
+	<name>kanbin-projest-app</name>
+	<url>http://maven.apache.org</url>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>21</java.version>
         <servlet.port>8080</servlet.port>
         <jetty.stop.port>9000</jetty.stop.port>
-        <spring.version>6.0.11</spring.version>
+        <spring.version>6.2.8</spring.version>
         <junit.version>5.10.2</junit.version>
         <jakarta.servlet.version>6.0.0</jakarta.servlet.version>
         <thymeleaf.version>3.1.2.RELEASE</thymeleaf.version>
@@ -31,7 +31,6 @@
     </properties>
 
     <dependencies>
-
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
@@ -43,6 +42,7 @@
             <artifactId>spring-webmvc</artifactId>
             <version>${spring.version}</version>
         </dependency>
+
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-core</artifactId>
@@ -79,6 +79,7 @@
             <artifactId>kanbin-projest-model</artifactId>
             <version>${project.version}</version>
         </dependency>
+
         <dependency>
             <groupId>fr.uha.ensisa.gl.kanbin</groupId>
             <artifactId>kanbin-projest-repo-mem</artifactId>
@@ -86,11 +87,47 @@
         </dependency>
 
         <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>5.12.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.seleniumhq.selenium</groupId>
+            <artifactId>selenium-java</artifactId>
+            <version>4.37.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.github.bonigarcia</groupId>
+            <artifactId>webdrivermanager</artifactId>
+            <version>6.3.2</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
+
+    <repositories>
+        <repository>
+            <id>central</id>
+            <url>https://repo.maven.apache.org/maven2</url>
+            <releases><enabled>true</enabled></releases>
+            <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+    </repositories>
 
     <build>
         <finalName>${project.name}</finalName>
@@ -100,24 +137,42 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
                 <configuration>
+                    <release>21</release>
                     <parameters>true</parameters>
                 </configuration>
             </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-war-plugin</artifactId>
                 <version>3.4.0</version>
             </plugin>
+
             <plugin>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-maven-plugin</artifactId>
                 <version>11.0.25</version>
                 <configuration>
+                    <httpConnector>
+                        <port>${servlet.port}</port>
+                    </httpConnector>
+                    <stopKey>quit</stopKey>
+                    <stopPort>${jetty.stop.port}</stopPort>
                     <webApp>
                         <contextPath>/</contextPath>
                     </webApp>
-                    <stopKey>quit</stopKey>
-                    <stopPort>${jetty.stop.port}</stopPort>
+                    <scan>5</scan>
+                    <scanTargetPatterns>
+                        <scanTargetPattern>
+                            <directory>src/main/webapp/WEB-INF</directory>
+                            <includes>
+                                <include>**/*.html</include>
+                            </includes>
+                            <excludes>
+                                <exclude>**/*.properties</exclude>
+                            </excludes>
+                        </scanTargetPattern>
+                    </scanTargetPatterns>
                 </configuration>
                 <executions>
                     <execution>
@@ -136,20 +191,37 @@
                     </execution>
                 </executions>
             </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <version>3.5.4</version>
                 <executions>
                     <execution>
+                        <id>perform-it</id>
                         <goals>
                             <goal>integration-test</goal>
-                            <goal>verify</goal>
                         </goals>
                         <configuration>
+                            <systemProperties>
+                                <property>
+                                    <name>servlet.port</name>
+                                    <value>${servlet.port}</value>
+                                </property>
+                                <property>
+                                    <name>name</name>
+                                    <value>${project.name}</value>
+                                </property>
+                            </systemProperties>
                             <useSystemClassLoader>true</useSystemClassLoader>
                             <useModulePath>false</useModulePath>
                         </configuration>
+                    </execution>
+                    <execution>
+                        <id>verify-it</id>
+                        <goals>
+                            <goal>verify</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>
