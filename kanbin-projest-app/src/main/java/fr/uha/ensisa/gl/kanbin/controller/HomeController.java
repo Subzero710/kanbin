@@ -36,25 +36,23 @@ public class HomeController {
     @RequestMapping(value="/hello")
     public ModelAndView hello(@RequestParam(required=false, defaultValue="World") String name) {
         ModelAndView ret = new ModelAndView("home");
-        // Adds an objet to be used in home.jsp
+
         ret.addObject("name", name);
         return ret;
     }
 
     @PostMapping("/board/add-column")
     public String addColumn(@RequestParam("title") String title) {
-        // Trouver le Board actif (le premier créé)
+
         Board board = boards.findAll().stream().findFirst()
                 .orElseGet(() -> boards.save(new Board("Default")));
 
-        // 2. Créer l'objet Column.
+
         String key = title.toLowerCase().replaceAll("\\s+", "-");
 
-        // Le constructeur (key, title) est utilisé. Le BoardRepoMem attribuera l'ID (id=0 initial)
+
         Column newColumn = new Column(key, title);
 
-        // 3. Appeler la méthode métier du repository pour ajouter et sauvegarder
-        // Le Dev 1 a inclus cette méthode directement dans son BoardRepoMem.
         boards.addColumn(board.getId(), newColumn);
 
         return "redirect:/board";
