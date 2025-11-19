@@ -11,7 +11,7 @@
     </form>
     <h1 class="page-title">Kanban</h1>
     <div class="board" id="board">
-        <section class="kb-col" th:each="c : ${columns}" th:attr="data-col=${c.key}">
+        <section class="kb-col"  th:each="c, colStat : ${columns}" th:attr="data-col=${c.key}">
             <header class="kb-col-header">
                 <span th:text="${c.title}" th:id="'col-title-' + ${c.key}">Column</span>
                 <form th:action="@{/board/remove-column}" method="post" style="display:inline;">
@@ -20,7 +20,39 @@
                 </form>
             </header>
             <div class="kb-col-body">
-                <div class="kb-empty">Aucune carte</div>
+            <div class="kb-empty"
+                 th:if="${#lists.isEmpty(issuesByColumn[c.key])}">
+                Aucune carte
+            </div>
+
+            <article class="kb-card"
+                     th:each="issue : ${issuesByColumn[c.key]}">
+                <div class="kb-card-title" th:text="${issue.title}">
+                    Titre de l'Issue
+                </div>
+
+                <div class="kb-card-actions">
+                    <!-- reculer d'une colonne -->
+                    <form th:if="${!colStat.first}"
+                          th:action="@{/board/move-issue}"
+                          method="post"
+                          style="display:inline;">
+                        <input type="hidden" name="issueId" th:value="${issue.id}"/>
+                        <input type="hidden" name="direction" value="prev"/>
+                        <button type="submit" class="kb-move-btn kb-move-prev">-</button>
+                    </form>
+
+                    <!-- avancer d'une colonne -->
+                    <form th:if="${!colStat.last}"
+                          th:action="@{/board/move-issue}"
+                          method="post"
+                          style="display:inline;">
+                        <input type="hidden" name="issueId" th:value="${issue.id}"/>
+                        <input type="hidden" name="direction" value="next"/>
+                        <button type="submit" class="kb-move-btn kb-move-next">+</button>
+                    </form>
+                </div>
+            </article>
             </div>
         </section>
     </div>

@@ -19,15 +19,6 @@ public class IssueController {
     @Autowired
     public IssueController(IssueRepo issueRepo) {
         this.issueRepo = issueRepo;
-        if (issueRepo.count() == 0) {
-            Issue i1 = new Issue();
-            i1.setTitle("Story: Configurer l'environnement");
-            issueRepo.persist(i1);
-
-            Issue i2 = new Issue();
-            i2.setTitle("Story: Ajouter les tests unitaires");
-            issueRepo.persist(i2);
-        }
     }
 
     @GetMapping("/")
