@@ -12,12 +12,13 @@ import fr.uha.ensisa.gl.kanbin.projest.model.Column;
 import fr.uha.ensisa.gl.kanbin.projest.repo.BoardRepo;
 
 @Controller
-public class HomeController {
+public class BoardController {
     private final BoardRepo boards;
 
-    public HomeController(BoardRepo boards) {
+    public BoardController(BoardRepo boards) {
         this.boards = boards;
     }
+
     @GetMapping("/board")
     public ModelAndView board() {
         // prendre le premier board existant, sinon en créer un

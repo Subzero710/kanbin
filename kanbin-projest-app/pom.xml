@@ -1,98 +1,108 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
 
-	<artifactId>kanbin-projest-app</artifactId>
-	<packaging>war</packaging>
+    <artifactId>kanbin-projest-app</artifactId>
+    <packaging>war</packaging>
 
     <parent>
         <groupId>fr.uha.ensisa.gl.kanbin</groupId>
         <artifactId>kanbin-projest-parent</artifactId>
         <version>1.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
 	<name>kanbin-projest-app</name>
 	<url>http://maven.apache.org</url>
 
-	<properties>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<java.version>21</java.version>
-		<servlet.port>8080</servlet.port>
-		<jetty.stop.port>9000</jetty.stop.port>
-		<spring.version>6.2.8</spring.version>
-		<maven.compiler.target>${java.version}</maven.compiler.target>
-		<maven.compiler.source>${java.version}</maven.compiler.source>
-	</properties>
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <java.version>21</java.version>
+        <servlet.port>8080</servlet.port>
+        <jetty.stop.port>9000</jetty.stop.port>
+        <spring.version>6.2.8</spring.version>
+        <junit.version>5.10.2</junit.version>
+        <jakarta.servlet.version>6.0.0</jakarta.servlet.version>
+        <thymeleaf.version>3.1.2.RELEASE</thymeleaf.version>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+    </properties>
 
-	<dependencies>
-        
-		<!-- Spring core & mvc -->
-		<dependency>
-			<groupId>org.springframework</groupId>
-			<artifactId>spring-context</artifactId>
-			<version>${spring.version}</version>
-		</dependency>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <version>${spring.version}</version>
+        </dependency>
 
-		<dependency>
-			<groupId>org.springframework</groupId>
-			<artifactId>spring-webmvc</artifactId>
-			<version>${spring.version}</version>
-		</dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webmvc</artifactId>
+            <version>${spring.version}</version>
+        </dependency>
 
-		<!-- CGLib for @Configuration -->
-		<dependency>
-			<groupId>cglib</groupId>
-			<artifactId>cglib-nodep</artifactId>
-			<version>3.3.0</version>
-			<scope>runtime</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-core</artifactId>
+            <version>${spring.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>cglib</groupId>
+            <artifactId>cglib-nodep</artifactId>
+            <version>3.3.0</version>
+            <scope>runtime</scope>
+        </dependency>
 
         <dependency>
             <groupId>jakarta.servlet</groupId>
             <artifactId>jakarta.servlet-api</artifactId>
-            <version>5.0.0</version>
             <scope>provided</scope>
         </dependency>
 
-		<!-- Thymeleaf -->
-		<dependency>
-			<groupId>org.thymeleaf</groupId>
-			<artifactId>thymeleaf-spring6</artifactId>
-			<version>3.1.3.RELEASE</version>
-		</dependency>
+        <dependency>
+            <groupId>org.thymeleaf</groupId>
+            <artifactId>thymeleaf-spring6</artifactId>
+            <version>${thymeleaf.version}</version>
+        </dependency>
 
-		<!-- JSR-330 for @Inject -->
-		<dependency>
-			<groupId>javax.inject</groupId>
-			<artifactId>javax.inject</artifactId>
-			<version>1</version>
-		</dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.19.0</version>
+        </dependency>
 
-		<!-- Jackson JSON Mapper -->
-		<dependency>
-			<groupId>com.fasterxml.jackson.core</groupId>
-			<artifactId>jackson-databind</artifactId>
-			<version>2.19.0</version>
-		</dependency>
+        <dependency>
+            <groupId>fr.uha.ensisa.gl.kanbin</groupId>
+            <artifactId>kanbin-projest-model</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>fr.uha.ensisa.gl.kanbin</groupId>
             <artifactId>kanbin-projest-repo-mem</artifactId>
-            <version>1.0-SNAPSHOT</version>
-            <scope>compile</scope>
+            <version>${project.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>5.12.0</version>  <scope>test</scope>
+            <version>5.12.0</version>
+            <scope>test</scope>
         </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
-            <version>5.12.0</version>  <scope>test</scope>
+            <scope>test</scope>
         </dependency>
 
         <dependency>
@@ -108,8 +118,6 @@
             <version>6.3.2</version>
             <scope>test</scope>
         </dependency>
-
-
     </dependencies>
 
     <repositories>
@@ -121,97 +129,102 @@
         </repository>
     </repositories>
 
-	<build>
-		<finalName>${project.name}</finalName>
-		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
+    <build>
+        <finalName>${project.name}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
-				<configuration>
+                <configuration>
                     <release>21</release>
-					<parameters>true</parameters>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-war-plugin</artifactId>
-				<version>3.4.0</version>
-			</plugin>
-			<plugin>
-				<groupId>org.eclipse.jetty</groupId>
-				<artifactId>jetty-maven-plugin</artifactId>
-				<version>11.0.25</version>
-				<configuration>
-					<httpConnector>
-						<port>${servlet.port}</port>
-					</httpConnector>
-					<stopKey>quit</stopKey>
-					<stopPort>${jetty.stop.port}</stopPort>
-					<webApp>
-						<contextPath>/</contextPath>
-					</webApp>
-					<scan>5</scan>
-					<scanTargetPatterns>
-						<scanTargetPattern>
-							<directory>src/main/webapp/WEB-INF</directory>
-							<includes>
-								<include>**/*.html</include>
-							</includes>
-							<excludes>
-								<exclude>**/*.properties</exclude>
-							</excludes>
-						</scanTargetPattern>
-					</scanTargetPatterns>
-				</configuration>
-				<executions>
-					<execution>
-						<id>start-it</id>
-						<phase>pre-integration-test</phase>
-						<goals>
-							<goal>start</goal>
-						</goals>
-					</execution>
-					<execution>
-						<id>stop-it</id>
-						<phase>post-integration-test</phase>
-						<goals>
-							<goal>stop</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-failsafe-plugin</artifactId>
-				<version>3.5.3</version>
-				<executions>
-					<execution>
-						<id>perform-it</id>
-						<goals>
-							<goal>integration-test</goal>
-						</goals>
-						<configuration>
-							<systemProperties>
-								<property>
-									<name>servlet.port</name>
-									<value>${servlet.port}</value>
-								</property>
-								<property>
-									<name>name</name>
-									<value>${project.name}</value>
-								</property>
-							</systemProperties>
-						</configuration>
-					</execution>
-					<execution>
-						<id>verify-it</id>
-						<goals>
-							<goal>verify</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-		</plugins>
-	</build>
+                    <parameters>true</parameters>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>3.4.0</version>
+            </plugin>
+
+            <plugin>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-maven-plugin</artifactId>
+                <version>11.0.25</version>
+                <configuration>
+                    <httpConnector>
+                        <port>${servlet.port}</port>
+                    </httpConnector>
+                    <stopKey>quit</stopKey>
+                    <stopPort>${jetty.stop.port}</stopPort>
+                    <webApp>
+                        <contextPath>/</contextPath>
+                    </webApp>
+                    <scan>5</scan>
+                    <scanTargetPatterns>
+                        <scanTargetPattern>
+                            <directory>src/main/webapp/WEB-INF</directory>
+                            <includes>
+                                <include>**/*.html</include>
+                            </includes>
+                            <excludes>
+                                <exclude>**/*.properties</exclude>
+                            </excludes>
+                        </scanTargetPattern>
+                    </scanTargetPatterns>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>start-it</id>
+                        <phase>pre-integration-test</phase>
+                        <goals>
+                            <goal>start</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>stop-it</id>
+                        <phase>post-integration-test</phase>
+                        <goals>
+                            <goal>stop</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.5.4</version>
+                <executions>
+                    <execution>
+                        <id>perform-it</id>
+                        <goals>
+                            <goal>integration-test</goal>
+                        </goals>
+                        <configuration>
+                            <systemProperties>
+                                <property>
+                                    <name>servlet.port</name>
+                                    <value>${servlet.port}</value>
+                                </property>
+                                <property>
+                                    <name>name</name>
+                                    <value>${project.name}</value>
+                                </property>
+                            </systemProperties>
+                            <useSystemClassLoader>true</useSystemClassLoader>
+                            <useModulePath>false</useModulePath>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>verify-it</id>
+                        <goals>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

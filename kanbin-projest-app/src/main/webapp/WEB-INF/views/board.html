@@ -1,6 +1,5 @@
-<!-- board.html -->
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
 <head th:include="../fragments/template :: head(~{::title})">
     <title>Kanban Board</title>
 </head>
@@ -14,7 +13,7 @@
     <div class="board" id="board">
         <section class="kb-col" th:each="c : ${columns}" th:attr="data-col=${c.key}">
             <header class="kb-col-header">
-                <span th:text="${c.title}">Column</span>
+                <span th:text="${c.title}" th:id="'col-title-' + ${c.key}">Column</span>
                 <form th:action="@{/board/remove-column}" method="post" style="display:inline;">
                     <input type="hidden" name="columnId" th:value="${c.id}"/>
                     <button type="submit" value="remove Column">-remove-</button>
