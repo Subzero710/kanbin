@@ -16,13 +16,13 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-public class HomeControllerTest {
+public class BoardControllerTest {
 
     @Mock
     private BoardRepo boardRepo;
 
     @InjectMocks
-    private HomeController sut;
+    private BoardController sut;
 
     private final long TEST_BOARD_ID = 1L;
     private Board testBoard;
