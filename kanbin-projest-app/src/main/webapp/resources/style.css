@@ -23,6 +23,10 @@
     padding: .6rem .8rem;
     border-bottom: 1px solid #dee2e6;
     font-weight: 600;
+
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    hyphens: auto;
 }
 .kb-col-body   {
     padding: .8rem;
