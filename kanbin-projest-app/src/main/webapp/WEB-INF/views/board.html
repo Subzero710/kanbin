@@ -6,7 +6,7 @@
 <body>
 <div class="main-wrapper">
     <form th:action="@{/board/add-column}" method="post" accept-charset="UTF-8" style="margin-bottom: 20px;">
-        <input type="text" name="title" placeholder="Titre de la nouvelle colonne" required/>
+        <input type="text" name="title" placeholder="Titre de la nouvelle colonne" required maxlength="30"/>
         <input type="submit" value="Ajouter Colonne"/>
     </form>
     <h1 class="page-title">Kanban</h1>
