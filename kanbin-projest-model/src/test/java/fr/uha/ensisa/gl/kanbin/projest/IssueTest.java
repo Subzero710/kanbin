@@ -22,6 +22,7 @@ public class IssueTest {
     public void anIssueHasAStableId(){
         Issue sut = new Issue(42, "no title");
         long id = sut.getId();
+
         assertEquals(id, sut.getId());
         assertEquals(id, sut.getId());
         assertEquals(id, sut.getId());

@@ -16,7 +16,9 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.10.2</junit.version>
         <jakarta.servlet.version>6.0.0</jakarta.servlet.version>
-        <mockito.version>5.12.0</mockito.version> </properties>
+        <mockito.version>5.12.0</mockito.version>
+        <skip.tests>false</skip.tests>
+    </properties>
 
     <dependencyManagement>
         <dependencies>
@@ -58,13 +60,39 @@
     <dependencies>
     </dependencies>
 
-
     <build>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.4</version>
+                <configuration>
+                    <skipTests>${skip.tests}</skipTests>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.11</version>
+                <configuration>
+                    <skip>${skip.tests}</skip>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
@@ -74,5 +102,4 @@
         <module>kanbin-projest-repo-mem</module>
         <module>kanbin-projest-app</module>
     </modules>
-
 </project>

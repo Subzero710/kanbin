@@ -4,9 +4,9 @@ import java.util.Collection;
 import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
 
 public interface IssueRepo {
-    public void persist(Issue issue);
-    public void remove(long id);
-    public Issue find(long id);
-    public Collection<Issue> findAll();
-    public long count();
+    void persist(Issue issue);
+    void remove(long id);
+    Issue find(long id);
+    Collection<Issue> findAll();
+    long count();
 }

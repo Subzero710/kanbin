@@ -14,8 +14,8 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-	<name>kanbin-projest-app</name>
-	<url>http://maven.apache.org</url>
+    <name>kanbin-projest-app</name>
+    <url>http://maven.apache.org</url>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -23,8 +23,6 @@
         <servlet.port>8080</servlet.port>
         <jetty.stop.port>9000</jetty.stop.port>
         <spring.version>6.2.8</spring.version>
-        <junit.version>5.10.2</junit.version>
-        <jakarta.servlet.version>6.0.0</jakarta.servlet.version>
         <thymeleaf.version>3.1.2.RELEASE</thymeleaf.version>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <maven.compiler.source>${java.version}</maven.compiler.source>
@@ -36,13 +34,11 @@
             <artifactId>spring-context</artifactId>
             <version>${spring.version}</version>
         </dependency>
-
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-webmvc</artifactId>
             <version>${spring.version}</version>
         </dependency>
-
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-core</artifactId>
@@ -55,19 +51,16 @@
             <version>3.3.0</version>
             <scope>runtime</scope>
         </dependency>
-
         <dependency>
             <groupId>jakarta.servlet</groupId>
             <artifactId>jakarta.servlet-api</artifactId>
             <scope>provided</scope>
         </dependency>
-
         <dependency>
             <groupId>org.thymeleaf</groupId>
             <artifactId>thymeleaf-spring6</artifactId>
             <version>${thymeleaf.version}</version>
         </dependency>
-
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
@@ -79,7 +72,6 @@
             <artifactId>kanbin-projest-model</artifactId>
             <version>${project.version}</version>
         </dependency>
-
         <dependency>
             <groupId>fr.uha.ensisa.gl.kanbin</groupId>
             <artifactId>kanbin-projest-repo-mem</artifactId>
@@ -89,16 +81,13 @@
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>5.12.0</version>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
@@ -111,7 +100,6 @@
             <version>4.37.0</version>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>io.github.bonigarcia</groupId>
             <artifactId>webdrivermanager</artifactId>

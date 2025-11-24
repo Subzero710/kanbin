@@ -1,5 +1,7 @@
 package fr.uha.ensisa.gl.kanbin.projest.model;
 
+import java.util.random.RandomGenerator;
+
 public class Issue {
 
     private long id;
@@ -18,5 +20,5 @@ public class Issue {
     public String getTitle() { return this.title; }
     public long getId(){ return this.id; }
     public void setTitle(String title) { this.title = title; }
-    public void setId(long id) { this.id = id; }
+    public void setId(long id) { this.id = id; } // NÉCESSAIRE pour le Repo séquentiel
 }
