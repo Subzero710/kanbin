@@ -7,7 +7,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import; // Import de la classe de configuration du Repository
+import org.springframework.context.annotation.Import;
 import org.springframework.web.multipart.MultipartResolver;
 import org.springframework.web.multipart.support.StandardServletMultipartResolver;
 import org.springframework.web.servlet.ViewResolver;
@@ -24,7 +24,7 @@ import org.thymeleaf.templatemode.TemplateMode;
 @Configuration
 @ComponentScan(basePackages="fr.uha.ensisa.gl.kanbin")
 @EnableWebMvc
-@Import(RepoConfig.class) // Importe les Beans définis dans RepoConfig (RepoFactory, BoardRepo, IssueRepo)
+@Import(RepoConfig.class) // C'est ici que la magie opère : on délègue la config des repos
 public class MvcConfiguration implements WebMvcConfigurer {
     @Autowired
     private ApplicationContext applicationContext;
@@ -73,7 +73,4 @@ public class MvcConfiguration implements WebMvcConfigurer {
     public MultipartResolver multipartResolver(){
         return new StandardServletMultipartResolver();
     }
-
-    // NOTE : Les Beans RepoFactory, BoardRepo, et IssueRepo ne sont PAS définis ici.
-    // Ils sont gérés par l'annotation @Import(RepoConfig.class).
 }

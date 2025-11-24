@@ -25,7 +25,7 @@
         </tr>
         </thead>
         <tbody>
-        <tr th:each="issue : ${issues}">
+        <tr th:each="issue : ${issues}" class="issue_row" th:id="${'issue_' + issue.id}">
             <td th:text="${issue.id}">1</td>
             <td th:text="${issue.title}">Titre de l'Issue</td>
             <td>

@@ -1,20 +1,23 @@
-<!-- board.html -->
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
 <head th:include="../fragments/template :: head(~{::title})">
     <title>Kanban Board</title>
 </head>
 <body>
 <div class="main-wrapper">
     <form th:action="@{/board/add-column}" method="post" accept-charset="UTF-8" style="margin-bottom: 20px;">
-        <input type="text" name="title" placeholder="Titre de la nouvelle colonne" required/>
+        <input type="text" name="title" placeholder="Titre de la nouvelle colonne" required maxlength="30"/>
         <input type="submit" value="Ajouter Colonne"/>
     </form>
     <h1 class="page-title">Kanban</h1>
     <div class="board" id="board">
         <section class="kb-col" th:each="c : ${columns}" th:attr="data-col=${c.key}">
             <header class="kb-col-header">
-                <span th:text="${c.title}">Column</span>
+                <span th:text="${c.title}" th:id="'col-title-' + ${c.key}">Column</span>
+                <form th:action="@{/board/remove-column}" method="post" style="display:inline;">
+                    <input type="hidden" name="columnId" th:value="${c.id}"/>
+                    <button type="submit" value="remove Column">-remove-</button>
+                </form>
             </header>
             <div class="kb-col-body">
                 <div class="kb-empty">Aucune carte</div>

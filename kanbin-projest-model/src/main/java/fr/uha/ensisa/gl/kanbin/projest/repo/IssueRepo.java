@@ -7,6 +7,7 @@ public interface IssueRepo {
     public void persist(Issue issue);
     public void remove(long id);
     Issue find(long id);
+    public Issue find(long id);
     public Collection<Issue> findAll();
     public long count();
 }

@@ -1,7 +1,7 @@
 package fr.uha.ensisa.gl.kanbin.config;
 
 import fr.uha.ensisa.gl.kanbin.projest.repo.IssueRepo;
-import fr.uha.ensisa.gl.kanbin.projest.repo.BoardRepo; // ⬅️ Import nécessaire
+import fr.uha.ensisa.gl.kanbin.projest.repo.BoardRepo; // Cet import est OBLIGATOIRE
 import fr.uha.ensisa.gl.kanbin.projest.repo.RepoFactory;
 import fr.uha.ensisa.gl.kanbin.projest.repo.mem.RepoFactoryMem;
 import org.springframework.context.annotation.Bean;
@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Configuration;
 public class RepoConfig {
     @Bean
     public RepoFactory repoFactory() {
-        return new RepoFactoryMem();
+        return new RepoFactoryMem(); [cite_start]// Implémentation mémoire définie dans RepoFactoryMem [cite: 213]
     }
 
     @Bean

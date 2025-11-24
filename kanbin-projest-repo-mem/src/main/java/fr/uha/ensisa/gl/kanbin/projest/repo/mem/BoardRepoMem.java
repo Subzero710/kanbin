@@ -17,6 +17,7 @@ public class BoardRepoMem implements BoardRepo {
         if (store.isEmpty()) {
             Board b = new Board("Default");
             b.setId(boardSeq.getAndIncrement());
+            // Initialisation des colonnes par défaut
             b.addColumn(new Column(colSeq.getAndIncrement(), "backlog", "Backlog"));
             b.addColumn(new Column(colSeq.getAndIncrement(), "todo",    "To do"));
             b.addColumn(new Column(colSeq.getAndIncrement(), "ongoing", "Ongoing"));
@@ -55,6 +56,7 @@ public class BoardRepoMem implements BoardRepo {
         if (b == null) throw new NoSuchElementException("board " + boardId + " not found");
         if (column.getId() == 0) column.setId(colSeq.getAndIncrement());
         b.addColumn(column);
+        this.save(b);
         return column;
     }
 
@@ -62,6 +64,10 @@ public class BoardRepoMem implements BoardRepo {
     public boolean removeColumn(long boardId, long columnId) {
         Board b = store.get(boardId);
         if (b == null) return false;
-        return b.removeColumn(columnId);
+        boolean removed = b.removeColumn(columnId);
+        if (removed) {
+            this.save(b);
+        }
+        return removed;
     }
 }
