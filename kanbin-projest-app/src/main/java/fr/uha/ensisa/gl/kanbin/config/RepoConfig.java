@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Configuration;
 public class RepoConfig {
     @Bean
     public RepoFactory repoFactory() {
-        return new RepoFactoryMem(); [cite_start]// Implémentation mémoire définie dans RepoFactoryMem [cite: 213]
+        return new RepoFactoryMem();
     }
 
     @Bean
