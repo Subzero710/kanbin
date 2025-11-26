@@ -20,5 +20,5 @@ public class Issue {
     public String getTitle() { return this.title; }
     public long getId(){ return this.id; }
     public void setTitle(String title) { this.title = title; }
-    public void setId(long id) { this.id = id; } // NÉCESSAIRE pour le Repo séquentiel
+    public void setId(long id) { this.id = id; }
 }
