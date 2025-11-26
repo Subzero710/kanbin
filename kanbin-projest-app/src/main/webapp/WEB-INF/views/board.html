@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr" xmlns:th="http://www.thymeleaf.org">
 <head th:include="../fragments/template :: head(~{::title})">
-    <title>Kanban Board</title>
+    <title>Kanbin Board</title>
 </head>
 <body>
 <div class="main-wrapper">
@@ -9,7 +9,7 @@
         <input type="text" name="title" placeholder="Titre de la nouvelle colonne" required maxlength="30"/>
         <input type="submit" value="Ajouter Colonne"/>
     </form>
-    <h1 class="page-title">Kanban</h1>
+    <h1 class="page-title">Kanbin</h1>
     <div class="board" id="board">
         <section class="kb-col"  th:each="c, colStat : ${columns}" th:attr="data-col=${c.key}">
             <header class="kb-col-header">
