@@ -10,6 +10,9 @@ import org.junit.jupiter.api.Test;
 
 import fr.uha.ensisa.gl.kanbin.projest.model.Board;
 import fr.uha.ensisa.gl.kanbin.projest.model.Column;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 public class BoardTest {
 
