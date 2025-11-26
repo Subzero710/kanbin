@@ -22,7 +22,7 @@ public class IssueRepoMemTest {
         assertNotNull(retreive);
         assertEquals(newId, retreive.getId());
         assertEquals(i.getTitle(), retreive.getTitle());
-        assertEquals(initialCount + 1, sut.count()); // (Vient du Bloc 3 - Bonne pratique)
+        assertEquals(initialCount + 1, sut.count());
     }
     @Test
     public void testRemoveIssue() {
