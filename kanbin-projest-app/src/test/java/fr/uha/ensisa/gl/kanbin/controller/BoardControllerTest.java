@@ -11,6 +11,7 @@ import org.mockito.MockitoAnnotations;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -61,5 +62,11 @@ public class BoardControllerTest {
         sut.addColumn("Ma Colonne");
         verify(boardRepo).save(any(Board.class));
         verify(boardRepo).addColumn(eq(TEST_BOARD_ID), any(Column.class));
+    }
+
+    @Test
+    void homeRedirect_shouldRedirectToBoard() {
+        String viewName = sut.homeRedirect();
+        assertEquals("redirect:/board", viewName);
     }
 }

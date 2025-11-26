@@ -18,6 +18,11 @@ public class BoardController {
         this.boards = boards;
     }
 
+    @GetMapping("/")
+    public String homeRedirect() {
+        return "redirect:/board";
+    }
+
     @GetMapping("/board")
     public ModelAndView board() {
         Board b = boards.findAll().stream().findFirst()

@@ -22,11 +22,6 @@ public class IssueController {
         this.issueRepo = issueRepo;
     }
 
-    @GetMapping("/")
-    public String homeRedirect() {
-        return "redirect:/issues";
-    }
-
     @GetMapping("/issues")
     public ModelAndView listIssues() {
         Collection<Issue> issues = issueRepo.findAll();
@@ -54,12 +49,5 @@ public class IssueController {
         issueRepo.remove(id);
         redirectAttributes.addFlashAttribute("message", "La story ID " + id + " a été supprimée avec succès.");
         return "redirect:/issues";
-    }
-
-    @GetMapping("/hello")
-    public ModelAndView hello(@RequestParam(required = false, defaultValue = "Utilisateur") String name) {
-        ModelAndView ret = new ModelAndView("home");
-        ret.addObject("name", name);
-        return ret;
     }
 }
