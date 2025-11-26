@@ -18,6 +18,11 @@ public class BoardController {
         this.boards = boards;
     }
 
+    @GetMapping("/")
+    public String homeRedirect() {
+        return "redirect:/board";
+    }
+
     @GetMapping("/board")
     public ModelAndView board() {
         Board b = boards.findAll().stream().findFirst()
@@ -35,6 +40,15 @@ public class BoardController {
         String key = title.toLowerCase().replaceAll("\\s+", "-");
         Column newColumn = new Column(key, title);
         boards.addColumn(board.getId(), newColumn);
+        return "redirect:/board";
+    }
+
+    @PostMapping("/board/remove-column")
+    public String removeColumn(@RequestParam("columnId") long columnId) {
+        Board board = boards.findAll().stream().findFirst()
+                .orElseGet(() -> boards.save(new Board("Default")));
+        board.removeColumn(columnId);
+        boards.save(board);
         return "redirect:/board";
     }
 }

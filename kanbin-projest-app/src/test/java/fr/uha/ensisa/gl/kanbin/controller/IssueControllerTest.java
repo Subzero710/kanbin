@@ -69,22 +69,9 @@ public class IssueControllerTest {
     }
 
     @Test
-    void homeRedirect_shouldRedirectToIssues() {
-        String viewName = sut.homeRedirect();
-        assertEquals("redirect:/issues", viewName);
-    }
-
-    @Test
     void newIssue_shouldShowCreateForm() {
         ModelAndView mv = sut.newIssue();
         assertEquals("create-issue", mv.getViewName());
         assertTrue(mv.getModel().containsKey("issue"));
-    }
-
-    @Test
-    void hello_shouldShowHomePage() {
-        ModelAndView mv = sut.hello("Tester");
-        assertEquals("home", mv.getViewName());
-        assertEquals("Tester", mv.getModel().get("name"));
     }
 }

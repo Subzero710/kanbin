@@ -16,7 +16,11 @@
                 <span th:text="${c.title}" th:id="'col-title-' + ${c.key}">Column</span>
                 <form th:action="@{/board/remove-column}" method="post" style="display:inline;">
                     <input type="hidden" name="columnId" th:value="${c.id}"/>
-                    <button type="submit" value="remove Column">-remove-</button>
+                    <button type="submit" class="btn btn-danger btn-sm"
+                            onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette colonne ?')"
+                            value="Remove column">
+                        Remove
+                    </button>
                 </form>
             </header>
             <div class="kb-col-body">
