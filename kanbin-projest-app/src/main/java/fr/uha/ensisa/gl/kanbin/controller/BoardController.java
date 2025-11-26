@@ -42,4 +42,13 @@ public class BoardController {
         boards.addColumn(board.getId(), newColumn);
         return "redirect:/board";
     }
+
+    @PostMapping("/board/remove-column")
+    public String removeColumn(@RequestParam("columnId") long columnId) {
+        Board board = boards.findAll().stream().findFirst()
+                .orElseGet(() -> boards.save(new Board("Default")));
+        board.removeColumn(columnId);
+        boards.save(board);
+        return "redirect:/board";
+    }
 }
