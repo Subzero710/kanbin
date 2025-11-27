@@ -1,5 +1,11 @@
 package fr.uha.ensisa.gl.kanbin.projest;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import org.junit.jupiter.api.Test;
@@ -36,7 +42,7 @@ public class BoardTest {
 
     @Test
     public void addColumn_returnsSameAndStored() {
-        Column c = mock(Column.class);
+        Column c = new Column(1L, "key1", "ToDo");
         Board b = new Board();
         Column returned = b.addColumn(c);
         assertSame(c, returned);
@@ -46,10 +52,8 @@ public class BoardTest {
 
     @Test
     public void removeColumn_byId_successAndFailure() {
-        Column c1 = mock(Column.class);
-        Column c2 = mock(Column.class);
-        when(c1.getId()).thenReturn(1L);
-        when(c2.getId()).thenReturn(2L);
+        Column c1 = new Column(1L, "key1", "ToDo");
+        Column c2 = new Column(2L, "key2", "Done");
 
         Board b = new Board();
         b.addColumn(c1);
@@ -68,7 +72,7 @@ public class BoardTest {
     @Test
     public void getColumns_returnsMutableList() {
         Board b = new Board();
-        Column c = mock(Column.class);
+        Column c = new Column(1L, "key1", "ToDo");
         b.getColumns().add(c);
         assertEquals(1, b.getColumns().size());
         assertSame(c, b.getColumns().get(0));
@@ -77,6 +81,44 @@ public class BoardTest {
         b.getColumns().clear();
         assertTrue(b.getColumns().isEmpty());
     }
+
+    @Test
+    public void addColumn_shouldAddColumnToBoard() {
+        Board board = new Board(1L, "Test Board");
+        Column col = new Column(10L, "todo", "To Do");
+
+        board.addColumn(col);
+
+        assertEquals(1, board.getColumns().size());
+        assertSame(col, board.getColumns().get(0));
+    }
+
+    @Test
+    public void removeColumn_existingColumn_shouldReturnTrueAndRemoveIt() {
+        Board board = new Board(1L, "Test Board");
+        Column col1 = new Column(10L, "todo", "To Do");
+        Column col2 = new Column(20L, "doing", "Doing");
+        board.addColumn(col1);
+        board.addColumn(col2);
+
+        boolean removed = board.removeColumn(10L);
+
+        assertTrue(removed);
+        assertEquals(1, board.getColumns().size());
+        assertSame(col2, board.getColumns().get(0));
+    }
+
+    @Test
+    public void removeColumn_unknownId_shouldReturnFalseAndKeepColumns() {
+        Board board = new Board(1L, "Test Board");
+        Column col1 = new Column(10L, "todo", "To Do");
+        board.addColumn(col1);
+
+        boolean removed = board.removeColumn(999L);
+
+        assertFalse(removed);
+        assertEquals(1, board.getColumns().size());
+        assertSame(col1, board.getColumns().get(0));
+    }
+
 }
-
-
