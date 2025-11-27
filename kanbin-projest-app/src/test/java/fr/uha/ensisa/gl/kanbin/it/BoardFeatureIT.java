@@ -15,41 +15,7 @@ import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class BoardFeatureIT {
-
-    public static WebDriver driver;
-    private static String host;
-    private static String port;
-
-    @BeforeAll
-    public static void setupWebDriver() {
-        if (driver != null) return;
-
-        host = System.getProperty("host", "localhost");
-        port = System.getProperty("servlet.port", "8080");
-
-        WebDriverManager.chromedriver().setup(); // Configure le driver Chrome
-
-        ChromeOptions options = new ChromeOptions();
-        options.addArguments("--headless");
-        options.addArguments("--disable-gpu");
-        options.addArguments("--window-size=1920,1080");
-
-        driver = new ChromeDriver(options);
-    }
-
-    @AfterAll
-    public static void shutdownWebDriver() {
-        if (driver != null) {
-            driver.quit();
-            driver = null;
-        }
-    }
-
-    public static String getBaseUrl() {
-        return "http://" + host + ":" + port + "/";
-    }
-
+public class BoardFeatureIT extends AbstractIT {
     @Test
     public void testAddColumnFeature() {
 
