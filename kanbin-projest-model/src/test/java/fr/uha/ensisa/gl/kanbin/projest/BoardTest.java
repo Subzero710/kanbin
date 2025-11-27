@@ -7,9 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
-
 import fr.uha.ensisa.gl.kanbin.projest.model.Board;
 import fr.uha.ensisa.gl.kanbin.projest.model.Column;
+
 
 public class BoardTest {
 
@@ -75,6 +75,7 @@ public class BoardTest {
         assertEquals(1, b.getColumns().size());
         assertSame(c, b.getColumns().get(0));
 
+        // verify that clearing the returned list affects the board
         b.getColumns().clear();
         assertTrue(b.getColumns().isEmpty());
     }

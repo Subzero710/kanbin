@@ -158,4 +158,25 @@ public class BoardControllerTest {
         assertEquals("initial", issue.getColumnKey());
         verify(issueRepo, never()).persist(any(Issue.class));
     }
+
+    @Test
+    void board_shouldAssignOrphanIssuesToDefaultColumn() {
+        // 1. Setup : Un board avec une colonne par défaut
+        Board b = new Board(TEST_BOARD_ID, "Default");
+        Column defaultCol = new Column(10L, "todo", "To Do");
+        b.addColumn(defaultCol);
+
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+
+        Issue orphanIssue = new Issue(99L, "Orphan Issue", "lost-column");
+        when(issueRepo.findAll()).thenReturn(List.of(orphanIssue));
+
+        sut.board();
+
+        ArgumentCaptor<Issue> issueCaptor = ArgumentCaptor.forClass(Issue.class);
+        verify(issueRepo).persist(issueCaptor.capture());
+
+        assertEquals("todo", issueCaptor.getValue().getColumnKey(),
+                "L'issue orpheline aurait dû être déplacée dans la première colonne disponible");
+    }
 }

@@ -102,4 +102,7 @@
         <module>kanbin-projest-repo-mem</module>
         <module>kanbin-projest-app</module>
     </modules>
+
+
+
 </project>

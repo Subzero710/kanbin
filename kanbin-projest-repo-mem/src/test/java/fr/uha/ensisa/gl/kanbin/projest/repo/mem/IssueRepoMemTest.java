@@ -1,7 +1,6 @@
-package fr.uha.ensisa.gl.kanbin.projest;
+package fr.uha.ensisa.gl.kanbin.projest.repo.mem;
 
 import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
-import fr.uha.ensisa.gl.kanbin.projest.repo.mem.IssueRepoMem;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
