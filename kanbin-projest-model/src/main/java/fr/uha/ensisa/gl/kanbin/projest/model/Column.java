@@ -10,7 +10,7 @@ public class Column {
     public Column(long id, String key, String title) {
         this.id = id; this.key = key; this.title = title;
     }
-    public Column(String key, String title) { this(0L, key, title); }
+    public Column(String key, String title) { this(0L, key, title); } // 0l à revoir si problème
 
     public long getId() { return id; }
     public void setId(long id) { this.id = id; }
