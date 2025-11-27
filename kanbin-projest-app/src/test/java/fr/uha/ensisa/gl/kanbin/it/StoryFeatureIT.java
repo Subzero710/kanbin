@@ -1,14 +1,8 @@
 package fr.uha.ensisa.gl.kanbin.it;
 
-import io.github.bonigarcia.wdm.WebDriverManager;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.By;
-import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
@@ -23,23 +17,45 @@ public class StoryFeatureIT extends AbstractIT {
     public void testCreateAndDeleteStory() {
         driver.get(getBaseUrl() + "issues/new");
         String storyTitle = "Story Test Selenium " + System.currentTimeMillis();
-        WebElement titleInput = driver.findElement(By.name("title")); // ou By.id("issueTitle") selon votre HTML
+        WebElement titleInput = driver.findElement(By.name("title"));
         WebElement submitBtn = driver.findElement(By.cssSelector("button[type='submit']"));
         titleInput.sendKeys(storyTitle);
         submitBtn.click();
+
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
         wait.until(ExpectedConditions.urlContains("/issues"));
+
         WebElement storyCell = wait.until(ExpectedConditions.visibilityOfElementLocated(
                 By.xpath("//td[contains(text(), '" + storyTitle + "')]")
         ));
         assertTrue(storyCell.isDisplayed(), "La story créée devrait être visible.");
+
         WebElement deleteBtn = driver.findElement(By.xpath("//tr[td[contains(text(), '" + storyTitle + "')]]//button"));
         deleteBtn.click();
+
         wait.until(ExpectedConditions.alertIsPresent());
         driver.switchTo().alert().accept();
         wait.until(ExpectedConditions.invisibilityOf(storyCell));
 
         String pageSource = driver.getPageSource();
         assertFalse(pageSource.contains(storyTitle), "La story devrait avoir disparu après suppression.");
+    }
+
+    @Test
+    public void testNavigateToBoard() {
+        // 1. Aller sur la page des issues
+        driver.get(getBaseUrl() + "issues");
+
+        // 2. Vérifier que le bouton existe et cliquer dessus
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
+        WebElement toBoardBtn = wait.until(ExpectedConditions.elementToBeClickable(By.id("btn-to-board")));
+        toBoardBtn.click();
+
+        // 3. Vérifier que l'URL a changé pour /board
+        wait.until(ExpectedConditions.urlContains("/board"));
+
+        // 4. Vérification bonus : le titre de la page Board
+        assertTrue(driver.getTitle().contains("Board") || driver.getPageSource().contains("Kanbin"),
+                "Devrait être arrivé sur la page du Board");
     }
 }
