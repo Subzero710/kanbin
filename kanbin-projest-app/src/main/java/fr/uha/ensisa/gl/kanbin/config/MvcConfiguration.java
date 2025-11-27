@@ -24,7 +24,7 @@ import org.thymeleaf.templatemode.TemplateMode;
 @Configuration
 @ComponentScan(basePackages="fr.uha.ensisa.gl.kanbin")
 @EnableWebMvc
-@Import(RepoConfig.class) // C'est ici que la magie opère : on délègue la config des repos
+@Import(RepoConfig.class)
 public class MvcConfiguration implements WebMvcConfigurer {
     @Autowired
     private ApplicationContext applicationContext;
