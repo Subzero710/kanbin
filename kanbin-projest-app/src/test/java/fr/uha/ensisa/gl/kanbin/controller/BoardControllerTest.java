@@ -45,14 +45,9 @@ public class BoardControllerTest {
 
     @Test
     void board_shouldReturnBoardView() {
-        // GIVEN
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
         when(issueRepo.findAll()).thenReturn(List.of());
-
-        // WHEN
         ModelAndView mv = sut.board();
-
-        // THEN
         assertEquals("board", mv.getViewName());
     }
 

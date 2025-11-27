@@ -43,18 +43,11 @@ public class StoryFeatureIT extends AbstractIT {
 
     @Test
     public void testNavigateToBoard() {
-        // 1. Aller sur la page des issues
         driver.get(getBaseUrl() + "issues");
-
-        // 2. Vérifier que le bouton existe et cliquer dessus
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
         WebElement toBoardBtn = wait.until(ExpectedConditions.elementToBeClickable(By.id("btn-to-board")));
         toBoardBtn.click();
-
-        // 3. Vérifier que l'URL a changé pour /board
         wait.until(ExpectedConditions.urlContains("/board"));
-
-        // 4. Vérification bonus : le titre de la page Board
         assertTrue(driver.getTitle().contains("Board") || driver.getPageSource().contains("Kanbin"),
                 "Devrait être arrivé sur la page du Board");
     }
