@@ -36,3 +36,24 @@
     color: #6c757d;
     font-size: .9rem;
 }
+
+.kb-card {
+    background-color: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1); /* Petite ombre sympa */
+}
+
+.kb-card-title {
+    font-weight: 500;
+    margin-bottom: 8px;
+
+    /* --- PROTECTION CONTRE LES LONGS MOTS --- */
+    overflow-wrap: break-word;  /* Coupe le mot si nécessaire */
+    word-wrap: break-word;      /* Compatibilité */
+    hyphens: auto;              /* Ajoute des tirets (-) */
+}
+
+
