@@ -56,4 +56,19 @@ public class ColumnTest {
         assertNotEquals(c, null);
         assertNotEquals(c, "some string");
     }
+
+    @Test
+    public void testGetterAndSetterAndEmptyConstructor() {
+        Column c = new Column();
+        c.setId(55L);
+        c.setKey("backlog");
+        c.setTitle("Backlog");
+        c.setPos(1);
+
+        assertEquals(55L, c.getId());
+        assertEquals("backlog", c.getKey());
+        assertEquals("Backlog", c.getTitle());
+        assertEquals(1, c.getPos());
+    }
+
 }
