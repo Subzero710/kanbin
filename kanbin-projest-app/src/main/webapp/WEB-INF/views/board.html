@@ -5,11 +5,20 @@
 </head>
 <body>
 <div class="main-wrapper">
+
+    <div style="margin-bottom: 15px;">
+        <a th:href="@{/issues}" class="btn btn-secondary" id="btn-to-issues">
+            Gérer les Stories (Backlog)
+        </a>
+    </div>
+
     <form th:action="@{/board/add-column}" method="post" accept-charset="UTF-8" style="margin-bottom: 20px;">
         <input type="text" name="title" placeholder="Titre de la nouvelle colonne" required maxlength="30"/>
         <input type="submit" value="Ajouter Colonne"/>
     </form>
+
     <h1 class="page-title">Kanbin</h1>
+
     <div class="board" id="board">
         <section class="kb-col"  th:each="c, colStat : ${columns}" th:attr="data-col=${c.key}">
             <header class="kb-col-header">
@@ -24,39 +33,37 @@
                 </form>
             </header>
             <div class="kb-col-body">
-            <div class="kb-empty"
-                 th:if="${#lists.isEmpty(issuesByColumn[c.key])}">
-                Aucune carte
-            </div>
-
-            <article class="kb-card"
-                     th:each="issue : ${issuesByColumn[c.key]}">
-                <div class="kb-card-title" th:text="${issue.title}">
-                    Titre de l'Issue
+                <div class="kb-empty"
+                     th:if="${#lists.isEmpty(issuesByColumn[c.key])}">
+                    Aucune carte
                 </div>
 
-                <div class="kb-card-actions">
-                    <!-- reculer d'une colonne -->
-                    <form th:if="${!colStat.first}"
-                          th:action="@{/board/move-issue}"
-                          method="post"
-                          style="display:inline;">
-                        <input type="hidden" name="issueId" th:value="${issue.id}"/>
-                        <input type="hidden" name="direction" value="prev"/>
-                        <button type="submit" class="kb-move-btn kb-move-prev">-</button>
-                    </form>
+                <article class="kb-card"
+                         th:each="issue : ${issuesByColumn[c.key]}">
+                    <div class="kb-card-title" th:text="${issue.title}">
+                        Titre de l'Issue
+                    </div>
 
-                    <!-- avancer d'une colonne -->
-                    <form th:if="${!colStat.last}"
-                          th:action="@{/board/move-issue}"
-                          method="post"
-                          style="display:inline;">
-                        <input type="hidden" name="issueId" th:value="${issue.id}"/>
-                        <input type="hidden" name="direction" value="next"/>
-                        <button type="submit" class="kb-move-btn kb-move-next">+</button>
-                    </form>
-                </div>
-            </article>
+                    <div class="kb-card-actions">
+                        <form th:if="${!colStat.first}"
+                              th:action="@{/board/move-issue}"
+                              method="post"
+                              style="display:inline;">
+                            <input type="hidden" name="issueId" th:value="${issue.id}"/>
+                            <input type="hidden" name="direction" value="prev"/>
+                            <button type="submit" class="kb-move-btn kb-move-prev">-</button>
+                        </form>
+
+                        <form th:if="${!colStat.last}"
+                              th:action="@{/board/move-issue}"
+                              method="post"
+                              style="display:inline;">
+                            <input type="hidden" name="issueId" th:value="${issue.id}"/>
+                            <input type="hidden" name="direction" value="next"/>
+                            <button type="submit" class="kb-move-btn kb-move-next">+</button>
+                        </form>
+                    </div>
+                </article>
             </div>
         </section>
     </div>
