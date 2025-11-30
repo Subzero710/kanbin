@@ -3,7 +3,7 @@ package fr.uha.ensisa.gl.kanbin.controller;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
 
@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Controller
 public class BoardController {
@@ -30,7 +31,7 @@ public class BoardController {
 
     private Board getOrCreateDefaultBoard() {
         return boards.findAll().stream().findFirst()
-        .orElseGet(() -> boards.save(new Board("Default")));
+                .orElseGet(() -> boards.save(new Board("Default")));
     }
 
     @GetMapping("/")
@@ -79,7 +80,6 @@ public class BoardController {
         Board board = getOrCreateDefaultBoard();
 
         String key = title.toLowerCase().replaceAll("\\s+", "-");
-
 
         Column newColumn = new Column(key, title);
 
@@ -135,6 +135,34 @@ public class BoardController {
         issue.setColumnKey(columns.get(currentIndex).getKey());
         issues.persist(issue);
 
+        return "redirect:/board";
+    }
+
+    @GetMapping("/board/columns/{id}/edit")
+    public ModelAndView editColumnForm(@PathVariable long id) {
+        Board board = getOrCreateDefaultBoard();
+        Optional<Column> colOpt = board.getColumns().stream()
+                .filter(c -> c.getId() == id)
+                .findFirst();
+        if (colOpt.isEmpty()) {
+            return new ModelAndView("redirect:/board");
+        }
+        ModelAndView mv = new ModelAndView("edit-column");
+        mv.addObject("column", colOpt.get());
+        return mv;
+    }
+
+    @PostMapping("/board/columns/{id}")
+    public String updateColumn(@PathVariable long id, @RequestParam("title") String title) {
+        Board board = getOrCreateDefaultBoard();
+        Optional<Column> colOpt = board.getColumns().stream()
+                .filter(c -> c.getId() == id)
+                .findFirst();
+        if (colOpt.isPresent()) {
+            Column c = colOpt.get();
+            c.setTitle(title);
+            boards.save(board);
+        }
         return "redirect:/board";
     }
 }
