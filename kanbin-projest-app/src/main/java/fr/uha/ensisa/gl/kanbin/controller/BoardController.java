@@ -41,21 +41,28 @@ public class BoardController {
 
     @GetMapping("/board")
     public ModelAndView board() {
-        // prendre le premier board existant, sinon en créer un
         Board b = getOrCreateDefaultBoard();
         var mv = new ModelAndView("board");
         mv.addObject("board", b);
         mv.addObject("columns", b.getColumns());
 
-        // préparer les issues groupées par colonne
-        List<Column> columns = b.getColumns();
+        // On prépare les boîtes pour les sous-colonnes
         Map<String, List<Issue>> issuesByColumn = new LinkedHashMap<>();
-        for (Column c : columns) {
-            issuesByColumn.put(c.getKey(), new ArrayList<>());
+        String defaultKey = null;
+        for (Column mainCol : b.getColumns()) {
+            if (!mainCol.getSubColumns().isEmpty()) {
+                for (Column sub : mainCol.getSubColumns()) {
+                    issuesByColumn.put(sub.getKey(), new ArrayList<>());
+                    if (defaultKey == null) defaultKey = sub.getKey();
+                }
+            } else {
+                // Au cas où une ancienne colonne traîne sans sous-colonne
+                issuesByColumn.put(mainCol.getKey(), new ArrayList<>());
+                if (defaultKey == null) defaultKey = mainCol.getKey();
+            }
         }
 
-        String defaultKey = columns.isEmpty() ? null : columns.get(0).getKey();
-
+        // On range les issues
         for (Issue issue : issues.findAll()) {
             String key = issue.getColumnKey();
             if (key == null || !issuesByColumn.containsKey(key)) {
@@ -76,14 +83,22 @@ public class BoardController {
 
     @PostMapping("/board/add-column")
     public String addColumn(@RequestParam("title") String title) {
-
         Board board = getOrCreateDefaultBoard();
 
-        String key = title.toLowerCase().replaceAll("\\s+", "-");
+        // 1. Créer la colonne Principale
+        String mainKey = title.toLowerCase().replaceAll("\\s+", "-");
+        Column mainColumn = new Column(mainKey, title);
 
-        Column newColumn = new Column(key, title);
+        // 2. Créer automatiquement les 2 sous-colonnes
+        Column subTodo = new Column(mainKey + "-todo", "À Faire");
+        Column subWip  = new Column(mainKey + "-wip",  "En Cours");
 
-        boards.addColumn(board.getId(), newColumn);
+        // 3. Relier les enfants au parent
+        mainColumn.addSubColumn(subTodo);
+        mainColumn.addSubColumn(subWip);
+
+        // 4. Ajouter le parent au board
+        boards.addColumn(board.getId(), mainColumn);
 
         return "redirect:/board";
     }
@@ -99,42 +114,44 @@ public class BoardController {
     @PostMapping("/board/move-issue")
     public String moveIssue(@RequestParam("issueId") long issueId,
                             @RequestParam("direction") String direction) {
-
         Board board = getOrCreateDefaultBoard();
-        List<Column> columns = board.getColumns();
-        if (columns.isEmpty()) {
-            return "redirect:/board";
-        }
 
-        Issue issue = issues.find(issueId);
-        if (issue == null) {
-            return "redirect:/board";
-        }
-
-        String currentKey = issue.getColumnKey();
-        int currentIndex = 0;
-
-        if (currentKey != null) {
-            for (int i = 0; i < columns.size(); i++) {
-                if (currentKey.equals(columns.get(i).getKey())) {
-                    currentIndex = i;
-                    break;
-                }
+        // 1. APLATIR LA LISTE pour naviguer linéairement entre sous-colonnes
+        List<Column> flatList = new ArrayList<>();
+        for (Column mainCol : board.getColumns()) {
+            if (!mainCol.getSubColumns().isEmpty()) {
+                flatList.addAll(mainCol.getSubColumns());
+            } else {
+                flatList.add(mainCol);
             }
         }
 
-        if ("prev".equals(direction) && currentIndex > 0) {
-            currentIndex--;
-        } else if ("next".equals(direction) && currentIndex < columns.size() - 1) {
-            currentIndex++;
-        } else {
-            // déjà au bord, rien à faire
-            return "redirect:/board";
+        if (flatList.isEmpty()) return "redirect:/board";
+
+        Issue issue = issues.find(issueId);
+        if (issue == null) return "redirect:/board";
+
+        int currentIndex = -1;
+        for (int i = 0; i < flatList.size(); i++) {
+            if (flatList.get(i).getKey().equals(issue.getColumnKey())) {
+                currentIndex = i;
+                break;
+            }
         }
 
-        issue.setColumnKey(columns.get(currentIndex).getKey());
-        issues.persist(issue);
+        if (currentIndex != -1) {
+            int newIndex = currentIndex;
+            if ("prev".equals(direction) && currentIndex > 0) {
+                newIndex--;
+            } else if ("next".equals(direction) && currentIndex < flatList.size() - 1) {
+                newIndex++;
+            }
 
+            if (newIndex != currentIndex) {
+                issue.setColumnKey(flatList.get(newIndex).getKey());
+                issues.persist(issue);
+            }
+        }
         return "redirect:/board";
     }
 

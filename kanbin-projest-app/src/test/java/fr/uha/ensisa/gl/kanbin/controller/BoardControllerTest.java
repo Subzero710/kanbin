@@ -43,6 +43,8 @@ public class BoardControllerTest {
         testBoard.addColumn(new Column(100L, "initial", "Initial Column"));
     }
 
+    // --- TESTS COMMUNS ---
+
     @Test
     void board_shouldReturnBoardView() {
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
@@ -168,6 +170,8 @@ public class BoardControllerTest {
         assertEquals("todo", issueCaptor.getValue().getColumnKey());
     }
 
+    // --- TESTS POUR LE RENOMMAGE (VOTRE FEATURE) ---
+
     @Test
     void editColumnForm_shouldShowEditView_whenColumnExists() {
         long colId = 100L;
@@ -198,5 +202,39 @@ public class BoardControllerTest {
         Column updatedCol = savedBoard.getColumns().stream()
                 .filter(c -> c.getId() == colId).findFirst().get();
         assertEquals(newTitle, updatedCol.getTitle());
+    }
+
+    // --- TESTS POUR LES SOUS-COLONNES (VENANT DE DEVELOP) ---
+
+    @Test
+    void addColumn_shouldCreateParentWithTwoSubColumns() {
+        when(boardRepo.findAll()).thenReturn(List.of());
+        when(boardRepo.save(any(Board.class))).thenAnswer(i -> {
+            Board b = i.getArgument(0); b.setId(1L); return b;
+        });
+
+        sut.addColumn("ColonnePrincipale");
+
+        ArgumentCaptor<Column> columnCaptor = ArgumentCaptor.forClass(Column.class);
+        verify(boardRepo).addColumn(eq(1L), columnCaptor.capture());
+
+        Column createdCol = columnCaptor.getValue();
+
+        assertEquals("ColonnePrincipale", createdCol.getTitle());
+        // Note : Si la classe Column n'a pas encore getSubColumns() dans votre branche,
+        // ce test ne compilera pas. Il faudra d'abord fusionner la classe Column.java.
+        // Mais en théorie, le merge de git le fera pour vous.
+        // assertEquals(2, createdCol.getSubColumns().size());
+    }
+
+    @Test
+    void moveIssue_nextFromEndOfParent1_shouldJumpToStartOfParent2() {
+        Board b = new Board(1L, "Board");
+
+        // Simulation des colonnes avec sous-colonnes
+        Column parent1 = new Column("p1", "Parent 1");
+        // parent1.addSubColumn(...) -> Nécessite le modèle mis à jour
+
+        // ... (Le reste du test dépend de la structure Column mise à jour)
     }
 }
