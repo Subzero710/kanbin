@@ -56,7 +56,8 @@ public class StoryFeatureIT extends AbstractIT {
     public void testRenameStory() {
         driver.get(getBaseUrl() + "issues/new");
         String originalTitle = "Original Name " + System.currentTimeMillis();
-        driver.findElement(By.name("title")).sendKeys(originalTitle);
+        WebElement titleInput = driver.findElement(By.name("title"));
+        titleInput.sendKeys(originalTitle);
         driver.findElement(By.cssSelector("button[type='submit']")).click();
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
         wait.until(ExpectedConditions.urlContains("/issues"));
@@ -70,6 +71,9 @@ public class StoryFeatureIT extends AbstractIT {
         input.sendKeys(newTitle);
         driver.findElement(By.cssSelector("button[type='submit']")).click();
         wait.until(ExpectedConditions.urlContains("/issues"));
+        wait.until(ExpectedConditions.visibilityOfElementLocated(
+                By.xpath("//td[contains(text(), '" + newTitle + "')]")
+        ));
         String pageSource = driver.getPageSource();
         assertFalse(pageSource.contains(originalTitle), "L'ancien titre ne devrait plus être visible");
         assertTrue(pageSource.contains(newTitle), "Le nouveau titre devrait être affiché");

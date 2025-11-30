@@ -13,8 +13,7 @@
             <input type="text"
                    class="form-control"
                    id="issueTitle"
-                   name="title"
-                   th:value="${issue.title}"
+                   th:field="*{title}"
                    required
                    maxlength="255">
             <div class="form-text">Modifiez le titre ci-dessus.</div>
