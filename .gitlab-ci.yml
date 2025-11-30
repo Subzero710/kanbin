@@ -46,14 +46,14 @@ test:
   image: maven:3-eclipse-temurin-21
   script:
     - mvn $MAVEN_CLI_OPTS clean verify
-    - grep -v 'COMPLEXITY_MISSED,COMPLEXITY_COVERED' kanbin-projest-app/target/site/jacoco-aggregate/jacoco.csv | awk -F, '{missed += $10 ; covered += $11} END {print "Jacoco Coverage:", 100*covered/(covered+missed), "%"}'
+    - grep -v 'COMPLEXITY_MISSED,COMPLEXITY_COVERED' kanbin-projest-reporting/target/site/jacoco-aggregate/jacoco.csv | awk -F, '{missed += $10 ; covered += $11} END {print "Jacoco Coverage:", 100*covered/(covered+missed), "%"}'
 
   coverage: '/Jacoco Coverage:\s+\d+[,\.]?\d+\s+\%/'
 
   artifacts:
     when: always
     paths:
-      - "kanbin-projest-app/target/site/jacoco-aggregate/*"
+      - "kanbin-projest-reporting/target/site/jacoco-aggregate/*"
       - "**/target/surefire-reports/*"
     reports:
       junit:
