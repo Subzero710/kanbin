@@ -54,16 +54,16 @@ public class IssueControllerTest {
         Issue newIssue = new Issue();
         newIssue.setTitle("Nouvelle Story");
         String viewName = sut.createIssue(newIssue, redirectAttributes);
-        verify(issueRepo).persist(newIssue); // Vérifie la sauvegarde
-        verify(redirectAttributes).addFlashAttribute(eq("message"), anyString()); // Vérifie le message de confirmation
-        assertEquals("redirect:/issues", viewName); // Vérifie la redirection
+        verify(issueRepo).persist(newIssue);
+        verify(redirectAttributes).addFlashAttribute(eq("message"), anyString());
+        assertEquals("redirect:/issues", viewName);
     }
 
     @Test
     void deleteIssue_shouldRemoveAndRedirect() {
         long idToDelete = 123L;
         String viewName = sut.deleteIssue(idToDelete, redirectAttributes);
-        verify(issueRepo).remove(idToDelete); // Vérifie l'appel de suppression
+        verify(issueRepo).remove(idToDelete);
         verify(redirectAttributes).addFlashAttribute(eq("message"), anyString());
         assertEquals("redirect:/issues", viewName);
     }
@@ -73,5 +73,39 @@ public class IssueControllerTest {
         ModelAndView mv = sut.newIssue();
         assertEquals("create-issue", mv.getViewName());
         assertTrue(mv.getModel().containsKey("issue"));
+    }
+
+    @Test
+    void editIssueForm_shouldShowEditView_whenIssueExists() {
+        long id = 5L;
+        Issue existing = new Issue(id, "Old Title");
+        when(issueRepo.find(id)).thenReturn(existing);
+        ModelAndView mv = sut.editIssueForm(id);
+        assertEquals("edit-issue", mv.getViewName());
+        assertEquals(existing, mv.getModel().get("issue"));
+    }
+
+    @Test
+    void editIssueForm_shouldRedirect_whenIssueDoesNotExist() {
+        long id = 99L;
+        when(issueRepo.find(id)).thenReturn(null);
+        ModelAndView mv = sut.editIssueForm(id);
+        assertEquals("redirect:/issues", mv.getViewName());
+    }
+
+    @Test
+    void updateIssue_shouldUpdateAndRedirect() {
+        long id = 10L;
+        Issue existing = new Issue(id, "Old Title");
+        existing.setColumnKey("todo");
+        when(issueRepo.find(id)).thenReturn(existing);
+        Issue updatedData = new Issue();
+        updatedData.setTitle("New Title");
+        String viewName = sut.updateIssue(id, updatedData, redirectAttributes);
+        assertEquals("redirect:/issues", viewName);
+        verify(issueRepo).persist(updatedData);
+        assertEquals(id, updatedData.getId());
+        assertEquals("todo", updatedData.getColumnKey());
+        verify(redirectAttributes).addFlashAttribute(eq("message"), anyString());
     }
 }
