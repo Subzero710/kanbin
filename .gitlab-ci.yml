@@ -54,6 +54,8 @@ test:
     when: always
     paths:
       - "kanbin-projest-app/target/site/jacoco-aggregate/*"
+      - "**/target/surefire-reports/*"
     reports:
       junit:
         - "**/target/surefire-reports/TEST-*.xml"
+
