@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head th:include="../fragments/template :: head(~{::title})">
+    <title>Modifier la Story</title>
+</head>
+<body>
+<div class="container mt-5">
+    <h1 class="mb-4">Modifier la Story #<span th:text="${issue.id}"></span></h1>
+
+    <form th:action="@{/issues/{id}(id=${issue.id})}" th:object="${issue}" method="post" accept-charset="UTF-8">
+        <div class="mb-3">
+            <label for="issueTitle" class="form-label">Titre de la Story</label>
+            <input type="text"
+                   class="form-control"
+                   id="issueTitle"
+                   name="title"
+                   th:value="${issue.title}"
+                   required
+                   maxlength="255">
+            <div class="form-text">Modifiez le titre ci-dessus.</div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+        <a th:href="@{/issues}" class="btn btn-secondary">Annuler</a>
+    </form>
+
+</div>
+<div th:replace="../fragments/template :: footer"></div>
+</body>
+</html>
