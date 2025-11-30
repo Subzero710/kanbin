@@ -74,10 +74,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.11</version>
-                <configuration>
-                    <skip>${skip.tests}</skip>
-                </configuration>
+                <version>0.8.12</version>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
@@ -85,6 +82,7 @@
                             <goal>prepare-agent</goal>
                         </goals>
                     </execution>
+
                     <execution>
                         <id>report</id>
                         <phase>test</phase>
@@ -92,7 +90,39 @@
                             <goal>report</goal>
                         </goals>
                     </execution>
+
                 </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-maven</artifactId>
+                <version>1.16.1</version>
+
+                <dependencies>
+                    <dependency>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-junit5-plugin</artifactId>
+                        <version>1.2.1</version>
+                    </dependency>
+                </dependencies>
+
+                <configuration>
+                    <targetClasses>
+                        <param>fr.uha.ensisa.gl.kanbin.*</param>
+                    </targetClasses>
+                    <targetTests>
+                        <param>fr.uha.ensisa.gl.kanbin.*</param>
+                    </targetTests>
+                    <excludedTestClasses>
+                        <param>**.*IT</param>
+                    </excludedTestClasses>
+
+                    <withHistory>true</withHistory>
+                    <outputFormats>
+                        <outputFormat>HTML</outputFormat>
+                    </outputFormats>
+                </configuration>
             </plugin>
         </plugins>
     </build>
