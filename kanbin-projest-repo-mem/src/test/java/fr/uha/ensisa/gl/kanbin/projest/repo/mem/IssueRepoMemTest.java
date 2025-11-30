@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.*;
+import java.util.Collection;
 
 public class IssueRepoMemTest {
 
@@ -33,5 +35,20 @@ public class IssueRepoMemTest {
         assertNotNull(sut.find(id));
         sut.remove(id);
         assertNull(sut.find(id));
+    }
+
+    @Test
+    public void testFindAll() {
+        IssueRepoMem repo = new IssueRepoMem();
+
+        Issue i1 = new Issue(1L, "Story 1");
+        Issue i2 = new Issue(2L, "Story 2");
+        repo.persist(i1);
+        repo.persist(i2);
+        Collection<Issue> allIssues = repo.findAll();
+
+        assertEquals(2, allIssues.size());
+        assertTrue(allIssues.contains(i1));
+        assertTrue(allIssues.contains(i2));
     }
 }

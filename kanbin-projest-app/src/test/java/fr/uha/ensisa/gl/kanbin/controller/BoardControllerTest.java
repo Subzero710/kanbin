@@ -12,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.web.servlet.ModelAndView;
+import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 
@@ -28,6 +29,7 @@ public class BoardControllerTest {
 
     @Mock
     private IssueRepo issueRepo;
+
 
     @InjectMocks
     private BoardController sut;
@@ -167,4 +169,75 @@ public class BoardControllerTest {
 
         assertEquals("todo", issueCaptor.getValue().getColumnKey());
     }
+
+    @Test
+    void addColumn_shouldCreateParentWithTwoSubColumns() {
+        when(boardRepo.findAll()).thenReturn(List.of());
+        when(boardRepo.save(any(Board.class))).thenAnswer(i -> {
+            Board b = i.getArgument(0); b.setId(1L); return b;
+        });
+
+        sut.addColumn("ColonnePrincipale");
+
+        ArgumentCaptor<Column> columnCaptor = ArgumentCaptor.forClass(Column.class);
+        verify(boardRepo).addColumn(eq(1L), columnCaptor.capture());
+
+        Column createdCol = columnCaptor.getValue();
+
+        assertEquals("ColonnePrincipale", createdCol.getTitle());
+        assertEquals(2, createdCol.getSubColumns().size());
+        assertEquals("À Faire", createdCol.getSubColumns().get(0).getTitle());
+        assertEquals("En Cours", createdCol.getSubColumns().get(1).getTitle());
+    }
+
+    @Test
+    void moveIssue_nextFromEndOfParent1_shouldJumpToStartOfParent2() {
+        Board b = new Board(1L, "Board");
+
+        Column parent1 = new Column("p1", "Parent 1");
+        parent1.addSubColumn(new Column("p1-todo", "Todo"));
+        parent1.addSubColumn(new Column("p1-wip", "Wip"));
+
+        Column parent2 = new Column("p2", "Parent 2");
+        parent2.addSubColumn(new Column("p2-todo", "Todo"));
+
+        b.addColumn(parent1);
+        b.addColumn(parent2);
+
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+
+        Issue issue = new Issue(1L, "Task 1");
+        issue.setColumnKey("p1-wip");
+        // On utilise bien issueRepo (et pas issues)
+        when(issueRepo.find(99L)).thenReturn(issue);
+
+        sut.moveIssue(99L, "next");
+
+        // On vérifie sur issueRepo
+        verify(issueRepo).persist(issue);
+        assertEquals("p2-todo", issue.getColumnKey());
+    }
+
+    @Test
+    void board_withMixedColumns_shouldMapAllKeys() {
+
+        Board b = new Board(1L, "Mixte");
+
+        // Cas  : Colonne AVEC sous-colonnes
+        Column parent = new Column("parent", "Parent");
+        parent.addSubColumn(new Column("sub1", "Sub 1"));
+        parent.addSubColumn(new Column("sub2", "Sub 2")); // Couvre le cas où defaultKey n'est plus null
+        b.addColumn(parent);
+
+        // Cas  : Colonne SANS sous-colonnes
+        Column simple = new Column("simple", "Simple");
+        b.addColumn(simple);
+
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        when(issueRepo.findAll()).thenReturn(List.of());
+
+        sut.board();
+
+    }
+
 }
