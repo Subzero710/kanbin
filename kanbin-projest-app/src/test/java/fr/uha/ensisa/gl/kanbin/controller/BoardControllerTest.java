@@ -167,4 +167,36 @@ public class BoardControllerTest {
 
         assertEquals("todo", issueCaptor.getValue().getColumnKey());
     }
+
+    @Test
+    void editColumnForm_shouldShowEditView_whenColumnExists() {
+        long colId = 100L;
+        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+        ModelAndView mv = sut.editColumnForm(colId);
+        assertEquals("edit-column", mv.getViewName());
+        Column c = (Column) mv.getModel().get("column");
+        assertEquals(colId, c.getId());
+    }
+
+    @Test
+    void editColumnForm_shouldRedirect_whenColumnDoesNotExist() {
+        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+        ModelAndView mv = sut.editColumnForm(999L);
+        assertEquals("redirect:/board", mv.getViewName());
+    }
+
+    @Test
+    void updateColumn_shouldChangeTitleAndSaveBoard() {
+        long colId = 100L;
+        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+        String newTitle = "Renamed Column";
+        String view = sut.updateColumn(colId, newTitle);
+        assertEquals("redirect:/board", view);
+        ArgumentCaptor<Board> boardCaptor = ArgumentCaptor.forClass(Board.class);
+        verify(boardRepo).save(boardCaptor.capture());
+        Board savedBoard = boardCaptor.getValue();
+        Column updatedCol = savedBoard.getColumns().stream()
+                .filter(c -> c.getId() == colId).findFirst().get();
+        assertEquals(newTitle, updatedCol.getTitle());
+    }
 }
