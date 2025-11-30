@@ -47,16 +47,27 @@ public class BoardController {
         mv.addObject("columns", b.getColumns());
 
         // préparer les issues groupées par colonne
-        List<Column> columns = b.getColumns();
+
         Map<String, List<Issue>> issuesByColumn = new LinkedHashMap<>();
-        for (Column c : columns) {
-            issuesByColumn.put(c.getKey(), new ArrayList<>());
+        String defaultKey = null;
+        for (Column mainCol : b.getColumns()) {
+            if (!mainCol.getSubColumns().isEmpty()) {
+                for (Column sub : mainCol.getSubColumns()) {
+                    issuesByColumn.put(sub.getKey(), new ArrayList<>());
+                    // Si c'est la toute première, c'est la par défaut
+                    if (defaultKey == null) defaultKey = sub.getKey();
+                }
+            } else {
+                // Au cas où une colonne n'aurait pas de sous-colonnes (sécurité)
+                issuesByColumn.put(mainCol.getKey(), new ArrayList<>());
+                if (defaultKey == null) defaultKey = mainCol.getKey();
+            }
         }
 
-        String defaultKey = columns.isEmpty() ? null : columns.get(0).getKey();
-
+        // On range les issues dans les boîtes
         for (Issue issue : issues.findAll()) {
             String key = issue.getColumnKey();
+            // Si l'issue est nouvelle (key null) ou sa colonne n'existe plus -> Hop, case départ !
             if (key == null || !issuesByColumn.containsKey(key)) {
                 key = defaultKey;
                 if (key != null) {
@@ -78,12 +89,20 @@ public class BoardController {
 
         Board board = getOrCreateDefaultBoard();
 
-        String key = title.toLowerCase().replaceAll("\\s+", "-");
+        // 1. Créer la colonne Principale (Le conteneur)
+        String mainKey = title.toLowerCase().replaceAll("\\s+", "-");
+        Column mainColumn = new Column(mainKey, title);
 
+        // 2. Créer automatiquement les 2 sous-colonnes
+        Column subTodo = new Column(mainKey + "-todo", "À Faire");
+        Column subWip  = new Column(mainKey + "-wip",  "En Cours");
 
-        Column newColumn = new Column(key, title);
+        // 3. Relier les enfants au parent
+        mainColumn.addSubColumn(subTodo);
+        mainColumn.addSubColumn(subWip);
 
-        boards.addColumn(board.getId(), newColumn);
+        // 4. Ajouter le parent au board
+        boards.addColumn(board.getId(), mainColumn);
 
         return "redirect:/board";
     }
@@ -101,39 +120,48 @@ public class BoardController {
                             @RequestParam("direction") String direction) {
 
         Board board = getOrCreateDefaultBoard();
-        List<Column> columns = board.getColumns();
-        if (columns.isEmpty()) {
-            return "redirect:/board";
-        }
-
-        Issue issue = issues.find(issueId);
-        if (issue == null) {
-            return "redirect:/board";
-        }
-
-        String currentKey = issue.getColumnKey();
-        int currentIndex = 0;
-
-        if (currentKey != null) {
-            for (int i = 0; i < columns.size(); i++) {
-                if (currentKey.equals(columns.get(i).getKey())) {
-                    currentIndex = i;
-                    break;
-                }
+        // 1. APLATIR LA LISTE : On met toutes les sous-colonnes à la suite
+        // Résultat : [Dev-Todo, Dev-Wip, Test-Todo, Test-Wip...]
+        List<Column> flatList = new ArrayList<>();
+        for (Column mainCol : board.getColumns()) {
+            if (!mainCol.getSubColumns().isEmpty()) {
+                flatList.addAll(mainCol.getSubColumns());
+            } else {
+                flatList.add(mainCol);
             }
         }
 
-        if ("prev".equals(direction) && currentIndex > 0) {
-            currentIndex--;
-        } else if ("next".equals(direction) && currentIndex < columns.size() - 1) {
-            currentIndex++;
-        } else {
-            // déjà au bord, rien à faire
-            return "redirect:/board";
+        if (flatList.isEmpty()) return "redirect:/board";
+
+        // 2. Trouver où est l'issue actuellement
+        Issue issue = issues.find(issueId);
+        if (issue == null) return "redirect:/board";
+
+        int currentIndex = -1;
+        for (int i = 0; i < flatList.size(); i++) {
+            if (flatList.get(i).getKey().equals(issue.getColumnKey())) {
+                currentIndex = i;
+                break;
+            }
         }
 
-        issue.setColumnKey(columns.get(currentIndex).getKey());
-        issues.persist(issue);
+        // 3. Calculer la destination (+1 ou -1)
+        if (currentIndex != -1) {
+            int newIndex = currentIndex; // On garde une copie pour comparer après
+
+            if ("prev".equals(direction) && currentIndex > 0) {
+                newIndex--;
+            } else if ("next".equals(direction) && currentIndex < flatList.size() - 1) {
+                newIndex++;
+            }
+
+            // 4. Sauvegarder le déplacement UNIQUEMENT si ça a bougé
+            // C'est cette condition qui va faire passer ton test au vert !
+            if (newIndex != currentIndex) {
+                issue.setColumnKey(flatList.get(newIndex).getKey());
+                issues.persist(issue);
+            }
+        }
 
         return "redirect:/board";
     }
