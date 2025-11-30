@@ -82,7 +82,6 @@
                             <goal>prepare-agent</goal>
                         </goals>
                     </execution>
-
                     <execution>
                         <id>report</id>
                         <phase>test</phase>
@@ -90,7 +89,6 @@
                             <goal>report</goal>
                         </goals>
                     </execution>
-
                 </executions>
             </plugin>
 
@@ -98,7 +96,6 @@
                 <groupId>org.pitest</groupId>
                 <artifactId>pitest-maven</artifactId>
                 <version>1.16.1</version>
-
                 <dependencies>
                     <dependency>
                         <groupId>org.pitest</groupId>
@@ -106,7 +103,6 @@
                         <version>1.2.1</version>
                     </dependency>
                 </dependencies>
-
                 <configuration>
                     <targetClasses>
                         <param>fr.uha.ensisa.gl.kanbin.*</param>
@@ -117,7 +113,6 @@
                     <excludedTestClasses>
                         <param>**.*IT</param>
                     </excludedTestClasses>
-
                     <withHistory>true</withHistory>
                     <outputFormats>
                         <outputFormat>HTML</outputFormat>
@@ -131,6 +126,7 @@
         <module>kanbin-projest-model</module>
         <module>kanbin-projest-repo-mem</module>
         <module>kanbin-projest-app</module>
+        <module>kanbin-projest-reporting</module>
     </modules>
 
 

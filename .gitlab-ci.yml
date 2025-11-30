@@ -36,17 +36,24 @@ stages:
 # Task: Compiling
 compile:
     stage: build
+    image: maven:3-eclipse-temurin-21
     script: # many commands can appear here (as an array)
         - mvn $MAVEN_CLI_OPTS clean compile
         
 # Task: testing
 test:
-    stage: test
-    script:
-        - mvn $MAVEN_CLI_OPTS test
-    artifacts: # results of the stage
-        paths:
-            - "**/target/surefire-reports/*"
-        reports:
-            junit:
-                - "**/target/surefire-reports/TEST-*.xml"
+  stage: test
+  image: maven:3-eclipse-temurin-21
+  script:
+    - mvn $MAVEN_CLI_OPTS clean verify
+    - grep -v 'COMPLEXITY_MISSED,COMPLEXITY_COVERED' kanbin-projest-app/target/site/jacoco-aggregate/jacoco.csv | awk -F, '{missed += $10 ; covered += $11} END {print "Jacoco Coverage:", 100*covered/(covered+missed), "%"}'
+
+  coverage: '/Jacoco Coverage:\s+\d+[,\.]?\d+\s+\%/'
+
+  artifacts:
+    when: always
+    paths:
+      - "kanbin-projest-app/target/site/jacoco-aggregate/*"
+    reports:
+      junit:
+        - "**/target/surefire-reports/TEST-*.xml"
