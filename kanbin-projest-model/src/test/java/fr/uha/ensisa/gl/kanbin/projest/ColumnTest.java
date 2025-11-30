@@ -71,4 +71,17 @@ public class ColumnTest {
         assertEquals(1, c.getPos());
     }
 
+    @Test
+    public void testSubColumnsManagement() {
+
+        Column parent = new Column("parent", "Parent");
+        assertEquals(0, parent.getSubColumns().size());
+
+        Column child = new Column("child", "Enfant");
+        parent.addSubColumn(child);
+
+        assertEquals(1, parent.getSubColumns().size());
+        assertEquals("child", parent.getSubColumns().get(0).getKey());
+    }
+
 }
