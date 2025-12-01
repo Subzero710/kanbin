@@ -3,7 +3,7 @@ package fr.uha.ensisa.gl.kanbin.controller;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
 
@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Controller
 public class BoardController {
@@ -30,7 +31,7 @@ public class BoardController {
 
     private Board getOrCreateDefaultBoard() {
         return boards.findAll().stream().findFirst()
-        .orElseGet(() -> boards.save(new Board("Default")));
+                .orElseGet(() -> boards.save(new Board("Default")));
     }
 
     @GetMapping("/")
@@ -40,34 +41,30 @@ public class BoardController {
 
     @GetMapping("/board")
     public ModelAndView board() {
-        // prendre le premier board existant, sinon en créer un
         Board b = getOrCreateDefaultBoard();
         var mv = new ModelAndView("board");
         mv.addObject("board", b);
         mv.addObject("columns", b.getColumns());
 
-        // préparer les issues groupées par colonne
-
+        // On prépare les boîtes pour les sous-colonnes
         Map<String, List<Issue>> issuesByColumn = new LinkedHashMap<>();
         String defaultKey = null;
         for (Column mainCol : b.getColumns()) {
             if (!mainCol.getSubColumns().isEmpty()) {
                 for (Column sub : mainCol.getSubColumns()) {
                     issuesByColumn.put(sub.getKey(), new ArrayList<>());
-                    // Si c'est la toute première, c'est la par défaut
                     if (defaultKey == null) defaultKey = sub.getKey();
                 }
             } else {
-                // Au cas où une colonne n'aurait pas de sous-colonnes (sécurité)
+                // Au cas où une ancienne colonne traîne sans sous-colonne
                 issuesByColumn.put(mainCol.getKey(), new ArrayList<>());
                 if (defaultKey == null) defaultKey = mainCol.getKey();
             }
         }
 
-        // On range les issues dans les boîtes
+        // On range les issues
         for (Issue issue : issues.findAll()) {
             String key = issue.getColumnKey();
-            // Si l'issue est nouvelle (key null) ou sa colonne n'existe plus -> Hop, case départ !
             if (key == null || !issuesByColumn.containsKey(key)) {
                 key = defaultKey;
                 if (key != null) {
@@ -86,10 +83,9 @@ public class BoardController {
 
     @PostMapping("/board/add-column")
     public String addColumn(@RequestParam("title") String title) {
-
         Board board = getOrCreateDefaultBoard();
 
-        // 1. Créer la colonne Principale (Le conteneur)
+        // 1. Créer la colonne Principale
         String mainKey = title.toLowerCase().replaceAll("\\s+", "-");
         Column mainColumn = new Column(mainKey, title);
 
@@ -118,10 +114,9 @@ public class BoardController {
     @PostMapping("/board/move-issue")
     public String moveIssue(@RequestParam("issueId") long issueId,
                             @RequestParam("direction") String direction) {
-
         Board board = getOrCreateDefaultBoard();
-        // 1. APLATIR LA LISTE : On met toutes les sous-colonnes à la suite
-        // Résultat : [Dev-Todo, Dev-Wip, Test-Todo, Test-Wip...]
+
+        // 1. APLATIR LA LISTE pour naviguer linéairement entre sous-colonnes
         List<Column> flatList = new ArrayList<>();
         for (Column mainCol : board.getColumns()) {
             if (!mainCol.getSubColumns().isEmpty()) {
@@ -133,7 +128,6 @@ public class BoardController {
 
         if (flatList.isEmpty()) return "redirect:/board";
 
-        // 2. Trouver où est l'issue actuellement
         Issue issue = issues.find(issueId);
         if (issue == null) return "redirect:/board";
 
@@ -145,24 +139,47 @@ public class BoardController {
             }
         }
 
-        // 3. Calculer la destination (+1 ou -1)
         if (currentIndex != -1) {
-            int newIndex = currentIndex; // On garde une copie pour comparer après
-
+            int newIndex = currentIndex;
             if ("prev".equals(direction) && currentIndex > 0) {
                 newIndex--;
             } else if ("next".equals(direction) && currentIndex < flatList.size() - 1) {
                 newIndex++;
             }
 
-            // 4. Sauvegarder le déplacement UNIQUEMENT si ça a bougé
-            // C'est cette condition qui va faire passer ton test au vert !
             if (newIndex != currentIndex) {
                 issue.setColumnKey(flatList.get(newIndex).getKey());
                 issues.persist(issue);
             }
         }
+        return "redirect:/board";
+    }
 
+    @GetMapping("/board/columns/{id}/edit")
+    public ModelAndView editColumnForm(@PathVariable long id) {
+        Board board = getOrCreateDefaultBoard();
+        Optional<Column> colOpt = board.getColumns().stream()
+                .filter(c -> c.getId() == id)
+                .findFirst();
+        if (colOpt.isEmpty()) {
+            return new ModelAndView("redirect:/board");
+        }
+        ModelAndView mv = new ModelAndView("edit-column");
+        mv.addObject("column", colOpt.get());
+        return mv;
+    }
+
+    @PostMapping("/board/columns/{id}")
+    public String updateColumn(@PathVariable long id, @RequestParam("title") String title) {
+        Board board = getOrCreateDefaultBoard();
+        Optional<Column> colOpt = board.getColumns().stream()
+                .filter(c -> c.getId() == id)
+                .findFirst();
+        if (colOpt.isPresent()) {
+            Column c = colOpt.get();
+            c.setTitle(title);
+            boards.save(board);
+        }
         return "redirect:/board";
     }
 }

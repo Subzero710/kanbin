@@ -8,7 +8,7 @@
 
     <div style="margin-bottom: 15px;">
         <a th:href="@{/issues}" class="btn btn-secondary" id="btn-to-issues">
-            Gérer les Stories (Backlog)
+            Gérer les Stories
         </a>
     </div>
 
@@ -25,15 +25,24 @@
             <header class="kb-col-header">
                 <span th:text="${c.title}" th:id="'col-title-' + ${c.key}">Column</span>
 
-                <form th:action="@{/board/remove-column}" method="post" style="display:inline; float:right;">
-                    <input type="hidden" name="columnId" th:value="${c.id}"/>
-                    <button type="submit" class="btn btn-danger btn-sm"
-                            onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette colonne ?')"
-                            value="Remove column">
-                        Remove
-                    </button>
-                </form>
+                <div style="display:inline-block; float:right;">
+                    <a th:href="@{/board/columns/{id}/edit(id=${c.id})}"
+                       class="btn btn-warning btn-sm"
+                       style="padding: 0px 5px; margin-right: 5px;"
+                       title="Renommer">edit</a>
+
+                    <form th:action="@{/board/remove-column}" method="post" style="display:inline;">
+                        <input type="hidden" name="columnId" th:value="${c.id}"/>
+                        <button type="submit" class="btn btn-danger btn-sm"
+                                onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette colonne ?')"
+                                value="Remove column"
+                                style="padding: 0px 5px;">
+                            X
+                        </button>
+                    </form>
+                </div>
             </header>
+
             <div class="kb-sub-wrapper">
 
                 <div class="kb-col sub-col" th:each="sub : ${c.subColumns}" th:attr="data-col=${sub.key}">

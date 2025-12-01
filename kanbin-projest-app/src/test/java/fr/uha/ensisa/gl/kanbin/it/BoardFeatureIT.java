@@ -74,6 +74,31 @@ public class BoardFeatureIT extends AbstractIT {
     }
 
     @Test
+    public void testRenameColumn() {
+        driver.get(getBaseUrl() + "board");
+        String originalTitle = "Col To Rename " + System.currentTimeMillis();
+        driver.findElement(By.name("title")).sendKeys(originalTitle);
+        driver.findElement(By.cssSelector("input[value='Ajouter Colonne']")).click();
+
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
+        WebElement editBtn = wait.until(ExpectedConditions.elementToBeClickable(
+                By.xpath("//header[contains(., '" + originalTitle + "')]//a[contains(@title, 'Renommer')]")
+        ));
+        editBtn.click();
+
+        wait.until(ExpectedConditions.urlContains("/edit"));
+        WebElement input = driver.findElement(By.id("colTitle"));
+        input.clear();
+        String newTitle = "RENAMED " + System.currentTimeMillis();
+        input.sendKeys(newTitle);
+        driver.findElement(By.cssSelector("button[type='submit']")).click();
+
+        wait.until(ExpectedConditions.urlContains("/board"));
+        boolean newPresent = driver.getPageSource().contains(newTitle);
+        assertTrue(newPresent, "Le nouveau titre de colonne devrait être affiché");
+    }
+
+    @Test
     public void testAddColumnDisplaysSubColumns() {
         driver.get(getBaseUrl() + "board");
 

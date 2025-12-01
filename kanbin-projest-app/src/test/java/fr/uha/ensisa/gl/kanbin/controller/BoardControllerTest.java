@@ -12,7 +12,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.web.servlet.ModelAndView;
-import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 
@@ -21,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import org.mockito.ArgumentCaptor;
 
 public class BoardControllerTest {
 
@@ -29,7 +29,6 @@ public class BoardControllerTest {
 
     @Mock
     private IssueRepo issueRepo;
-
 
     @InjectMocks
     private BoardController sut;
@@ -44,6 +43,8 @@ public class BoardControllerTest {
         testBoard = new Board(TEST_BOARD_ID, "Test Board");
         testBoard.addColumn(new Column(100L, "initial", "Initial Column"));
     }
+
+    // --- TESTS COMMUNS ---
 
     @Test
     void board_shouldReturnBoardView() {
@@ -170,6 +171,42 @@ public class BoardControllerTest {
         assertEquals("todo", issueCaptor.getValue().getColumnKey());
     }
 
+    // --- TESTS POUR LE RENOMMAGE (VOTRE FEATURE) ---
+
+    @Test
+    void editColumnForm_shouldShowEditView_whenColumnExists() {
+        long colId = 100L;
+        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+        ModelAndView mv = sut.editColumnForm(colId);
+        assertEquals("edit-column", mv.getViewName());
+        Column c = (Column) mv.getModel().get("column");
+        assertEquals(colId, c.getId());
+    }
+
+    @Test
+    void editColumnForm_shouldRedirect_whenColumnDoesNotExist() {
+        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+        ModelAndView mv = sut.editColumnForm(999L);
+        assertEquals("redirect:/board", mv.getViewName());
+    }
+
+    @Test
+    void updateColumn_shouldChangeTitleAndSaveBoard() {
+        long colId = 100L;
+        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+        String newTitle = "Renamed Column";
+        String view = sut.updateColumn(colId, newTitle);
+        assertEquals("redirect:/board", view);
+        ArgumentCaptor<Board> boardCaptor = ArgumentCaptor.forClass(Board.class);
+        verify(boardRepo).save(boardCaptor.capture());
+        Board savedBoard = boardCaptor.getValue();
+        Column updatedCol = savedBoard.getColumns().stream()
+                .filter(c -> c.getId() == colId).findFirst().get();
+        assertEquals(newTitle, updatedCol.getTitle());
+    }
+
+    // --- TESTS POUR LES SOUS-COLONNES (VENANT DE DEVELOP) ---
+
     @Test
     void addColumn_shouldCreateParentWithTwoSubColumns() {
         when(boardRepo.findAll()).thenReturn(List.of());
@@ -188,12 +225,14 @@ public class BoardControllerTest {
         assertEquals(2, createdCol.getSubColumns().size());
         assertEquals("À Faire", createdCol.getSubColumns().get(0).getTitle());
         assertEquals("En Cours", createdCol.getSubColumns().get(1).getTitle());
+
     }
 
     @Test
     void moveIssue_nextFromEndOfParent1_shouldJumpToStartOfParent2() {
         Board b = new Board(1L, "Board");
 
+        // Simulation des colonnes avec sous-colonnes
         Column parent1 = new Column("p1", "Parent 1");
         parent1.addSubColumn(new Column("p1-todo", "Todo"));
         parent1.addSubColumn(new Column("p1-wip", "Wip"));
@@ -239,5 +278,4 @@ public class BoardControllerTest {
         sut.board();
 
     }
-
 }
