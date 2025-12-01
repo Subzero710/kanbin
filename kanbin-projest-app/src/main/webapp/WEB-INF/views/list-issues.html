@@ -35,12 +35,18 @@
             <td th:text="${issue.id}">1</td>
             <td th:text="${issue.title}">Titre de l'Issue</td>
             <td>
-                <form th:action="@{/issues/{id}/delete(id=${issue.id})}" method="post">
-                    <button type="submit" class="btn btn-danger btn-sm"
-                            onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette Story ?')">
-                        Supprimer
-                    </button>
-                </form>
+                <div class="d-flex gap-2">
+                    <a th:href="@{/issues/{id}/edit(id=${issue.id})}" class="btn btn-warning btn-sm">
+                        Modifier
+                    </a>
+
+                    <form th:action="@{/issues/{id}/delete(id=${issue.id})}" method="post">
+                        <button type="submit" class="btn btn-danger btn-sm"
+                                onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette Story ?')">
+                            Supprimer
+                        </button>
+                    </form>
+                </div>
             </td>
         </tr>
         </tbody>
