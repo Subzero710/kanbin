@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import org.mockito.ArgumentCaptor;
 
 public class BoardControllerTest {
 
@@ -221,10 +222,10 @@ public class BoardControllerTest {
         Column createdCol = columnCaptor.getValue();
 
         assertEquals("ColonnePrincipale", createdCol.getTitle());
-        // Note : Si la classe Column n'a pas encore getSubColumns() dans votre branche,
-        // ce test ne compilera pas. Il faudra d'abord fusionner la classe Column.java.
-        // Mais en théorie, le merge de git le fera pour vous.
-        // assertEquals(2, createdCol.getSubColumns().size());
+        assertEquals(2, createdCol.getSubColumns().size());
+        assertEquals("À Faire", createdCol.getSubColumns().get(0).getTitle());
+        assertEquals("En Cours", createdCol.getSubColumns().get(1).getTitle());
+
     }
 
     @Test
@@ -233,8 +234,48 @@ public class BoardControllerTest {
 
         // Simulation des colonnes avec sous-colonnes
         Column parent1 = new Column("p1", "Parent 1");
-        // parent1.addSubColumn(...) -> Nécessite le modèle mis à jour
+        parent1.addSubColumn(new Column("p1-todo", "Todo"));
+        parent1.addSubColumn(new Column("p1-wip", "Wip"));
 
-        // ... (Le reste du test dépend de la structure Column mise à jour)
+        Column parent2 = new Column("p2", "Parent 2");
+        parent2.addSubColumn(new Column("p2-todo", "Todo"));
+
+        b.addColumn(parent1);
+        b.addColumn(parent2);
+
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+
+        Issue issue = new Issue(1L, "Task 1");
+        issue.setColumnKey("p1-wip");
+        // On utilise bien issueRepo (et pas issues)
+        when(issueRepo.find(99L)).thenReturn(issue);
+
+        sut.moveIssue(99L, "next");
+
+        // On vérifie sur issueRepo
+        verify(issueRepo).persist(issue);
+        assertEquals("p2-todo", issue.getColumnKey());
+    }
+
+    @Test
+    void board_withMixedColumns_shouldMapAllKeys() {
+
+        Board b = new Board(1L, "Mixte");
+
+        // Cas  : Colonne AVEC sous-colonnes
+        Column parent = new Column("parent", "Parent");
+        parent.addSubColumn(new Column("sub1", "Sub 1"));
+        parent.addSubColumn(new Column("sub2", "Sub 2")); // Couvre le cas où defaultKey n'est plus null
+        b.addColumn(parent);
+
+        // Cas  : Colonne SANS sous-colonnes
+        Column simple = new Column("simple", "Simple");
+        b.addColumn(simple);
+
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        when(issueRepo.findAll()).thenReturn(List.of());
+
+        sut.board();
+
     }
 }
