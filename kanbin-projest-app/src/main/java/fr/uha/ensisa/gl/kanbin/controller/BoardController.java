@@ -6,7 +6,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import fr.uha.ensisa.gl.kanbin.projest.model.Board;
 import fr.uha.ensisa.gl.kanbin.projest.model.Column;
@@ -105,49 +104,12 @@ public class BoardController {
     }
 
     @PostMapping("/board/remove-column")
-    public String removeColumn(@RequestParam("columnId") long columnId,
-                               RedirectAttributes redirectAttributes) {
+    public String removeColumn(@RequestParam("columnId") long columnId) {
         Board board = getOrCreateDefaultBoard();
-
-        // On retrouve la colonne racine à supprimer
-        Optional<Column> colOpt = board.getColumns().stream()
-                .filter(c -> c.getId() == columnId)
-                .findFirst();
-        if (colOpt.isEmpty()) {
-            return "redirect:/board";
-        }
-        Column column = colOpt.get();
-
-        // Clés de la colonne + de ses sous-colonnes
-        List<String> keys = new ArrayList<>();
-        if (column.getKey() != null) {
-            keys.add(column.getKey());
-        }
-        for (Column sub : column.getSubColumns()) {
-            if (sub.getKey() != null) {
-                keys.add(sub.getKey());
-            }
-        }
-
-        // Vérifier s'il existe des Issue dans ces colonnes
-        boolean hasIssues = issues.findAll().stream()
-                .anyMatch(i -> i.getColumnKey() != null
-                        && keys.contains(i.getColumnKey()));
-
-        if (hasIssues) {
-            redirectAttributes.addFlashAttribute(
-                    "errorMessage",
-                    "Impossible de supprimer une colonne non vide"
-            );
-            return "redirect:/board";
-        }
-
-        // Colonne vide : on peut la supprimer
         board.removeColumn(columnId);
         boards.save(board);
         return "redirect:/board";
     }
-
 
     @PostMapping("/board/move-issue")
     public String moveIssue(@RequestParam("issueId") long issueId,
