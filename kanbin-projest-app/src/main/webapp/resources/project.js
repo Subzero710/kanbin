@@ -4,7 +4,6 @@ document.addEventListener("DOMContentLoaded", function() {
     let draggedItem = null;
 
     columns.forEach(col => {
-        // Début du drag
         col.addEventListener('dragstart', function(e) {
             draggedItem = this;
             setTimeout(() => this.style.opacity = '0.4', 0);
@@ -26,7 +25,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
         col.addEventListener('dragenter', function(e) {
             e.preventDefault();
-            this.style.border = "2px dashed #000"; // Feedback visuel simple
+            // On ne met une bordure que si ce n'est pas l'élément qu'on traine
+            if (this !== draggedItem) {
+                this.style.border = "4px dashed #666";
+            }
         });
 
         col.addEventListener('dragleave', function() {
@@ -67,11 +69,11 @@ document.addEventListener("DOMContentLoaded", function() {
             }
 
             // Sauvegarde AJAX
-            saveNewOrder(draggedItem.getAttribute('data-id'), targetIndex);
+            saveNewOrder(draggedItem, draggedItem.getAttribute('data-id'), targetIndex);
         });
     });
 
-    function saveNewOrder(columnId, newIndex) {
+    function saveNewOrder(element, columnId, newIndex) {
         // On construit les données du formulaire
         const formData = new URLSearchParams();
         formData.append('columnId', columnId);
@@ -84,14 +86,32 @@ document.addEventListener("DOMContentLoaded", function() {
                 'Content-Type': 'application/x-www-form-urlencoded',
             }
         })
-            .then(response => response.text())
-            .then(data => {
-                if (data !== "OK") {
-                    console.error("Erreur serveur:", data);
-                    // En cas d'erreur, on recharge la page pour remettre l'ordre correct
-                    location.reload();
-                }
-            })
-            .catch(err => console.error(err));
+        .then(response => response.text())
+        .then(data => {
+            if (data === "OK") {
+                // SUCCÈS : On ajoute la classe verte
+                element.classList.add('flash-success');
+                // On la retire après l'animation pour pouvoir la rejouer plus tard
+                setTimeout(() => element.classList.remove('flash-success'), 1500);
+            } else {
+                // ERREUR SERVEUR
+                console.error("Erreur:", data);
+                handleError(element);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            handleError(element);
+        });
+    }
+
+    function handleError(element) {
+        // En cas d'erreur, on secoue l'élément en rouge
+        element.classList.add('flash-error');
+        setTimeout(() => {
+            element.classList.remove('flash-error');
+            alert("Erreur lors de la sauvegarde du déplacement. La page va être rechargée.");
+            location.reload(); // On recharge pour remettre l'ordre correct
+        }, 500);
     }
 });
