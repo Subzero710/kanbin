@@ -18,7 +18,18 @@
                    maxlength="255">
             <div class="form-text">Modifiez le titre ci-dessus.</div>
         </div>
-
+        <div class="mb-3">
+            <label for="detail" class="form-label">Détail :</label>
+            <textarea
+                    class="form-control"
+                    id="detail"
+                    rows="3"
+                    th:field="*{detail}"
+                    placeholder="Description détaillée de la story">
+            </textarea>
+            <div class="form-text">Décrivez les exigences, les critères d'acceptation et le contexte.</div>
+        </div>
+        
         <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
         <a th:href="@{/issues}" class="btn btn-secondary">Annuler</a>
     </form>
