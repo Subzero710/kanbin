@@ -5,6 +5,7 @@ import fr.uha.ensisa.gl.kanbin.projest.model.Column;
 import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
 import fr.uha.ensisa.gl.kanbin.projest.repo.BoardRepo;
 import fr.uha.ensisa.gl.kanbin.projest.repo.IssueRepo;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -12,6 +13,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 import java.util.List;
 
@@ -91,7 +94,8 @@ public class BoardControllerTest {
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
         assertTrue(testBoard.getColumns().stream().anyMatch(c -> c.getId() == columnToRemoveId));
 
-        String viewName = sut.removeColumn(columnToRemoveId);
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+        String viewName = sut.removeColumn(columnToRemoveId, redirectAttributes );
         assertEquals("redirect:/board", viewName);
 
         ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
