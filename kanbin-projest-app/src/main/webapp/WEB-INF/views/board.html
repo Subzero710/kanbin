@@ -20,7 +20,11 @@
     <h1 class="page-title">Kanbin</h1>
 
     <div class="board" id="board">
-        <section class="kb-col kb-main-col" th:each="c : ${columns}" th:attr="data-col=${c.key}">
+        <section class="kb-col kb-main-col"
+                 th:each="c, iterStat : ${columns}"
+                 th:attr="data-col=${c.key}, data-id=${c.id}"
+                 th:classappend="${iterStat.first} ? 'kb-col-fixed' : 'kb-col-draggable'"
+                 th:draggable="${!iterStat.first}">
 
             <header class="kb-col-header">
                 <span th:text="${c.title}" th:id="'col-title-' + ${c.key}">Column</span>

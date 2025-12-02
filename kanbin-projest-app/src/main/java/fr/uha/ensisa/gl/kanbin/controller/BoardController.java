@@ -182,4 +182,62 @@ public class BoardController {
         }
         return "redirect:/board";
     }
+
+    @PostMapping("/board/reorder-column")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public String reorderColumn(@RequestParam("columnId") long columnId,
+                                @RequestParam("newIndex") int newIndex) {
+
+        Board board = getOrCreateDefaultBoard();
+
+        boolean success = moveColumnInternal(board, columnId, newIndex);
+
+        if (success) {
+            boards.save(board); // On sauvegarde uniquement si le mouvement est valide
+            return "OK";
+        } else {
+            return "ERROR: Invalid move";
+        }
+    }
+
+    /**
+     * Tente de déplacer une colonne. Retourne false si l'opération est illégale.
+     * Cette méthode ne gère PAS le HTTP, juste la liste Java.
+     */
+    private boolean moveColumnInternal(Board board, long columnId, int newIndex) {
+        // Interdit de placer en position 0 (Réservé)
+        if (newIndex <= 0) {
+            return false;
+        }
+
+        List<Column> columns = board.getColumns();
+        int oldIndex = -1;
+        Column columnToMove = null;
+
+        // Recherche de la colonne
+        for (int i = 0; i < columns.size(); i++) {
+            if (columns.get(i).getId() == columnId) {
+                columnToMove = columns.get(i);
+                oldIndex = i;
+                break;
+            }
+        }
+
+        // Colonne introuvable OU on essaie de bouger la colonne fixe (index 0)
+        if (columnToMove == null || oldIndex == 0) {
+            return false;
+        }
+
+        // Réorganisation
+        columns.remove(oldIndex);
+
+        // Protection index hors limites
+        if (newIndex >= columns.size()) {
+            columns.add(columnToMove);
+        } else {
+            columns.add(newIndex, columnToMove);
+        }
+
+        return true;
+    }
 }

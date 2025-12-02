@@ -101,4 +101,19 @@
     padding: 8px;
 }
 
+/* Curseur de déplacement pour les colonnes bougeables */
+.kb-col-draggable .kb-col-header {
+    cursor: grab;
+}
+
+.kb-col-draggable .kb-col-header:active {
+    cursor: grabbing;
+}
+
+/* La colonne fixe ne doit pas avoir l'air bougeable */
+.kb-col-fixed {
+    border-color: #343a40; /* Un bord plus sombre pour montrer qu'elle est "ancrée" */
+    background-color: #f8f9fa;
+}
+
 
