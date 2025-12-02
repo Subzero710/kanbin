@@ -20,8 +20,15 @@
             <div class="form-text">Donnez un titre clair à votre story.</div>
         </div>
         <div class="mb-3">
-            <label for="detail">Détail :</label>
-            <textarea id="detail" name="detail" th:text="${issue.detail}" placeholder="Descripion détaillée de la story"></textarea>
+            <label for="detail" class="form-label">Détail :</label>
+            <textarea
+                    class="form-control"
+                    id="detail"
+                    rows="3"
+                    th:field="*{detail}"
+                    placeholder="Description détaillée de la story">
+            </textarea>
+            <div class="form-text">Décrivez les exigences, les critères d'acceptation et le contexte.</div>
         </div>
 
         <button type="submit" class="btn btn-primary">Créer la Story</button>
