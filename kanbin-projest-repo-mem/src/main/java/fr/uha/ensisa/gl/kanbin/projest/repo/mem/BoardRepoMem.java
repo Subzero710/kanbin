@@ -16,15 +16,18 @@ public class BoardRepoMem implements BoardRepo {
     public void seed() {
         if (store.isEmpty()) {
             Board b = new Board("Default");
-            b.setId(boardSeq.getAndIncrement());
-            // Initialisation des colonnes par défaut
-            b.addColumn(new Column(colSeq.getAndIncrement(), "backlog", "Backlog"));
-            b.addColumn(new Column(colSeq.getAndIncrement(), "todo",    "To do"));
-            b.addColumn(new Column(colSeq.getAndIncrement(), "ongoing", "Ongoing"));
-            b.addColumn(new Column(colSeq.getAndIncrement(), "toit",    "To IT"));
-            b.addColumn(new Column(colSeq.getAndIncrement(), "init",    "In IT"));
-            b.addColumn(new Column(colSeq.getAndIncrement(), "done",    "Done"));
-            store.put(b.getId(), b);
+
+            // Colonne principale "Backlog" construite comme celles de /board/add-column
+            Column backlog = new Column("backlog", "Backlog");
+            Column backlogTodo = new Column("backlog-todo", "À Faire");
+            Column backlogWip  = new Column("backlog-wip",  "En Cours");
+
+            backlog.addSubColumn(backlogTodo);
+            backlog.addSubColumn(backlogWip);
+            b.addColumn(backlog);
+
+            // On passe par save() pour avoir les mêmes règles d'IDs que partout ailleurs
+            save(b);
         }
     }
 

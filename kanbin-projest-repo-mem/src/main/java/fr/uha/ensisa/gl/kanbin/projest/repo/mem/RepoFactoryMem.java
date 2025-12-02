@@ -7,7 +7,7 @@ import fr.uha.ensisa.gl.kanbin.projest.repo.IssueRepo;
 public final class RepoFactoryMem implements RepoFactory {
     private final IssueRepo issueRepo = new IssueRepoMem();
     private final BoardRepo boardRepo = new BoardRepoMem();
-
+    public RepoFactoryMem() {((BoardRepoMem) this.boardRepo).seed();}
     @Override
     public IssueRepo getIssueRepo() {
         return this.issueRepo;
