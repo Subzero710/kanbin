@@ -4,7 +4,27 @@ document.addEventListener("DOMContentLoaded", function() {
     let draggedItem = null;
 
     columns.forEach(col => {
+        // Restriction du drag à l'en-tête
+
+        // VARIABLE D'ÉTAT : On stocke ici si le clic était valide
+        let isCursorInHeader = false;
+
+        // 1. ÉTAPE DE DÉTECTION (Avant le drag)
+        col.addEventListener('mousedown', function(e) {
+            // On regarde si l'élément cliqué est dans le header
+            if (e.target.closest('.kb-col-header')) {
+                isCursorInHeader = true;
+            }
+        });
+
+        // 2. DÉMARRAGE DU DRAG
         col.addEventListener('dragstart', function(e) {
+            // Si le clic initial n'était pas dans le header, on coupe tout
+            if (!isCursorInHeader) {
+                e.preventDefault();
+                return;
+            }
+
             draggedItem = this;
             setTimeout(() => this.style.opacity = '0.4', 0);
             e.dataTransfer.effectAllowed = 'move';
