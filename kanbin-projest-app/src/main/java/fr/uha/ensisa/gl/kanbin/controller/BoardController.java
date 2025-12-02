@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import fr.uha.ensisa.gl.kanbin.projest.model.Board;
 import fr.uha.ensisa.gl.kanbin.projest.model.Column;
@@ -104,12 +105,49 @@ public class BoardController {
     }
 
     @PostMapping("/board/remove-column")
-    public String removeColumn(@RequestParam("columnId") long columnId) {
+    public String removeColumn(@RequestParam("columnId") long columnId,
+                               RedirectAttributes redirectAttributes) {
         Board board = getOrCreateDefaultBoard();
+
+        // On retrouve la colonne racine à supprimer
+        Optional<Column> colOpt = board.getColumns().stream()
+                .filter(c -> c.getId() == columnId)
+                .findFirst();
+        if (colOpt.isEmpty()) {
+            return "redirect:/board";
+        }
+        Column column = colOpt.get();
+
+        // Clés de la colonne + de ses sous-colonnes
+        List<String> keys = new ArrayList<>();
+        if (column.getKey() != null) {
+            keys.add(column.getKey());
+        }
+        for (Column sub : column.getSubColumns()) {
+            if (sub.getKey() != null) {
+                keys.add(sub.getKey());
+            }
+        }
+
+        // Vérifier s'il existe des Issue dans ces colonnes
+        boolean hasIssues = issues.findAll().stream()
+                .anyMatch(i -> i.getColumnKey() != null
+                        && keys.contains(i.getColumnKey()));
+
+        if (hasIssues) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    "Impossible de supprimer une colonne non vide"
+            );
+            return "redirect:/board";
+        }
+
+        // Colonne vide : on peut la supprimer
         board.removeColumn(columnId);
         boards.save(board);
         return "redirect:/board";
     }
+
 
     @PostMapping("/board/move-issue")
     public String moveIssue(@RequestParam("issueId") long issueId,
@@ -158,28 +196,34 @@ public class BoardController {
     @GetMapping("/board/columns/{id}/edit")
     public ModelAndView editColumnForm(@PathVariable long id) {
         Board board = getOrCreateDefaultBoard();
+
+        // On cherche la colonne principale par id
         Optional<Column> colOpt = board.getColumns().stream()
                 .filter(c -> c.getId() == id)
                 .findFirst();
+
         if (colOpt.isEmpty()) {
             return new ModelAndView("redirect:/board");
         }
+
         ModelAndView mv = new ModelAndView("edit-column");
         mv.addObject("column", colOpt.get());
         return mv;
     }
 
     @PostMapping("/board/columns/{id}")
-    public String updateColumn(@PathVariable long id, @RequestParam("title") String title) {
+    public String updateColumn(@PathVariable long id,
+                               @RequestParam("title") String title) {
         Board board = getOrCreateDefaultBoard();
-        Optional<Column> colOpt = board.getColumns().stream()
+
+        board.getColumns().stream()
                 .filter(c -> c.getId() == id)
-                .findFirst();
-        if (colOpt.isPresent()) {
-            Column c = colOpt.get();
-            c.setTitle(title);
-            boards.save(board);
-        }
+                .findFirst()
+                .ifPresent(c -> c.setTitle(title));
+
+        // Important : persister le board après la modification
+        boards.save(board);
+
         return "redirect:/board";
     }
 }
