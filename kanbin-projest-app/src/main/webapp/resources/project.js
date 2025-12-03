@@ -14,6 +14,8 @@ document.addEventListener("DOMContentLoaded", function() {
             // On regarde si l'élément cliqué est dans le header
             if (e.target.closest('.kb-col-header')) {
                 isCursorInHeader = true;
+            } else {
+                isCursorInHeader = false;
             }
         });
 
