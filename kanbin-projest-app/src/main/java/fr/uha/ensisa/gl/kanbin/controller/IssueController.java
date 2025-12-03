@@ -38,8 +38,16 @@ public class IssueController {
 
     @PostMapping("/issues")
     public String createIssue(Issue issue, RedirectAttributes redirectAttributes) {
+        if (issue.getId() > 0) {
+            Issue oldIssue = issueRepo.find(issue.getId());
+            if (oldIssue != null && (issue.getColumnKey() == null || issue.getColumnKey().isEmpty())) {
+                issue.setColumnKey(oldIssue.getColumnKey());
+            }
+            redirectAttributes.addFlashAttribute("message", "La story a été mise à jour.");
+        } else {
+            redirectAttributes.addFlashAttribute("message", "La nouvelle story a été ajoutée.");
+        }
         issueRepo.persist(issue);
-        redirectAttributes.addFlashAttribute("message", "La nouvelle story '" + issue.getTitle() + "' a été ajoutée avec succès !");
         return "redirect:/issues";
     }
 
