@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 public class IssueControllerTest {
@@ -107,5 +108,19 @@ public class IssueControllerTest {
         assertEquals(id, updatedData.getId());
         assertEquals("todo", updatedData.getColumnKey());
         verify(redirectAttributes).addFlashAttribute(eq("message"), anyString());
+    }
+    
+    @Test
+    void updateIssue_shouldPreserveColumnKey_whenUpdating() {
+        long id = 15L;
+        Issue existing = new Issue(id, "Title", "done");
+        existing.setDetail("Detail");
+        when(issueRepo.find(id)).thenReturn(existing);
+        Issue updatedData = new Issue();
+        updatedData.setTitle("Updated Title");
+        updatedData.setDetail("Updated Detail");
+        sut.updateIssue(id, updatedData, redirectAttributes);
+        verify(issueRepo).persist(any(Issue.class));
+        assertEquals("done", updatedData.getColumnKey());
     }
 }
