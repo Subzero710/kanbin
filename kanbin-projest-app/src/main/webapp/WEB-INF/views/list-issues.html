@@ -27,6 +27,7 @@
         <tr>
             <th>ID</th>
             <th>Titre</th>
+            <th>Detail</th>
             <th>Actions</th>
         </tr>
         </thead>
@@ -34,6 +35,11 @@
         <tr th:each="issue : ${issues}" class="issue_row" th:id="${'issue_' + issue.id}">
             <td th:text="${issue.id}">1</td>
             <td th:text="${issue.title}">Titre de l'Issue</td>
+            <td>
+                <div class="table-card-detail">
+                    <span th:text="${issue.detail}">Détail de la story...</span>
+                </div>
+            </td>
             <td>
                 <div class="d-flex gap-2">
                     <a th:href="@{/issues/{id}/edit(id=${issue.id})}" class="btn btn-warning btn-sm">
