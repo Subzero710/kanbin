@@ -171,8 +171,6 @@ public class BoardControllerTest {
         assertEquals("todo", issueCaptor.getValue().getColumnKey());
     }
 
-    // --- TESTS POUR LE RENOMMAGE (VOTRE FEATURE) ---
-
     @Test
     void editColumnForm_shouldShowEditView_whenColumnExists() {
         long colId = 100L;
@@ -205,7 +203,7 @@ public class BoardControllerTest {
         assertEquals(newTitle, updatedCol.getTitle());
     }
 
-    // --- TESTS POUR LES SOUS-COLONNES (VENANT DE DEVELOP) ---
+    // --- TESTS POUR LES SOUS-COLONNES ---
 
     @Test
     void addColumn_shouldCreateParentWithTwoSubColumns() {
@@ -277,5 +275,102 @@ public class BoardControllerTest {
 
         sut.board();
 
+    }
+
+    // TESTS POUR LE REORDERING (DRAG & DROP)
+    @Test
+    void reorderColumn_validMove_shouldUpdateOrderAndSave() {
+        // Setup : Un board avec 3 colonnes (0:Fixed, 1:A, 2:B)
+        Board board = new Board(TEST_BOARD_ID, "Test Board");
+        Column fixed = new Column(100L, "fixed", "Backlog (Fixed)");
+        Column colA = new Column(101L, "col-a", "Col A");
+        Column colB = new Column(102L, "col-b", "Col B");
+
+        board.addColumn(fixed);
+        board.addColumn(colA);
+        board.addColumn(colB);
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        // Action : Déplacer "Col B" (index actuel 2) vers l'index 1 (devant A)
+        String response = sut.reorderColumn(102L, 1);
+
+        // Vérification
+        assertEquals("OK", response);
+
+        // L'ordre doit avoir changé : [Fixed, B, A]
+        assertEquals(fixed, board.getColumns().get(0));
+        assertEquals(colB, board.getColumns().get(1)); // B est passé devant
+        assertEquals(colA, board.getColumns().get(2));
+
+        // La sauvegarde doit avoir été appelée
+        verify(boardRepo).save(board);
+    }
+
+    @Test
+    void reorderColumn_moveToIndexZero_shouldFail() {
+        // Setup standard
+        Board board = new Board(TEST_BOARD_ID, "Test Board");
+        board.addColumn(new Column(100L, "fixed", "Fixed"));
+        board.addColumn(new Column(101L, "col-a", "Col A"));
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        // Action : Essayer de déplacer Col A tout au début (index 0)
+        String response = sut.reorderColumn(101L, 0);
+
+        // Vérification
+        assertEquals("ERROR: Invalid move", response);
+        verify(boardRepo, never()).save(any()); // Pas de sauvegarde
+    }
+
+    @Test
+    void reorderColumn_moveFixedColumn_shouldFail() {
+        // Setup standard
+        Board board = new Board(TEST_BOARD_ID, "Test Board");
+        Column fixed = new Column(100L, "fixed", "Fixed");
+        board.addColumn(fixed);
+        board.addColumn(new Column(101L, "col-a", "Col A"));
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        // Action : Essayer de déplacer la colonne fixe (ID 100) vers la fin (index 1)
+        String response = sut.reorderColumn(100L, 1);
+
+        // Vérification
+        assertEquals("ERROR: Invalid move", response);
+
+        // L'ordre ne doit pas changer
+        assertEquals(fixed, board.getColumns().get(0));
+        verify(boardRepo, never()).save(any());
+    }
+
+    @Test
+    void reorderColumn_moveToIndexGreaterThanSize_shouldAppendToEnd() {
+        // 1. SETUP : Board [Fixed, A, B]
+        Board board = new Board(TEST_BOARD_ID, "Test Board");
+        Column fixed = new Column(100L, "fixed", "Fixed");
+        Column colA = new Column(101L, "col-a", "Col A");
+        Column colB = new Column(102L, "col-b", "Col B");
+
+        board.addColumn(fixed);
+        board.addColumn(colA);
+        board.addColumn(colB);
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        // 2. ACTION : Déplacer "Col A" (index 1) vers un index très grand (ex: 10)
+        String response = sut.reorderColumn(101L, 10);
+
+        // 3. VÉRIFICATION
+        assertEquals("OK", response);
+
+        List<Column> result = board.getColumns();
+        assertEquals(3, result.size());
+
+        // L'ordre doit être : [Fixed, B, A]
+        assertEquals(fixed, result.get(0));
+        assertEquals(colB, result.get(1));
+        assertEquals(colA, result.get(2), "Col A doit être placée tout à la fin");
+
+        verify(boardRepo).save(board);
     }
 }
