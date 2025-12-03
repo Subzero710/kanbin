@@ -143,3 +143,28 @@
     animation: shakeError 0.5s ease-in-out;
     border: 4px solid #dc3545 !important;
 }
+
+.kb-card-detail {
+
+    max-height: 4.5em;
+    overflow: hidden;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    font-size: 0.65em;
+    line-height: 1.5;
+    color: #6c757d;
+}
+
+
+
+.kb-card-detail span {
+    white-space: pre-wrap;
+}
+
+.table-card-detail {
+
+    max-height: 2em;
+    overflow: hidden;
+    line-height: 1.5;
+    color: #34393d;
+}
