@@ -5,6 +5,9 @@ import fr.uha.ensisa.gl.kanbin.projest.model.Column;
 import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
 import fr.uha.ensisa.gl.kanbin.projest.repo.BoardRepo;
 import fr.uha.ensisa.gl.kanbin.projest.repo.IssueRepo;
+import fr.uha.ensisa.gl.kanbin.projest.repo.mem.IssueRepoMem;
+import fr.uha.ensisa.gl.kanbin.projest.repo.mem.BoardRepoMem;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -12,11 +15,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -91,7 +95,8 @@ public class BoardControllerTest {
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
         assertTrue(testBoard.getColumns().stream().anyMatch(c -> c.getId() == columnToRemoveId));
 
-        String viewName = sut.removeColumn(columnToRemoveId);
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+        String viewName = sut.removeColumn(columnToRemoveId, redirectAttributes );
         assertEquals("redirect:/board", viewName);
 
         ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
@@ -278,4 +283,72 @@ public class BoardControllerTest {
         sut.board();
 
     }
+
+    @Test
+    public void removeColumn_shouldRemoveEmptyColumn() {
+        // Arrange
+        BoardRepoMem boardRepo = new BoardRepoMem();
+        IssueRepoMem issueRepo = new IssueRepoMem();
+        BoardController controller = new BoardController(boardRepo, issueRepo);
+
+        Board board = new Board("Test board");
+        boardRepo.save(board);
+
+        Column col = new Column("TODO", "A faire");
+        col = boardRepo.addColumn(board.getId(), col);
+        long columnId = col.getId();
+
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+
+        // Act
+        String view = controller.removeColumn(columnId, redirectAttributes);
+
+        // Assert
+        assertEquals("redirect:/board", view);
+
+        Board reloaded = boardRepo.findById(board.getId()).orElseThrow();
+        assertTrue(reloaded.getColumns().isEmpty(), "La colonne vide devrait être supprimée");
+
+        assertFalse(redirectAttributes.getFlashAttributes().containsKey("errorMessage"),
+                "Aucun message d'erreur ne doit être présent pour une colonne vide");
+    }
+    @Test
+    public void removeColumn_shouldNotRemoveNonEmptyColumn_andSetErrorMessage() {
+        // Arrange
+        BoardRepoMem boardRepo = new BoardRepoMem();
+        IssueRepoMem issueRepo = new IssueRepoMem();
+        BoardController controller = new BoardController(boardRepo, issueRepo);
+
+        Board board = new Board("Test board");
+        boardRepo.save(board);
+
+        Column col = new Column("IN_PROGRESS", "En cours");
+        col = boardRepo.addColumn(board.getId(), col);
+        long columnId = col.getId();
+
+        // On crée une issue dans cette colonne
+        Issue issue = new Issue();
+        issue.setTitle("Une story");
+        issue.setColumnKey(col.getKey());
+        issueRepo.persist(issue);
+
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+
+        // Act
+        String view = controller.removeColumn(columnId, redirectAttributes);
+
+        // Assert
+        assertEquals("redirect:/board", view);
+
+        Board reloaded = boardRepo.findById(board.getId()).orElseThrow();
+        assertFalse(reloaded.getColumns().isEmpty(),
+                "La colonne ne doit pas être supprimée si elle contient des issues");
+
+        assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorMessage"),
+                "Un message d'erreur doit être ajouté en flash");
+        assertEquals("Impossible de supprimer une colonne non vide",
+                redirectAttributes.getFlashAttributes().get("errorMessage"));
+    }
+
+
 }

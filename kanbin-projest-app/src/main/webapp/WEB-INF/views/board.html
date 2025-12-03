@@ -18,6 +18,7 @@
     </form>
 
     <h1 class="page-title">Kanbin</h1>
+    <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}"></div>
 
     <div class="board" id="board">
         <section class="kb-col kb-main-col" th:each="c : ${columns}" th:attr="data-col=${c.key}">
