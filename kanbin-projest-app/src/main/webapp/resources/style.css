@@ -36,3 +36,135 @@
     color: #6c757d;
     font-size: .9rem;
 }
+
+.kb-card {
+    background-color: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1); /* Petite ombre sympa */
+}
+
+.kb-card-title {
+    font-weight: 500;
+    margin-bottom: 8px;
+
+    /* --- PROTECTION CONTRE LES LONGS MOTS --- */
+    overflow-wrap: break-word;  /* Coupe le mot si nécessaire */
+    word-wrap: break-word;      /* Compatibilité */
+    hyphens: auto;              /* Ajoute des tirets (-) */
+}
+
+
+/* 1. La Colonne Principale (Parent) */
+/* Elle devient un conteneur gris qui regroupe les sous-colonnes */
+.kb-main-col {
+    background-color: #f4f5f7; /* Gris clair pour distinguer le groupe */
+    min-width: 450px;          /* Assez large pour contenir 2 sous-colonnes */
+    margin-right: 15px;        /* Espace entre les groupes principaux */
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #dfe1e6;
+    border-radius: 6px;
+}
+
+/* 2. Le Wrapper (Conteneur Flex) */
+/* C'est lui qui met les sous-colonnes sur une ligne horizontale */
+.kb-sub-wrapper {
+    display: flex;
+    flex-direction: row;       /* Horizontal : Côte à côte */
+    height: 100%;              /* Prend toute la hauteur disponible */
+    padding: 8px;              /* Petit espace interne */
+    gap: 8px;                  /* Espace entre "À Faire" et "En Cours" */
+}
+
+/* 3. La Sous-Colonne (Enfant) */
+.sub-col {
+    flex: 1;                   /* Elles se partagent l'espace (50% / 50%) */
+    background-color: #ffffff; /* Fond blanc pour bien voir les cartes */
+    border: 1px solid #ebecf0;
+    border-radius: 4px;
+    min-width: 200px;          /* Largeur minimale pour ne pas être écrasée */
+    display: flex;
+    flex-direction: column;
+}
+
+/* 4. Le Header de la Sous-Colonne */
+.sub-header {
+    background-color: #fafbfc;
+    text-align: center;
+    font-size: 0.85rem;        /* Un peu plus petit que le titre principal */
+    color: #5e6c84;
+    font-weight: 600;
+    border-bottom: 1px solid #dfe1e6;
+    padding: 8px;
+}
+
+/* Seul l'en-tête montre qu'on peut attraper */
+.kb-col-draggable .kb-col-header {
+    cursor: grab;
+}
+.kb-col-draggable .kb-col-header:active {
+    cursor: grabbing;
+}
+/* Le reste de la colonne ne doit pas avoir le curseur de déplacement */
+.kb-col-draggable .kb-col-body {
+    cursor: default;
+}
+
+/* La colonne fixe ne doit pas avoir l'air bougeable */
+.kb-col-fixed {
+    border-color: #343a40; /* Un bord plus sombre pour montrer qu'elle est "ancrée" */
+    background-color: #f8f9fa;
+}
+
+/* ANIMATIONS DE FEEDBACK */
+/* Succès : Une lueur verte qui disparaît doucement */
+@keyframes flashSuccess {
+    0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); border: 4px solid #28a745; }
+    50% { box-shadow: 0 0 20px 0 rgba(40, 167, 69, 0.5); border: 4px solid #28a745; }
+    100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); border: 1px solid #dee2e6; }
+}
+
+/* Erreur : Une secousse rouge */
+@keyframes shakeError {
+    0%, 100% { transform: translateX(0); border-color: #dc3545; }
+    25% { transform: translateX(-5px); }
+    50% { transform: translateX(5px); }
+    75% { transform: translateX(-5px); }
+}
+
+.flash-success {
+    animation: flashSuccess 1.5s ease-out;
+}
+
+.flash-error {
+    animation: shakeError 0.5s ease-in-out;
+    border: 4px solid #dc3545 !important;
+}
+
+.kb-card-detail {
+
+    max-height: 4.5em;
+    overflow: hidden;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    font-size: 0.65em;
+    line-height: 1.5;
+    color: #6c757d;
+}
+
+
+
+.kb-card-detail span {
+    white-space: pre-wrap;
+}
+
+.table-card-detail {
+
+    max-height: 2em;
+    overflow: hidden;
+    line-height: 1.5;
+    color: #34393d;
+}

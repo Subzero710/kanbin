@@ -56,4 +56,32 @@ public class ColumnTest {
         assertNotEquals(c, null);
         assertNotEquals(c, "some string");
     }
+
+    @Test
+    public void testGetterAndSetterAndEmptyConstructor() {
+        Column c = new Column();
+        c.setId(55L);
+        c.setKey("backlog");
+        c.setTitle("Backlog");
+        c.setPos(1);
+
+        assertEquals(55L, c.getId());
+        assertEquals("backlog", c.getKey());
+        assertEquals("Backlog", c.getTitle());
+        assertEquals(1, c.getPos());
+    }
+
+    @Test
+    public void testSubColumnsManagement() {
+
+        Column parent = new Column("parent", "Parent");
+        assertEquals(0, parent.getSubColumns().size());
+
+        Column child = new Column("child", "Enfant");
+        parent.addSubColumn(child);
+
+        assertEquals(1, parent.getSubColumns().size());
+        assertEquals("child", parent.getSubColumns().get(0).getKey());
+    }
+
 }

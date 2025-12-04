@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 public class IssueControllerTest {
@@ -49,21 +50,51 @@ public class IssueControllerTest {
         verify(issueRepo).findAll();
     }
 
+    // 1. Test du cas critique "Sauvegarde avec perte de colonne" (Le bug qu'on a corrigé)
     @Test
-    void createIssue_shouldPersistAndRedirect() {
+    void createIssue_withExistingIdAndNullKey_shouldRestoreOldKey() {
+        long id = 50L;
+        String originalKey = "col-doing";
+        Issue oldIssue = new Issue(id, "Old Story");
+        oldIssue.setColumnKey(originalKey);
+        Issue newVersion = new Issue(id, "Updated Story");
+        newVersion.setColumnKey(null);
+        when(issueRepo.find(id)).thenReturn(oldIssue);
+        sut.createIssue(newVersion, redirectAttributes);
+        assertEquals(originalKey, newVersion.getColumnKey());
+        verify(issueRepo).persist(newVersion);
+    }
+
+    // 2. Test du cas "Sauvegarde normale avec clé existante" (Pas de restauration nécessaire)
+    @Test
+    void createIssue_withExistingIdAndNewKey_shouldKeepNewKey() {
+        long id = 51L;
+        Issue oldIssue = new Issue(id, "Old Story");
+        oldIssue.setColumnKey("col-todo");
+        Issue newVersion = new Issue(id, "Moved Story");
+        newVersion.setColumnKey("col-done");
+        when(issueRepo.find(id)).thenReturn(oldIssue);
+        sut.createIssue(newVersion, redirectAttributes);
+        assertEquals("col-done", newVersion.getColumnKey());
+        verify(issueRepo).persist(newVersion);
+    }
+    @Test
+    void createIssue_whenNew_shouldAddCreationMessage() {
         Issue newIssue = new Issue();
-        newIssue.setTitle("Nouvelle Story");
-        String viewName = sut.createIssue(newIssue, redirectAttributes);
-        verify(issueRepo).persist(newIssue); // Vérifie la sauvegarde
-        verify(redirectAttributes).addFlashAttribute(eq("message"), anyString()); // Vérifie le message de confirmation
-        assertEquals("redirect:/issues", viewName); // Vérifie la redirection
+        newIssue.setId(0L);
+        newIssue.setTitle("Ma Nouvelle Story");
+        sut.createIssue(newIssue, redirectAttributes);
+        verify(redirectAttributes).addFlashAttribute(
+                eq("message"),
+                eq("La nouvelle story a été ajoutée.")
+        );
     }
 
     @Test
     void deleteIssue_shouldRemoveAndRedirect() {
         long idToDelete = 123L;
         String viewName = sut.deleteIssue(idToDelete, redirectAttributes);
-        verify(issueRepo).remove(idToDelete); // Vérifie l'appel de suppression
+        verify(issueRepo).remove(idToDelete);
         verify(redirectAttributes).addFlashAttribute(eq("message"), anyString());
         assertEquals("redirect:/issues", viewName);
     }
@@ -73,5 +104,53 @@ public class IssueControllerTest {
         ModelAndView mv = sut.newIssue();
         assertEquals("create-issue", mv.getViewName());
         assertTrue(mv.getModel().containsKey("issue"));
+    }
+
+    @Test
+    void editIssueForm_shouldShowEditView_whenIssueExists() {
+        long id = 5L;
+        Issue existing = new Issue(id, "Old Title");
+        when(issueRepo.find(id)).thenReturn(existing);
+        ModelAndView mv = sut.editIssueForm(id);
+        assertEquals("edit-issue", mv.getViewName());
+        assertEquals(existing, mv.getModel().get("issue"));
+    }
+
+    @Test
+    void editIssueForm_shouldRedirect_whenIssueDoesNotExist() {
+        long id = 99L;
+        when(issueRepo.find(id)).thenReturn(null);
+        ModelAndView mv = sut.editIssueForm(id);
+        assertEquals("redirect:/issues", mv.getViewName());
+    }
+
+    @Test
+    void updateIssue_shouldUpdateAndRedirect() {
+        long id = 10L;
+        Issue existing = new Issue(id, "Old Title");
+        existing.setColumnKey("todo");
+        when(issueRepo.find(id)).thenReturn(existing);
+        Issue updatedData = new Issue();
+        updatedData.setTitle("New Title");
+        String viewName = sut.updateIssue(id, updatedData, redirectAttributes);
+        assertEquals("redirect:/issues", viewName);
+        verify(issueRepo).persist(updatedData);
+        assertEquals(id, updatedData.getId());
+        assertEquals("todo", updatedData.getColumnKey());
+        verify(redirectAttributes).addFlashAttribute(eq("message"), anyString());
+    }
+    
+    @Test
+    void updateIssue_shouldPreserveColumnKey_whenUpdating() {
+        long id = 15L;
+        Issue existing = new Issue(id, "Title", "done");
+        existing.setDetail("Detail");
+        when(issueRepo.find(id)).thenReturn(existing);
+        Issue updatedData = new Issue();
+        updatedData.setTitle("Updated Title");
+        updatedData.setDetail("Updated Detail");
+        sut.updateIssue(id, updatedData, redirectAttributes);
+        verify(issueRepo).persist(any(Issue.class));
+        assertEquals("done", updatedData.getColumnKey());
     }
 }

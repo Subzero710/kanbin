@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="fr" xmlns:th="http://www.thymeleaf.org">
 <head th:include="../fragments/template :: head(~{::title})">
-    <title>Créer une nouvelle Story</title>
+    <title>Modifier la Story</title>
 </head>
 <body>
 <div class="container mt-5">
-    <h1 class="mb-4">Créer une nouvelle Story</h1>
+    <h1 class="mb-4">Modifier la Story #<span th:text="${issue.id}"></span></h1>
 
-    <form th:action="@{/issues}" th:object="${issue}" method="post" accept-charset="UTF-8">
+    <form th:action="@{/issues/{id}(id=${issue.id})}" th:object="${issue}" method="post" accept-charset="UTF-8">
         <div class="mb-3">
             <label for="issueTitle" class="form-label">Titre de la Story</label>
             <input type="text"
@@ -15,9 +15,8 @@
                    id="issueTitle"
                    th:field="*{title}"
                    required
-                   placeholder="Ex: Implémenter la validation du formulaire"
                    maxlength="255">
-            <div class="form-text">Donnez un titre clair à votre story.</div>
+            <div class="form-text">Modifiez le titre ci-dessus.</div>
         </div>
         <div class="mb-3">
             <label for="detail" class="form-label">Détail :</label>
@@ -30,9 +29,9 @@
             </textarea>
             <div class="form-text">Décrivez les exigences, les critères d'acceptation et le contexte.</div>
         </div>
-
-        <button type="submit" class="btn btn-primary">Créer la Story</button>
-        <a th:href="@{/issues}" class="btn btn-secondary">Annuler et Retour à la Liste</a>
+        
+        <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+        <a th:href="@{/issues}" class="btn btn-secondary">Annuler</a>
     </form>
 
 </div>

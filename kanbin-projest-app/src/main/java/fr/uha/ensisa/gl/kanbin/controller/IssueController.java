@@ -7,10 +7,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import org.springframework.web.bind.annotation.RequestParam;
 import java.util.Collection;
 
 @Controller
@@ -40,8 +38,16 @@ public class IssueController {
 
     @PostMapping("/issues")
     public String createIssue(Issue issue, RedirectAttributes redirectAttributes) {
+        if (issue.getId() > 0) {
+            Issue oldIssue = issueRepo.find(issue.getId());
+            if (oldIssue != null && (issue.getColumnKey() == null || issue.getColumnKey().isEmpty())) {
+                issue.setColumnKey(oldIssue.getColumnKey());
+            }
+            redirectAttributes.addFlashAttribute("message", "La story a été mise à jour.");
+        } else {
+            redirectAttributes.addFlashAttribute("message", "La nouvelle story a été ajoutée.");
+        }
         issueRepo.persist(issue);
-        redirectAttributes.addFlashAttribute("message", "La nouvelle story '" + issue.getTitle() + "' a été ajoutée avec succès !");
         return "redirect:/issues";
     }
 
@@ -49,6 +55,30 @@ public class IssueController {
     public String deleteIssue(@PathVariable long id, RedirectAttributes redirectAttributes) {
         issueRepo.remove(id);
         redirectAttributes.addFlashAttribute("message", "La story ID " + id + " a été supprimée avec succès.");
+        return "redirect:/issues";
+    }
+
+    @GetMapping("/issues/{id}/edit")
+    public ModelAndView editIssueForm(@PathVariable long id) {
+        Issue issue = issueRepo.find(id);
+        if (issue == null) {
+            return new ModelAndView("redirect:/issues");
+        }
+        ModelAndView mv = new ModelAndView("edit-issue");
+        mv.addObject("issue", issue);
+        return mv;
+    }
+
+    @PostMapping("/issues/{id}")
+    public String updateIssue(@PathVariable long id, Issue issue, RedirectAttributes redirectAttributes) {
+        issue.setId(id);
+        Issue existing = issueRepo.find(id);
+        if (existing != null) {
+            issue.setColumnKey(existing.getColumnKey());
+        }
+
+        issueRepo.persist(issue);
+        redirectAttributes.addFlashAttribute("message", "La story '" + issue.getTitle() + "' a été mise à jour.");
         return "redirect:/issues";
     }
 }

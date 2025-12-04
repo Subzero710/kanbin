@@ -8,7 +8,7 @@
 
     <div style="margin-bottom: 15px;">
         <a th:href="@{/issues}" class="btn btn-secondary" id="btn-to-issues">
-            Gérer les Stories (Backlog)
+            Gérer les Stories
         </a>
     </div>
 
@@ -18,52 +18,72 @@
     </form>
 
     <h1 class="page-title">Kanbin</h1>
+    <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}"></div>
 
     <div class="board" id="board">
-        <section class="kb-col"  th:each="c, colStat : ${columns}" th:attr="data-col=${c.key}">
+        <section class="kb-col kb-main-col"
+                 th:each="c, iterStat : ${columns}"
+                 th:attr="data-col=${c.key}, data-id=${c.id}"
+                 th:classappend="${iterStat.first} ? 'kb-col-fixed' : 'kb-col-draggable'"
+                 th:draggable="${!iterStat.first}">
+
             <header class="kb-col-header">
                 <span th:text="${c.title}" th:id="'col-title-' + ${c.key}">Column</span>
-                <form th:action="@{/board/remove-column}" method="post" style="display:inline;">
-                    <input type="hidden" name="columnId" th:value="${c.id}"/>
-                    <button type="submit" class="btn btn-danger btn-sm"
-                            onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette colonne ?')"
-                            value="Remove column">
-                        Remove
-                    </button>
-                </form>
-            </header>
-            <div class="kb-col-body">
-                <div class="kb-empty"
-                     th:if="${#lists.isEmpty(issuesByColumn[c.key])}">
-                    Aucune carte
+
+                <div style="display:inline-block; float:right;">
+                    <a th:href="@{/board/columns/{id}/edit(id=${c.id})}"
+                       class="btn btn-warning btn-sm"
+                       style="padding: 0px 5px; margin-right: 5px;"
+                       title="Renommer">edit</a>
+
+                    <form th:action="@{/board/remove-column}" method="post" style="display:inline;">
+                        <input type="hidden" name="columnId" th:value="${c.id}"/>
+                        <button type="submit" class="btn btn-danger btn-sm"
+                                onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette colonne ?')"
+                                value="Remove column"
+                                style="padding: 0px 5px;">
+                            X
+                        </button>
+                    </form>
                 </div>
+            </header>
 
-                <article class="kb-card"
-                         th:each="issue : ${issuesByColumn[c.key]}">
-                    <div class="kb-card-title" th:text="${issue.title}">
-                        Titre de l'Issue
+            <div class="kb-sub-wrapper">
+
+                <div class="kb-col sub-col" th:each="sub : ${c.subColumns}" th:attr="data-col=${sub.key}">
+
+                    <header class="kb-col-header sub-header">
+                        <span th:text="${sub.title}">Sous-titre</span>
+                    </header>
+
+                    <div class="kb-col-body">
+                        <div class="kb-empty" th:if="${#lists.isEmpty(issuesByColumn[sub.key])}">
+                            Aucune carte
+                        </div>
+
+                        <article class="kb-card" th:each="issue : ${issuesByColumn[sub.key]}">
+                            <div class="kb-card-title" th:text="${issue.title}">Titre</div>
+
+                            <div class="kb-card-actions"> <!-- Buton change column -->
+                                <form th:action="@{/board/move-issue}" method="post" style="display:inline;">
+                                    <input type="hidden" name="issueId" th:value="${issue.id}"/>
+                                    <input type="hidden" name="direction" value="prev"/>
+                                    <button type="submit" class="kb-move-btn kb-move-prev">-</button>
+                                </form>
+
+                                <form th:action="@{/board/move-issue}" method="post" style="display:inline;">
+                                    <input type="hidden" name="issueId" th:value="${issue.id}"/>
+                                    <input type="hidden" name="direction" value="next"/>
+                                    <button type="submit" class="kb-move-btn kb-move-next">+</button>
+                                </form>
+                            </div>
+                            <!-- Detail -->
+                            <div class="kb-card-detail">
+                                <span th:text="${issue.detail}">Détail de la story...</span>
+                            </div>
+                        </article>
                     </div>
-
-                    <div class="kb-card-actions">
-                        <form th:if="${!colStat.first}"
-                              th:action="@{/board/move-issue}"
-                              method="post"
-                              style="display:inline;">
-                            <input type="hidden" name="issueId" th:value="${issue.id}"/>
-                            <input type="hidden" name="direction" value="prev"/>
-                            <button type="submit" class="kb-move-btn kb-move-prev">-</button>
-                        </form>
-
-                        <form th:if="${!colStat.last}"
-                              th:action="@{/board/move-issue}"
-                              method="post"
-                              style="display:inline;">
-                            <input type="hidden" name="issueId" th:value="${issue.id}"/>
-                            <input type="hidden" name="direction" value="next"/>
-                            <button type="submit" class="kb-move-btn kb-move-next">+</button>
-                        </form>
-                    </div>
-                </article>
+                </div>
             </div>
         </section>
     </div>

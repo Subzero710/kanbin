@@ -30,7 +30,7 @@ public class StoryFeatureIT extends AbstractIT {
         ));
         assertTrue(storyCell.isDisplayed(), "La story créée devrait être visible.");
 
-        WebElement deleteBtn = driver.findElement(By.xpath("//tr[td[contains(text(), '" + storyTitle + "')]]//button"));
+        WebElement deleteBtn = driver.findElement(By.xpath("//tr[td[contains(text(), '" + storyTitle + "')]]//form//button"));
         deleteBtn.click();
 
         wait.until(ExpectedConditions.alertIsPresent());
@@ -50,5 +50,32 @@ public class StoryFeatureIT extends AbstractIT {
         wait.until(ExpectedConditions.urlContains("/board"));
         assertTrue(driver.getTitle().contains("Board") || driver.getPageSource().contains("Kanbin"),
                 "Devrait être arrivé sur la page du Board");
+    }
+
+    @Test
+    public void testRenameStory() {
+        driver.get(getBaseUrl() + "issues/new");
+        String originalTitle = "Original Name " + System.currentTimeMillis();
+        WebElement titleInput = driver.findElement(By.name("title"));
+        titleInput.sendKeys(originalTitle);
+        driver.findElement(By.cssSelector("button[type='submit']")).click();
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
+        wait.until(ExpectedConditions.urlContains("/issues"));
+        WebElement editBtn = driver.findElement(
+                By.xpath("//tr[td[contains(text(), '" + originalTitle + "')]]//a[contains(@href, '/edit')]")
+        );
+        editBtn.click();
+        WebElement input = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("issueTitle")));
+        input.clear();
+        String newTitle = "Renamed Name " + System.currentTimeMillis();
+        input.sendKeys(newTitle);
+        driver.findElement(By.cssSelector("button[type='submit']")).click();
+        wait.until(ExpectedConditions.urlContains("/issues"));
+        wait.until(ExpectedConditions.visibilityOfElementLocated(
+                By.xpath("//td[contains(text(), '" + newTitle + "')]")
+        ));
+        String pageSource = driver.getPageSource();
+        assertFalse(pageSource.contains(originalTitle), "L'ancien titre ne devrait plus être visible");
+        assertTrue(pageSource.contains(newTitle), "Le nouveau titre devrait être affiché");
     }
 }

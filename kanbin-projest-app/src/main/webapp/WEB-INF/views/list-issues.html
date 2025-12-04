@@ -18,7 +18,7 @@
         </a>
 
         <a th:href="@{/board}" class="btn btn-info text-white ms-2" id="btn-to-board">
-            Voir le Board Kanban
+            Voir le Board Kanbin
         </a>
     </div>
 
@@ -27,6 +27,7 @@
         <tr>
             <th>ID</th>
             <th>Titre</th>
+            <th>Detail</th>
             <th>Actions</th>
         </tr>
         </thead>
@@ -35,12 +36,23 @@
             <td th:text="${issue.id}">1</td>
             <td th:text="${issue.title}">Titre de l'Issue</td>
             <td>
-                <form th:action="@{/issues/{id}/delete(id=${issue.id})}" method="post">
-                    <button type="submit" class="btn btn-danger btn-sm"
-                            onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette Story ?')">
-                        Supprimer
-                    </button>
-                </form>
+                <div class="table-card-detail">
+                    <span th:text="${issue.detail}">Détail de la story...</span>
+                </div>
+            </td>
+            <td>
+                <div class="d-flex gap-2">
+                    <a th:href="@{/issues/{id}/edit(id=${issue.id})}" class="btn btn-warning btn-sm">
+                        Modifier
+                    </a>
+
+                    <form th:action="@{/issues/{id}/delete(id=${issue.id})}" method="post">
+                        <button type="submit" class="btn btn-danger btn-sm"
+                                onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette Story ?')">
+                            Supprimer
+                        </button>
+                    </form>
+                </div>
             </td>
         </tr>
         </tbody>

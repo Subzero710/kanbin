@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Collection;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -105,4 +106,18 @@ class BoardRepoMemTest {
         assertTrue(deleted);
         assertTrue(repo.findById(b.getId()).isEmpty());
     }
+
+    @Test
+    public void testFindAll() {
+
+        BoardRepoMem repo = new BoardRepoMem();
+
+        repo.save(new Board("Board 1"));
+        repo.save(new Board("Board 2"));
+
+        Collection<Board> allBoards = repo.findAll();
+        assertTrue(allBoards.size() >= 2);
+    }
+
+
 }

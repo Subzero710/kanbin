@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head th:include="../fragments/template :: head(~{::title})">
+    <title>Renommer la Colonne</title>
+</head>
+<body>
+<div class="container mt-5">
+    <h1 class="mb-4">Renommer la Colonne</h1>
+
+    <form th:action="@{/board/columns/{id}(id=${column.id})}" method="post" accept-charset="UTF-8">
+        <div class="mb-3">
+            <label for="colTitle" class="form-label">Titre de la Colonne</label>
+            <input type="text"
+                   class="form-control"
+                   id="colTitle"
+                   name="title"
+                   th:value="${column.title}"
+                   required
+                   maxlength="50">
+        </div>
+
+        <button type="submit" class="btn btn-primary">Enregistrer</button>
+        <a th:href="@{/board}" class="btn btn-secondary">Annuler</a>
+    </form>
+
+</div>
+<div th:replace="../fragments/template :: footer"></div>
+</body>
+</html>
