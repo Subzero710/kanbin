@@ -50,14 +50,44 @@ public class IssueControllerTest {
         verify(issueRepo).findAll();
     }
 
+    // 1. Test du cas critique "Sauvegarde avec perte de colonne" (Le bug qu'on a corrigé)
     @Test
-    void createIssue_shouldPersistAndRedirect() {
+    void createIssue_withExistingIdAndNullKey_shouldRestoreOldKey() {
+        long id = 50L;
+        String originalKey = "col-doing";
+        Issue oldIssue = new Issue(id, "Old Story");
+        oldIssue.setColumnKey(originalKey);
+        Issue newVersion = new Issue(id, "Updated Story");
+        newVersion.setColumnKey(null);
+        when(issueRepo.find(id)).thenReturn(oldIssue);
+        sut.createIssue(newVersion, redirectAttributes);
+        assertEquals(originalKey, newVersion.getColumnKey());
+        verify(issueRepo).persist(newVersion);
+    }
+
+    // 2. Test du cas "Sauvegarde normale avec clé existante" (Pas de restauration nécessaire)
+    @Test
+    void createIssue_withExistingIdAndNewKey_shouldKeepNewKey() {
+        long id = 51L;
+        Issue oldIssue = new Issue(id, "Old Story");
+        oldIssue.setColumnKey("col-todo");
+        Issue newVersion = new Issue(id, "Moved Story");
+        newVersion.setColumnKey("col-done");
+        when(issueRepo.find(id)).thenReturn(oldIssue);
+        sut.createIssue(newVersion, redirectAttributes);
+        assertEquals("col-done", newVersion.getColumnKey());
+        verify(issueRepo).persist(newVersion);
+    }
+    @Test
+    void createIssue_whenNew_shouldAddCreationMessage() {
         Issue newIssue = new Issue();
-        newIssue.setTitle("Nouvelle Story");
-        String viewName = sut.createIssue(newIssue, redirectAttributes);
-        verify(issueRepo).persist(newIssue);
-        verify(redirectAttributes).addFlashAttribute(eq("message"), anyString());
-        assertEquals("redirect:/issues", viewName);
+        newIssue.setId(0L);
+        newIssue.setTitle("Ma Nouvelle Story");
+        sut.createIssue(newIssue, redirectAttributes);
+        verify(redirectAttributes).addFlashAttribute(
+                eq("message"),
+                eq("La nouvelle story a été ajoutée.")
+        );
     }
 
     @Test
