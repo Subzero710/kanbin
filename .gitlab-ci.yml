@@ -6,6 +6,7 @@ variables:
   SELENIUM_URL: "http://selenium-chrome:4444/wd/hub"
 
 # Configuration du cache pour "libs" et "target"
+# C'est GRACE A CA que l'étape 2 retrouvera les libs sans avoir besoin des artifacts
 cache:
   key: "$CI_COMMIT_REF_SLUG"
   paths:
@@ -36,7 +37,7 @@ build_job:
       - "**/target/*.war"
       - "**/target/classes"
       - "**/target/test-classes"
-      - "libs/"
+      # J'AI SUPPRIMÉ LA LIGNE "libs/" ICI POUR EVITER L'ERREUR 413
 
 # --- ETAPE 2 : INTEGRATION ---
 integration_test_job:
@@ -47,6 +48,7 @@ integration_test_job:
   script:
     - 'export MY_IP=$(hostname -i)'
     - 'echo "Testing on IP: $MY_IP"'
+    # Le cache va restaurer le dossier "libs" automatiquement ici
     - 'mvn -nsu $MAVEN_CLI_OPTS -Dselenium.remote.browser=1 -Dselenium.remote.url=$SELENIUM_URL -Dhost=$MY_IP -Djetty.http.host=0.0.0.0 failsafe:integration-test failsafe:verify -Dsurefire.skip=true'
   dependencies:
     - build_job
