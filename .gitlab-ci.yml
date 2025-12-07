@@ -1,31 +1,20 @@
 image: maven:3-eclipse-temurin-21
 
-
-before_script:
-  - echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
-    https://maven.apache.org/xsd/settings-1.0.0.xsd">
-    <mirrors>
-    <mirror>
-    <id>ensisa</id>
-    <name>Nexus ENSISA</name>
-    <url>https://nexus.cluster.ensisa.uha.fr/repository/maven-public/</url>
-    <mirrorOf>*</mirrorOf>
-    </mirror>
-    </mirrors>
-    </settings>' > settings.xml
-
+# Configuration globale : On utilise le dossier "libs" comme demandé par le prof
 variables:
   MAVEN_CLI_OPTS: "--batch-mode -s settings.xml -Dmaven.repo.local=libs"
-
   SELENIUM_URL: "http://selenium-chrome:4444/wd/hub"
 
+# Configuration du cache pour "libs" et "target"
 cache:
   key: "$CI_COMMIT_REF_SLUG"
   paths:
     - "libs"
     - "**/target"
+
+# Création du settings.xml pour le Nexus de l'école avant chaque job
+before_script:
+  - echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd"><mirrors><mirror><id>ensisa</id><name>Nexus ENSISA</name><url>https://nexus.cluster.ensisa.uha.fr/repository/maven-public/</url><mirrorOf>*</mirrorOf></mirror></mirrors></settings>' > settings.xml
 
 stages:
   - build_and_test
@@ -33,11 +22,12 @@ stages:
   - package
   - run
 
+# --- ETAPE 1 : BUILD ---
 build_job:
   stage: build_and_test
   script:
-    - mvn $MAVEN_CLI_OPTS clean install -DskipITs spotbugs:check failsafe:help
-    - grep -v 'COMPLEXITY_MISSED,COMPLEXITY_COVERED' kanbin-projest-reporting/target/site/jacoco-aggregate/jacoco.csv | awk -F, '{missed += $10 ; covered += $11} END {print "Jacoco Coverage:", 100*covered/(covered+missed), "%"}'
+    - 'mvn $MAVEN_CLI_OPTS clean install -DskipITs spotbugs:check failsafe:help'
+    - "grep -v 'COMPLEXITY_MISSED,COMPLEXITY_COVERED' kanbin-projest-reporting/target/site/jacoco-aggregate/jacoco.csv | awk -F, '{missed += $10 ; covered += $11} END {print \"Jacoco Coverage:\", 100*covered/(covered+missed), \"%\"}'"
   artifacts:
     expire_in: 1 hour
     reports:
@@ -48,35 +38,34 @@ build_job:
       - "**/target/test-classes"
       - "libs/"
 
-
+# --- ETAPE 2 : INTEGRATION ---
 integration_test_job:
   stage: integration
   services:
     - name: selenium/standalone-chrome
       alias: selenium-chrome
   script:
-    - export MY_IP=$(hostname -i)
-    - echo "Testing on IP: $MY_IP"
-
-    - mvn -nsu $MAVEN_CLI_OPTS -Dselenium.remote.browser=1 -Dselenium.remote.url=$SELENIUM_URL -Dhost=$MY_IP -Djetty.http.host=0.0.0.0 failsafe:integration-test failsafe:verify -Dsurefire.skip=true
+    - 'export MY_IP=$(hostname -i)'
+    - 'echo "Testing on IP: $MY_IP"'
+    - 'mvn -nsu $MAVEN_CLI_OPTS -Dselenium.remote.browser=1 -Dselenium.remote.url=$SELENIUM_URL -Dhost=$MY_IP -Djetty.http.host=0.0.0.0 failsafe:integration-test failsafe:verify -Dsurefire.skip=true'
   dependencies:
     - build_job
 
-
+# --- ETAPE 3 : DOCKER (KANIKO) ---
 docker-build:
   stage: package
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
-  before_script: []
+  before_script: [] # Désactive le settings.xml ici
   script:
-    - WARFILE=$(find kanbin-projest-app/target -name "*.war")
-    - echo "FROM jetty:12-jdk21-eclipse-temurin" > Dockerfile
-    - echo "EXPOSE 8080" >> Dockerfile
-    - echo "ADD $WARFILE /var/lib/jetty/webapps/${CI_PROJECT_NAMESPACE}-${CI_PROJECT_NAME}.war" >> Dockerfile
-    - mkdir -p /kaniko/.docker
-    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
-    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $CI_REGISTRY_IMAGE:${CI_COMMIT_TAG:-latest}
+    - 'WARFILE=$(find kanbin-projest-app/target -name "*.war")'
+    - 'echo "FROM jetty:12-jdk21-eclipse-temurin" > Dockerfile'
+    - 'echo "EXPOSE 8080" >> Dockerfile'
+    - 'echo "ADD $WARFILE /var/lib/jetty/webapps/${CI_PROJECT_NAMESPACE}-${CI_PROJECT_NAME}.war" >> Dockerfile'
+    - 'mkdir -p /kaniko/.docker'
+    - 'echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json'
+    - '/kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $CI_REGISTRY_IMAGE:${CI_COMMIT_TAG:-latest}'
   dependencies:
     - build_job
   rules:
@@ -84,19 +73,19 @@ docker-build:
     - if: $CI_COMMIT_BRANCH =~ /^release-.*$/
     - if: $CI_COMMIT_TAG
 
-
+# --- ETAPE 4 : KUBERNETES ---
 .kubernetes: &kubernetes
   stage: run
   image: docker-private.cluster.ensisa.uha.fr/docker/kubectl
-  before_script: []
+  before_script: [] # Désactive le settings.xml ici
   script:
-    - kubectl config set-cluster k8s --server="${K8S_SERVER}" --certificate-authority=${K8S_CERTIFICATE_AUTHORITY}
-    - kubectl config set-credentials gitlab-ci --token="${K8S_USER_TOKEN}"
-    - kubectl config set-context default --cluster=k8s --user=gitlab-ci
-    - kubectl config use-context default
-    - APP_NAME="${CI_PROJECT_NAMESPACE}-${CI_PROJECT_NAME}"
-    - NAMESPACE="gitlab-cd-${ENV}"
-    - kubectl -n ${NAMESPACE} create secret docker-registry $APP_NAME-registry-secret --docker-server=${CI_REGISTRY} --docker-username=${CI_DEPLOY_USER} --docker-password=${CI_DEPLOY_PASSWORD} --dry-run -o yaml | kubectl -n ${NAMESPACE} apply -f -
+    - 'kubectl config set-cluster k8s --server="${K8S_SERVER}" --certificate-authority=${K8S_CERTIFICATE_AUTHORITY}'
+    - 'kubectl config set-credentials gitlab-ci --token="${K8S_USER_TOKEN}"'
+    - 'kubectl config set-context default --cluster=k8s --user=gitlab-ci'
+    - 'kubectl config use-context default'
+    - 'APP_NAME="${CI_PROJECT_NAMESPACE}-${CI_PROJECT_NAME}"'
+    - 'NAMESPACE="gitlab-cd-${ENV}"'
+    - 'kubectl -n ${NAMESPACE} create secret docker-registry $APP_NAME-registry-secret --docker-server=${CI_REGISTRY} --docker-username=${CI_DEPLOY_USER} --docker-password=${CI_DEPLOY_PASSWORD} --dry-run -o yaml | kubectl -n ${NAMESPACE} apply -f -'
     - |
       echo "
       apiVersion: apps/v1
@@ -161,9 +150,9 @@ docker-build:
                   port:
                     number: 80
       " > app.yml
-    - cat app.yml
-    - kubectl ${ACTION} -f app.yml
-    - kubectl -n $NAMESPACE rollout restart deployment $APP_NAME 2>/dev/null || /bin/true
+    - 'cat app.yml'
+    - 'kubectl ${ACTION} -f app.yml'
+    - 'kubectl -n $NAMESPACE rollout restart deployment $APP_NAME 2>/dev/null || /bin/true'
 
 deploy-staging:
   <<: *kubernetes
