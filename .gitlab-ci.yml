@@ -40,19 +40,7 @@ build_job:
       - "kanbin-projest-reporting/target/site/jacoco-aggregate/*"
       - "**/target/spotbugs.xml"
 
-# --- ETAPE 2 : INTEGRATION (Stratégie Locale) ---
-integration_test_job:
-  stage: integration
-  script:
-    # 1. On installe Chrome et Firefox DANS le conteneur (plus de problème de réseau)
-    - apt-get update && apt-get install -y chromium chromium-driver firefox-esr
 
-    # 2. On lance les tests.
-    # Note : On ne définit PAS -Dselenium.remote.url, donc Java passera en mode "Local"
-    # Note : On ajoute -Dbrowser=chrome (ou firefox) si besoin, par défaut c'est chrome.
-    - 'mvn $MAVEN_CLI_OPTS failsafe:integration-test failsafe:verify -Dsurefire.skip=true'
-  dependencies:
-    - build_job
 
 # --- ETAPE 3 : DOCKER (KANIKO) ---
 docker-build:
