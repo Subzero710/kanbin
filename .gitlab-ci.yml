@@ -14,10 +14,11 @@ stages:
   - package
   - run
 
-# --- ÉTAPE 1 ---
+# --- ÉTAPE 1 : BUILD ---
 build_job:
   stage: build_and_test
   script:
+    # On télécharge failsafe maintenant pour le cache
     - mvn $MAVEN_OPTS clean install -DskipITs spotbugs:check failsafe:help
     - grep -v 'COMPLEXITY_MISSED,COMPLEXITY_COVERED' kanbin-projest-reporting/target/site/jacoco-aggregate/jacoco.csv | awk -F, '{missed += $10 ; covered += $11} END {print "Jacoco Coverage:", 100*covered/(covered+missed), "%"}'
   artifacts:
@@ -30,23 +31,31 @@ build_job:
       - "**/target/test-classes"
       - ".m2/repository/fr/uha/ensisa/gl/kanbin/**"
 
-# --- ÉTAPE 2 (CORRIGÉE : Jetty Host 0.0.0.0) ---
+# --- ÉTAPE 2 : INTEGRATION (LA CORRECTION EST ICI) ---
 integration_test_job:
   stage: integration
   services:
     - name: selenium/standalone-chrome
       alias: selenium-chrome
   variables:
-    SELENIUM_OPTS: "-Dselenium.remote.browser=1 -Dselenium.remote.url=http://selenium-chrome:4444/wd/hub"
+    # URL du service Selenium (le navigateur)
+    SELENIUM_URL: "http://selenium-chrome:4444/wd/hub"
   script:
-    # On récupère l'IP
+    # 1. On récupère l'adresse IP de CE conteneur (là où tourne Jetty)
     - export MY_IP=$(hostname -i)
-    # CORRECTION : On force Jetty à écouter sur 0.0.0.0 pour être accessible par l'IP
-    - mvn -nsu $MAVEN_OPTS $SELENIUM_OPTS -Dhost=$MY_IP -Djetty.http.host=0.0.0.0 failsafe:integration-test failsafe:verify -Dsurefire.skip=true
+    - echo "Mon IP est : $MY_IP"
+
+    # 2. La commande Maven Ultime :
+    # -nsu : Utilise le cache local
+    # -Dselenium.remote.browser=1 : Active le 'if' dans ton code Java (selon le prof)
+    # -Dselenium.remote.url=... : Dit à Java où est le navigateur
+    # -Dhost=$MY_IP : Dit à Java quelle URL donner au navigateur (http://172.x.x.x:8080)
+    # -Djetty.http.host=0.0.0.0 : OBLIGATOIRE. Ouvre Jetty au monde extérieur (sinon Connection Refused)
+    - mvn -nsu $MAVEN_OPTS -Dselenium.remote.browser=1 -Dselenium.remote.url=$SELENIUM_URL -Dhost=$MY_IP -Djetty.http.host=0.0.0.0 failsafe:integration-test failsafe:verify -Dsurefire.skip=true
   dependencies:
     - build_job
 
-# --- ÉTAPE 3 ---
+# --- ÉTAPE 3 : KANIKO ---
 docker-build:
   stage: package
   image:
@@ -67,7 +76,7 @@ docker-build:
     - if: $CI_COMMIT_BRANCH =~ /^release-.*$/
     - if: $CI_COMMIT_TAG
 
-# --- ÉTAPE 4 ---
+# --- ÉTAPE 4 : KUBERNETES ---
 .kubernetes: &kubernetes
   stage: run
   image: docker-private.cluster.ensisa.uha.fr/docker/kubectl
