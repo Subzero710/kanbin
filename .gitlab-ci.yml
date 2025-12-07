@@ -1,7 +1,6 @@
 image: maven:3-eclipse-temurin-21
 
-# --- CONFIGURATION OBLIGATOIRE ÉCOLE ---
-# (Sans ça, rien ne marche sur le réseau de l'école)
+# --- CONFIGURATION GLOBALE ---
 variables:
   MAVEN_CLI_OPTS: "--batch-mode -s settings.xml -Dmaven.repo.local=libs"
 
@@ -16,25 +15,40 @@ before_script:
 
 stages:
   - build_and_test
+  - integration
 
-# --- LE SEUL JOB (Pour l'instant) ---
+# --- ÉTAPE 1 : BUILD & QUALITÉ ---
 build_job:
   stage: build_and_test
   script:
-    # 1. On nettoie tout
-    # 2. On installe les dépendances
-    # 3. -DskipITs : On NE LANCE PAS les tests d'intégration (Selenium) pour l'instant
-    # 4. spotbugs:check : On lance l'analyseur de qualité
-    - mvn $MAVEN_CLI_OPTS clean install -DskipITs spotbugs:check
+    # 1. Compile et installe les JARs dans le cache "libs"
+    # 2. Lance SpotBugs (Qualité)
+    # 3. Pré-télécharge Failsafe pour l'étape suivante
+    - mvn $MAVEN_CLI_OPTS clean install -DskipITs spotbugs:check failsafe:help
 
-    # Génération du rapport de couverture (pour le badge GitLab)
+    # Rapport de couverture
     - "grep -v 'COMPLEXITY_MISSED,COMPLEXITY_COVERED' kanbin-projest-reporting/target/site/jacoco-aggregate/jacoco.csv | awk -F, '{missed += $10 ; covered += $11} END {print \"Jacoco Coverage:\", 100*covered/(covered+missed), \"%\"}'"
-
   artifacts:
     expire_in: 1 hour
-    when: always # On garde les rapports MÊME si ça plante
     reports:
       junit: "**/target/surefire-reports/TEST-*.xml"
     paths:
-      - "**/target/surefire-reports"
-      - "**/target/spotbugs.xml"
+      - "**/target/*.war"
+      - "**/target/classes"
+      - "**/target/test-classes"
+      # On laisse "libs" dans le cache, pas besoin de l'uploader en artefact
+
+# --- ÉTAPE 2 : TESTS D'INTÉGRATION (SELENIUM) ---
+integration_test_job:
+  stage: integration
+  script:
+    # ASTUCE : On installe Chrome DANS ce conteneur.
+    # Plus de problèmes de réseau, tout se passe en local.
+    - apt-get update && apt-get install -y chromium chromium-driver
+
+    # Lancement des tests d'intégration.
+    # Note : On n'active PAS le mode "remote" (-Dselenium.remote...),
+    # donc ton code AbstractIT va utiliser le Chrome local qu'on vient d'installer.
+    - mvn $MAVEN_CLI_OPTS failsafe:integration-test failsafe:verify -Dsurefire.skip=true
+  dependencies:
+    - build_job
