@@ -1,8 +1,10 @@
 image: maven:3-eclipse-temurin-21
 
+# On définit le dossier local une bonne fois pour toutes
 variables:
   MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
 
+# Cache global pour toutes les étapes
 cache:
   key: "$CI_COMMIT_REF_SLUG"
   paths:
@@ -14,9 +16,11 @@ stages:
   - package
   - run
 
+# --- ÉTAPE 1 ---
 build_job:
   stage: build_and_test
   script:
+    # On installe les JARs dans le dossier local .m2/repository
     - mvn $MAVEN_OPTS clean install -DskipITs spotbugs:check
     - grep -v 'COMPLEXITY_MISSED,COMPLEXITY_COVERED' kanbin-projest-reporting/target/site/jacoco-aggregate/jacoco.csv | awk -F, '{missed += $10 ; covered += $11} END {print "Jacoco Coverage:", 100*covered/(covered+missed), "%"}'
   artifacts:
@@ -27,20 +31,26 @@ build_job:
       - "**/target/*.war"
       - "**/target/classes"
       - "**/target/test-classes"
+      # On force la sauvegarde du dépôt local pour être sûr
       - ".m2/repository/fr/uha/ensisa/gl/kanbin/**"
 
+# --- ÉTAPE 2 (Celle qui plante) ---
 integration_test_job:
   stage: integration
   services:
     - name: selenium/standalone-chrome
       alias: selenium-chrome
   variables:
-    MAVEN_OPTS: "-Dselenium.remote.browser=1 -Dselenium.remote.url=http://selenium-chrome:4444/wd/hub -Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+    # On combine les options Selenium ET l'option du repo local
+    SELENIUM_OPTS: "-Dselenium.remote.browser=1 -Dselenium.remote.url=http://selenium-chrome:4444/wd/hub"
   script:
-    - mvn $MAVEN_OPTS failsafe:integration-test failsafe:verify -Dsurefire.skip=true
+    # ATTENTION : J'ai ajouté explicitement -Dmaven.repo.local ici !
+    # C'est la ceinture et les bretelles pour forcer Maven à voir le JAR.
+    - mvn -Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository $SELENIUM_OPTS failsafe:integration-test failsafe:verify -Dsurefire.skip=true
   dependencies:
     - build_job
 
+# --- ÉTAPE 3 ---
 docker-build:
   stage: package
   image:
@@ -61,6 +71,7 @@ docker-build:
     - if: $CI_COMMIT_BRANCH =~ /^release-.*$/
     - if: $CI_COMMIT_TAG
 
+# --- ÉTAPE 4 ---
 .kubernetes: &kubernetes
   stage: run
   image: docker-private.cluster.ensisa.uha.fr/docker/kubectl
