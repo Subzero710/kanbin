@@ -30,7 +30,7 @@ build_job:
       - "**/target/test-classes"
       - ".m2/repository/fr/uha/ensisa/gl/kanbin/**"
 
-# --- ÉTAPE 2 (CORRIGÉE AVEC L'IP) ---
+# --- ÉTAPE 2 (CORRIGÉE : Jetty Host 0.0.0.0) ---
 integration_test_job:
   stage: integration
   services:
@@ -39,11 +39,10 @@ integration_test_job:
   variables:
     SELENIUM_OPTS: "-Dselenium.remote.browser=1 -Dselenium.remote.url=http://selenium-chrome:4444/wd/hub"
   script:
-    # --- CORRECTION RÉSEAU ---
-    # On récupère l'IP du conteneur courant pour que Chrome puisse nous trouver
+    # On récupère l'IP
     - export MY_IP=$(hostname -i)
-    # On passe -Dhost=$MY_IP à Maven
-    - mvn -nsu $MAVEN_OPTS $SELENIUM_OPTS -Dhost=$MY_IP failsafe:integration-test failsafe:verify -Dsurefire.skip=true
+    # CORRECTION : On force Jetty à écouter sur 0.0.0.0 pour être accessible par l'IP
+    - mvn -nsu $MAVEN_OPTS $SELENIUM_OPTS -Dhost=$MY_IP -Djetty.http.host=0.0.0.0 failsafe:integration-test failsafe:verify -Dsurefire.skip=true
   dependencies:
     - build_job
 
