@@ -6,6 +6,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.firefox.FirefoxDriver;
+import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.remote.RemoteWebDriver;
 
 import java.net.MalformedURLException;
@@ -15,6 +17,7 @@ import java.time.Duration;
 public abstract class AbstractIT {
 
     protected static WebDriver driver;
+    // Par défaut localhost (fonctionne sur ton PC ET sur le CI en mode local)
     private static String host = "localhost";
     private static String port = "8080";
 
@@ -22,28 +25,54 @@ public abstract class AbstractIT {
     public static void setupWebDriver() throws MalformedURLException {
         if (driver != null) return;
 
-        // Récupération des propriétés système injectées par Maven
+        // Récupération des propriétés
         String remoteBrowser = System.getProperty("selenium.remote.browser");
         String envHost = System.getProperty("host");
         String envPort = System.getProperty("servlet.port");
         String remoteUrl = System.getProperty("selenium.remote.url");
+        // Choix du navigateur (par défaut chrome)
+        String browser = System.getProperty("browser", "chrome").toLowerCase();
 
         if (envHost != null) host = envHost;
         if (envPort != null) port = envPort;
 
-        System.out.println(">>> DEBUG: Host=" + host + " Port=" + port + " RemoteMode=" + remoteBrowser);
+        System.out.println(">>> DEBUG CONFIG: Host=" + host + ":" + port + " | RemoteMode=" + remoteBrowser + " | Browser=" + browser);
 
-        ChromeOptions options = new ChromeOptions();
-        options.addArguments("--headless=new", "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--window-size=1920,1080");
+        // --- OPTIONS CHROME (CRITIQUES POUR DOCKER) ---
+        ChromeOptions chromeOptions = new ChromeOptions();
+        chromeOptions.addArguments("--headless=new"); // Obligatoire CI
+        chromeOptions.addArguments("--no-sandbox"); // ANTI-CRASH DOCKER
+        chromeOptions.addArguments("--disable-dev-shm-usage"); // ANTI-CRASH DOCKER
+        chromeOptions.addArguments("--disable-gpu");
+        chromeOptions.addArguments("--remote-allow-origins=*");
+        chromeOptions.addArguments("--window-size=1920,1080");
 
-        // Logique demandée par le prof : si remote.browser est défini, on passe en RemoteWebDriver
+        // --- OPTIONS FIREFOX ---
+        FirefoxOptions firefoxOptions = new FirefoxOptions();
+        firefoxOptions.addArguments("-headless");
+        firefoxOptions.addArguments("--width=1920");
+        firefoxOptions.addArguments("--height=1080");
+
+        // Logique de sélection
         if ("1".equals(remoteBrowser) && remoteUrl != null) {
-            System.out.println(">>> MODE CI: Connexion au Selenium distant...");
-            driver = new RemoteWebDriver(new URL(remoteUrl), options);
+            // Mode Remote (si on voulait utiliser un service selenium externe)
+            System.out.println(">>> MODE: REMOTE GRID");
+            if (browser.contains("firefox")) {
+                driver = new RemoteWebDriver(new URL(remoteUrl), firefoxOptions);
+            } else {
+                driver = new RemoteWebDriver(new URL(remoteUrl), chromeOptions);
+            }
         } else {
-            System.out.println(">>> MODE LOCAL: Démarrage Chrome...");
-            WebDriverManager.chromedriver().setup();
-            driver = new ChromeDriver(options);
+            // Mode Local (Ton PC + CI méthode installation locale)
+            System.out.println(">>> MODE: LOCAL DRIVER");
+            if (browser.contains("firefox")) {
+                WebDriverManager.firefoxdriver().setup();
+                driver = new FirefoxDriver(firefoxOptions);
+            } else {
+                WebDriverManager.chromedriver().setup();
+                // On passe bien les options anti-crash ici !
+                driver = new ChromeDriver(chromeOptions);
+            }
         }
 
         driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(2));
