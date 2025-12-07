@@ -1,20 +1,18 @@
 image: maven:3-eclipse-temurin-21
 
-# Config prof : Création du settings.xml pour utiliser le Nexus de l'école
-before_script:
-  - echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd"><mirrors><mirror><id>ensisa</id><name>Nexus ENSISA</name><url>https://nexus.cluster.ensisa.uha.fr/repository/maven-public/</url><mirrorOf>*</mirrorOf></mirror></mirrors></settings>' > settings.xml
-
 variables:
-  # Prof : On force le repo local dans le dossier "libs" du projet
   MAVEN_CLI_OPTS: "--batch-mode -s settings.xml -Dmaven.repo.local=libs"
-  SELENIUM_URL: "http://selenium-chrome:4444/wd/hub"
+  # PLUS BESOIN D'URL DISTANTE
+  # SELENIUM_URL: "http://selenium-chrome:4444/wd/hub"
 
-# Prof : On cache "libs" pour le passer entre les jobs sans le retélécharger
 cache:
   key: "$CI_COMMIT_REF_SLUG"
   paths:
     - "libs"
     - "**/target"
+
+before_script:
+  - echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd"><mirrors><mirror><id>ensisa</id><name>Nexus ENSISA</name><url>https://nexus.cluster.ensisa.uha.fr/repository/maven-public/</url><mirrorOf>*</mirrorOf></mirror></mirrors></settings>' > settings.xml
 
 stages:
   - build_and_test
@@ -22,13 +20,11 @@ stages:
   - package
   - run
 
-# --- ETAPE 1 : BUILD & UNIT TESTS ---
+# --- ETAPE 1 : BUILD ---
 build_job:
   stage: build_and_test
   script:
-    # Prof : Compilation + SpotBugs + JaCoCo. On ignore les tests d'intégration ici (-DskipITs)
     - 'mvn $MAVEN_CLI_OPTS clean install -DskipITs spotbugs:check failsafe:help'
-    # Prof : Extraction du % de couverture pour le badge
     - "grep -v 'COMPLEXITY_MISSED,COMPLEXITY_COVERED' kanbin-projest-reporting/target/site/jacoco-aggregate/jacoco.csv | awk -F, '{missed += $10 ; covered += $11} END {print \"Jacoco Coverage:\", 100*covered/(covered+missed), \"%\"}'"
   artifacts:
     expire_in: 1 hour
@@ -38,30 +34,29 @@ build_job:
       - "**/target/*.war"
       - "**/target/classes"
       - "**/target/test-classes"
-      # IMPORTANT : On ne met PAS "libs/" dans artifacts (trop lourd, crash 413), il est géré par le cache
 
-# --- ETAPE 2 : INTEGRATION TESTS ---
+# --- ETAPE 2 : INTEGRATION (MODE LOCAL AVEC INSTALLATION) ---
 integration_test_job:
   stage: integration
-  services:
-    - name: selenium/standalone-chrome
-      alias: selenium-chrome
+  # PLUS DE SERVICE ICI
   script:
-    - 'export MY_IP=$(hostname -i)'
-    # Prof : On lance failsafe (verify).
-    # -nsu : Utilise le cache "libs" sans vérifier internet
-    # -Dselenium.remote.browser=1 : Active le mode CI dans le code Java
-    - 'mvn -nsu $MAVEN_CLI_OPTS -Dselenium.remote.browser=1 -Dselenium.remote.url=$SELENIUM_URL -Dhost=$MY_IP -Djetty.http.host=0.0.0.0 failsafe:integration-test failsafe:verify -Dsurefire.skip=true'
+    # 1. On installe Chromium et le driver (car l'image Maven est vide)
+    - apt-get update && apt-get install -y chromium chromium-driver
+
+    # 2. On lance Maven SANS le mode remote browser.
+    # Ton code AbstractIT va donc passer dans le 'else' (Mode Local)
+    # Et comme Chrome est installé, ça va marcher sur localhost !
+    - 'mvn -nsu $MAVEN_CLI_OPTS failsafe:integration-test failsafe:verify -Dsurefire.skip=true'
   dependencies:
     - build_job
 
-# --- ETAPE 3 : DOCKER (KANIKO) ---
+# --- ETAPE 3 : KANIKO ---
 docker-build:
   stage: package
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
-  before_script: [] # Désactive le settings.xml ici (pas de bash dans kaniko)
+  before_script: []
   script:
     - 'WARFILE=$(find kanbin-projest-app/target -name "*.war")'
     - 'echo "FROM jetty:12-jdk21-eclipse-temurin" > Dockerfile'
@@ -77,11 +72,11 @@ docker-build:
     - if: $CI_COMMIT_BRANCH =~ /^release-.*$/
     - if: $CI_COMMIT_TAG
 
-# --- ETAPE 4 : DEPLOIEMENT (KUBERNETES) ---
+# --- ETAPE 4 : KUBERNETES ---
 .kubernetes: &kubernetes
   stage: run
   image: docker-private.cluster.ensisa.uha.fr/docker/kubectl
-  before_script: [] # Désactive le settings.xml ici
+  before_script: []
   script:
     - 'kubectl config set-cluster k8s --server="${K8S_SERVER}" --certificate-authority=${K8S_CERTIFICATE_AUTHORITY}'
     - 'kubectl config set-credentials gitlab-ci --token="${K8S_USER_TOKEN}"'
