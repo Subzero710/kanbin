@@ -14,16 +14,12 @@ stages:
   - package
   - run
 
-# --- ÉTAPE 1 : BUILD + PRÉ-CHARGEMENT ---
+# --- ÉTAPE 1 : BUILD + PRÉ-CHARGEMENT (On garde failsafe:help) ---
 build_job:
   stage: build_and_test
   script:
-    # MODIFICATION ICI :
-    # On ajoute "failsafe:help" à la fin.
-    # Cela force Maven à télécharger le plugin Failsafe MAINTENANT et à le mettre dans le cache.
+    # On garde failsafe:help pour mettre le plugin en cache
     - mvn $MAVEN_OPTS clean install -DskipITs spotbugs:check failsafe:help
-
-    # Calcul couverture (inchangé)
     - grep -v 'COMPLEXITY_MISSED,COMPLEXITY_COVERED' kanbin-projest-reporting/target/site/jacoco-aggregate/jacoco.csv | awk -F, '{missed += $10 ; covered += $11} END {print "Jacoco Coverage:", 100*covered/(covered+missed), "%"}'
   artifacts:
     expire_in: 1 hour
@@ -35,7 +31,7 @@ build_job:
       - "**/target/test-classes"
       - ".m2/repository/fr/uha/ensisa/gl/kanbin/**"
 
-# --- ÉTAPE 2 : INTEGRATION (MODE HORS-LIGNE) ---
+# --- ÉTAPE 2 : INTEGRATION (MODE SEMI-CONNECTÉ) ---
 integration_test_job:
   stage: integration
   services:
@@ -44,11 +40,9 @@ integration_test_job:
   variables:
     SELENIUM_OPTS: "-Dselenium.remote.browser=1 -Dselenium.remote.url=http://selenium-chrome:4444/wd/hub"
   script:
-    # MODIFICATION ICI :
-    # On remet "-o" (Offline).
-    # Comme on a pré-téléchargé le plugin Failsafe à l'étape 1, Maven le trouvera dans le cache !
-    # Et il trouvera aussi tes JARs locaux sans essayer d'aller sur internet.
-    - mvn -o $MAVEN_OPTS $SELENIUM_OPTS failsafe:integration-test failsafe:verify -Dsurefire.skip=true
+    # CORRECTION : Utilisation de -nsu (au lieu de -o)
+    # Maven trouvera le plugin (car caché à l'étape 1) ET Selenium aura du réseau.
+    - mvn -nsu $MAVEN_OPTS $SELENIUM_OPTS failsafe:integration-test failsafe:verify -Dsurefire.skip=true
   dependencies:
     - build_job
 
