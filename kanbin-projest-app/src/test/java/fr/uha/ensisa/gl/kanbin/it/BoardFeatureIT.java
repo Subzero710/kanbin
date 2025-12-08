@@ -94,6 +94,9 @@ public class BoardFeatureIT extends AbstractIT {
         driver.findElement(By.cssSelector("button[type='submit']")).click();
 
         wait.until(ExpectedConditions.urlContains("/board"));
+
+        wait.until(ExpectedConditions.textToBePresentInElementLocated(By.tagName("body"), newTitle));
+
         boolean newPresent = driver.getPageSource().contains(newTitle);
         assertTrue(newPresent, "Le nouveau titre de colonne devrait être affiché");
     }

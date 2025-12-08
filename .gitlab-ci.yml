@@ -1,61 +1,206 @@
-image: maven:3-eclipse-temurin-21-alpine # default container image to use for tasks
+image: maven:3-eclipse-temurin-21
 
-# task setting up maven properties
+# --- CONFIGURATION GLOBALE ---
 before_script:
-    - echo '<settings 
-            xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-            xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
-            https://maven.apache.org/xsd/settings-1.0.0.xsd">
-            <mirrors>
-                <mirror>
-                    <id>ensisa</id>
-                    <name>Nexus ENSISA</name>
-                    <url>https://nexus.cluster.ensisa.uha.fr/repository/maven-public/</url>
-                    <mirrorOf>*</mirrorOf>
-                </mirror>
-            </mirrors>
-        </settings>' > settings.xml
+  - echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd"><mirrors><mirror><id>ensisa</id><name>Nexus ENSISA</name><url>https://nexus.cluster.ensisa.uha.fr/repository/maven-public/</url><mirrorOf>*</mirrorOf></mirror></mirrors></settings>' > settings.xml
 
-# Various reusable properties
 variables:
-    MAVEN_CLI_OPTS: "--batch-mode -s settings.xml -Dmaven.repo.local=libs"
+  MAVEN_CLI_OPTS: "--batch-mode -s settings.xml -Dmaven.repo.local=libs"
+  SELENIUM_URL: "http://selenium-chrome:4444/wd/hub"
 
-# Folders to be reused from jobs to jobs
 cache:
-    key: default-cache
-    paths:
-        - "libs" # jars downloaded and installed by Maven
-        - "**/target" # results of Maven commands
+  key: "$CI_COMMIT_REF_SLUG"
+  paths:
+    - "libs"
+    - "**/target"
 
-# List of stages
 stages:
-    - build
-    - test
+  - build_and_test
+  - integration
+  - deploy  # Nom demandé (Docker/Kaniko)
+  - run     # Nom demandé (Kubernetes)
 
-# Task: Compiling
-compile:
-    stage: build
-    image: maven:3-eclipse-temurin-21
-    script: # many commands can appear here (as an array)
-        - mvn $MAVEN_CLI_OPTS clean compile
-        
-# Task: testing
-test:
-  stage: test
-  image: maven:3-eclipse-temurin-21
+# --- ETAPE 1 : BUILD & TU ---
+build_job:
+  stage: build_and_test
   script:
-    - mvn $MAVEN_CLI_OPTS clean verify -DskipITs
-    - grep -v 'COMPLEXITY_MISSED,COMPLEXITY_COVERED' kanbin-projest-reporting/target/site/jacoco-aggregate/jacoco.csv | awk -F, '{missed += $10 ; covered += $11} END {print "Jacoco Coverage:", 100*covered/(covered+missed), "%"}'
-
-  coverage: '/Jacoco Coverage:\s+\d+[,\.]?\d+\s+\%/'
-
+    - 'mvn $MAVEN_CLI_OPTS clean install -DskipITs spotbugs:check failsafe:help'
+    - "grep -v 'COMPLEXITY_MISSED,COMPLEXITY_COVERED' kanbin-projest-reporting/target/site/jacoco-aggregate/jacoco.csv | awk -F, '{missed += $10 ; covered += $11} END {print \"Jacoco Coverage:\", 100*covered/(covered+missed), \"%\"}'"
   artifacts:
-    when: always
-    paths:
-      - "kanbin-projest-reporting/target/site/jacoco-aggregate/*"
-      - "**/target/surefire-reports/*"
+    expire_in: 1 hour
     reports:
-      junit:
-        - "**/target/surefire-reports/TEST-*.xml"
+      junit: "**/target/surefire-reports/TEST-*.xml"
+    paths:
+      - "**/target/*.war"
+      - "**/target/classes"
+      - "**/target/test-classes"
+      - "kanbin-projest-reporting/target/site/jacoco-aggregate/*"
+      - "**/target/spotbugs.xml"
 
+# --- ETAPE 2 : INTEGRATION (Service + Paramètres) ---
+integration_test_job:
+  stage: integration
+  services:
+    - name: selenium/standalone-chrome
+      alias: selenium-chrome
+  script:
+    - export MY_IP=$(hostname -i)
+    # On passe -Djetty.http.host=0.0.0.0 ici en ligne de commande.
+    # Cela permet d'ouvrir Jetty SANS modifier le pom.xml.
+    - 'mvn -nsu $MAVEN_CLI_OPTS -Dselenium.remote.browser=1 -Dselenium.remote.url=$SELENIUM_URL -Dhost=$MY_IP -Djetty.http.host=0.0.0.0 verify -Dsurefire.skip=true'
+  dependencies:
+    - build_job
+
+# --- ETAPE 3 : DOCKER (Snippet Prof adapté) ---
+deploy-docker:
+  stage: deploy
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  before_script: [] # Désactive le settings.xml global
+  script:
+    # Recherche du WAR (adaptation du find pour éviter les erreurs de chemin)
+    - WARFILE=$(find kanbin-projest-app/target -name "*.war")
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    # Création du Dockerfile à la volée (comme le prof)
+    - |
+      echo "FROM jetty:11.0-jre17
+      EXPOSE 8080
+      ADD $WARFILE \${JETTY_BASE}/webapps/${CI_PROJECT_NAMESPACE}-${CI_PROJECT_NAME}.war" > Dockerfile
+    # Construction
+    - /kaniko/executor --cleanup --registry-mirror docker.cluster.ensisa.uha.fr --context $CI_PROJECT_DIR --destination "$CI_REGISTRY_IMAGE:${CI_COMMIT_TAG:-latest}"
+  dependencies:
+    - build_job
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH =~ /^release-.*$/
+    - if: $CI_COMMIT_TAG
+
+# --- ETAPE 4 : KUBERNETES (Snippet Prof adapté) ---
+.kubernetes: &kubernetes
+  stage: run
+  image: docker-private.cluster.ensisa.uha.fr/docker/kubectl
+  before_script: [] # Désactive le settings.xml global
+  script:
+    - kubectl config set-cluster k8s --server="${K8S_SERVER}" --certificate-authority=${K8S_CERTIFICATE_AUTHORITY}
+    - kubectl config set-credentials gitlab-ci --token="${K8S_USER_TOKEN}"
+    - kubectl config set-context default --cluster=k8s --user=gitlab-ci
+    - kubectl config use-context default
+    - APP_NAME="${CI_PROJECT_NAMESPACE}-${CI_PROJECT_NAME}"
+    - NAMESPACE="gitlab-cd-${ENV}"
+    # Création du secret
+    - kubectl -n ${NAMESPACE} create secret docker-registry $APP_NAME-registry-secret --docker-server=${CI_REGISTRY} --docker-username=${CI_DEPLOY_USER} --docker-password=${CI_DEPLOY_PASSWORD} --dry-run -o yaml | kubectl -n ${NAMESPACE} apply -f -
+    # Génération du YAML Kubernetes
+    - |
+      echo "
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        labels:
+          app: $APP_NAME
+        name: $APP_NAME
+        namespace: $NAMESPACE
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app: $APP_NAME
+        template:
+          metadata:
+            labels:
+              app: $APP_NAME
+          spec:
+            containers:
+              - image: "$CI_REGISTRY_IMAGE:${CI_COMMIT_TAG:-latest}"
+                imagePullPolicy: Always
+                name: $APP_NAME
+                ports:
+                  - name: http
+                    containerPort: 8080
+            imagePullSecrets:
+              - name: $APP_NAME-registry-secret
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: $APP_NAME-service
+        namespace: $NAMESPACE
+      spec:
+        type: ClusterIP
+        selector:
+          app: $APP_NAME
+        ports:
+          - name: http
+            protocol: TCP
+            port: 80
+            targetPort: 8080
+      ---
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: $APP_NAME-ingress
+        namespace: $NAMESPACE
+        annotations:
+          traefik.ingress.kubernetes.io/router.entrypoints: websecure
+      spec:
+        rules:
+        - host: ${ENV}.cluster.ensisa.uha.fr
+          http:
+            paths:
+            - path: /$APP_NAME
+              pathType: Prefix
+              backend:
+                service:
+                  name: $APP_NAME-service
+                  port:
+                    number: 80
+      " > app.yml
+    - cat app.yml
+    - kubectl ${ACTION} -f app.yml
+    - kubectl -n $NAMESPACE rollout restart deployment $APP_NAME 2>/dev/null || /bin/true
+
+deploy-staging:
+  <<: *kubernetes
+  variables:
+    ENV: staging
+    ACTION: apply
+  environment:
+    name: staging
+    url: https://staging.cluster.ensisa.uha.fr/${CI_PROJECT_NAMESPACE}-${CI_PROJECT_NAME}
+    on_stop: stop-staging
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /^release-.*$/
+
+deploy-prod:
+  <<: *kubernetes
+  variables:
+    ENV: prod
+    ACTION: apply
+  when: manual
+  environment:
+    name: production
+    url: https://prod.cluster.ensisa.uha.fr/${CI_PROJECT_NAMESPACE}-${CI_PROJECT_NAME}
+    on_stop: stop-prod
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+stop-staging:
+  <<: *kubernetes
+  variables:
+    ENV: staging
+    ACTION: delete
+  when: manual
+  environment:
+    name: staging
+    action: stop
+
+stop-prod:
+  <<: *kubernetes
+  variables:
+    ENV: prod
+    ACTION: delete
+  when: manual
+  environment:
+    name: production
+    action: stop
