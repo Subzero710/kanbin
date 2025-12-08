@@ -1,24 +1,27 @@
 image: maven:3-eclipse-temurin-21
 
+# Config Prof: Création du settings.xml pour le Nexus de l'école
+before_script:
+  - echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd"><mirrors><mirror><id>ensisa</id><name>Nexus ENSISA</name><url>https://nexus.cluster.ensisa.uha.fr/repository/maven-public/</url><mirrorOf>*</mirrorOf></mirror></mirrors></settings>' > settings.xml
+
 variables:
+  # Prof: Batch mode, settings.xml et dossier libs
   MAVEN_CLI_OPTS: "--batch-mode -s settings.xml -Dmaven.repo.local=libs"
 
+# Prof: Cache sur "libs" et "target"
 cache:
   key: "$CI_COMMIT_REF_SLUG"
   paths:
     - "libs"
     - "**/target"
 
-before_script:
-  - echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd"><mirrors><mirror><id>ensisa</id><name>Nexus ENSISA</name><url>https://nexus.cluster.ensisa.uha.fr/repository/maven-public/</url><mirrorOf>*</mirrorOf></mirror></mirrors></settings>' > settings.xml
-
 stages:
   - build_and_test
   - integration
-  - deploy
+  - package
   - run
 
-
+# --- ETAPE 1 : BUILD ---
 build_job:
   stage: build_and_test
   script:
@@ -35,33 +38,41 @@ build_job:
       - "kanbin-projest-reporting/target/site/jacoco-aggregate/*"
       - "**/target/spotbugs.xml"
 
-
+# --- ETAPE 2 : INTEGRATION (INSTALLATION MANUELLE CHROME) ---
 integration_test_job:
   stage: integration
   script:
-    - apt-get update && apt-get install -y chromium chromium-driver firefox-esr
+    # 1. On installe wget (outil de téléchargement)
+    - apt-get update && apt-get install -y wget
+
+    # 2. On télécharge Google Chrome Officiel (.deb)
+    - wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+
+    # 3. On l'installe (apt install ./... gère les dépendances automatiquement)
+    - apt-get install -y ./google-chrome-stable_current_amd64.deb
+
+    # 4. On lance les tests (Mode Local)
+    # Ton code Java va détecter Chrome installé localement et l'utiliser.
+    # Tout se passe sur localhost, donc pas de problème de réseau !
     - 'mvn $MAVEN_CLI_OPTS failsafe:integration-test failsafe:verify -Dsurefire.skip=true'
   dependencies:
     - build_job
 
-deploy-docker:
-  stage: deploy
+# --- ETAPE 3 : DOCKER (KANIKO) ---
+docker-build:
+  stage: package
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
   before_script: []
   script:
-
-    - WARFILE=$(find . -name '*.war' -path '*/target/*')
-    - mkdir -p /kaniko/.docker
-    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
-    - alias build='/kaniko/executor --cleanup --registry-mirror docker.cluster.ensisa.uha.fr --context $CI_PROJECT_DIR'
-    # Dockerfile du prof (Jetty 11 / JRE 17)
-    - |
-      echo "FROM jetty:11.0-jre17
-      EXPOSE 8080
-      ADD $WARFILE \${JETTY_BASE}/webapps/${CI_PROJECT_NAMESPACE}-${CI_PROJECT_NAME}.war" > Dockerfile
-    - build --destination "$CI_REGISTRY_IMAGE:${CI_COMMIT_TAG:-latest}"
+    - 'WARFILE=$(find kanbin-projest-app/target -name "*.war")'
+    - 'echo "FROM jetty:12-jdk21-eclipse-temurin" > Dockerfile'
+    - 'echo "EXPOSE 8080" >> Dockerfile'
+    - 'echo "ADD $WARFILE /var/lib/jetty/webapps/${CI_PROJECT_NAMESPACE}-${CI_PROJECT_NAME}.war" >> Dockerfile'
+    - 'mkdir -p /kaniko/.docker'
+    - 'echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json'
+    - '/kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $CI_REGISTRY_IMAGE:${CI_COMMIT_TAG:-latest}'
   dependencies:
     - build_job
   rules:
@@ -69,20 +80,19 @@ deploy-docker:
     - if: $CI_COMMIT_BRANCH =~ /^release-.*$/
     - if: $CI_COMMIT_TAG
 
+# --- ETAPE 4 : KUBERNETES ---
 .kubernetes: &kubernetes
   stage: run
   image: docker-private.cluster.ensisa.uha.fr/docker/kubectl
   before_script: []
   script:
-    # Setup kubectl
-    - kubectl config set-cluster k8s --server="${K8S_SERVER}" --certificate-authority=${K8S_CERTIFICATE_AUTHORITY}
-    - kubectl config set-credentials gitlab-ci --token="${K8S_USER_TOKEN}"
-    - kubectl config set-context default --cluster=k8s --user=gitlab-ci
-    - kubectl config use-context default
-    # Kubernetes deployment file
-    - APP_NAME="${CI_PROJECT_NAMESPACE}-${CI_PROJECT_NAME}"
-    - NAMESPACE="gitlab-cd-${ENV}"
-    - kubectl -n ${NAMESPACE} create secret docker-registry $APP_NAME-registry-secret --docker-server=${CI_REGISTRY} --docker-username=${CI_DEPLOY_USER} --docker-password=${CI_DEPLOY_PASSWORD} --dry-run -o yaml | kubectl -n ${NAMESPACE} apply -f -
+    - 'kubectl config set-cluster k8s --server="${K8S_SERVER}" --certificate-authority=${K8S_CERTIFICATE_AUTHORITY}'
+    - 'kubectl config set-credentials gitlab-ci --token="${K8S_USER_TOKEN}"'
+    - 'kubectl config set-context default --cluster=k8s --user=gitlab-ci'
+    - 'kubectl config use-context default'
+    - 'APP_NAME="${CI_PROJECT_NAMESPACE}-${CI_PROJECT_NAME}"'
+    - 'NAMESPACE="gitlab-cd-${ENV}"'
+    - 'kubectl -n ${NAMESPACE} create secret docker-registry $APP_NAME-registry-secret --docker-server=${CI_REGISTRY} --docker-username=${CI_DEPLOY_USER} --docker-password=${CI_DEPLOY_PASSWORD} --dry-run -o yaml | kubectl -n ${NAMESPACE} apply -f -'
     - |
       echo "
       apiVersion: apps/v1
@@ -147,10 +157,9 @@ deploy-docker:
                   port:
                     number: 80
       " > app.yml
-    - cat app.yml
-    # Deploy the yml
-    - kubectl ${ACTION} -f app.yml
-    - kubectl -n $NAMESPACE rollout restart deployment $APP_NAME 2>/dev/null || /bin/true
+    - 'cat app.yml'
+    - 'kubectl ${ACTION} -f app.yml'
+    - 'kubectl -n $NAMESPACE rollout restart deployment $APP_NAME 2>/dev/null || /bin/true'
 
 deploy-staging:
   <<: *kubernetes
