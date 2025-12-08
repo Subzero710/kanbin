@@ -41,7 +41,7 @@ public class BoardController {
     @GetMapping("/board")
     public ModelAndView board() {
         Board b = getOrCreateDefaultBoard();
-        var mv = new ModelAndView("board");
+        ModelAndView mv = new ModelAndView("board");
         mv.addObject("board", b);
         mv.addObject("columns", b.getColumns());
 
@@ -71,17 +71,22 @@ public class BoardController {
                     issues.persist(issue);
                 }
             }
-            mv.addObject("issuesByColumn", issuesByColumn);
-
-            // Prépare les informations WIP pour chaque colonne principale1
-            Map<Long, Long> wipUsageByColumnId = new HashMap<>();
-            for (Column mainCol : b.getColumns()) {
-                long count = countIssuesInColumn(b, mainCol);
-                wipUsageByColumnId.put(mainCol.getId(), count);
+            if (key != null) {
+                issuesByColumn.get(key).add(issue);
             }
-            mv.addObject("wipUsageByColumnId", wipUsageByColumnId);
+        }
 
-            return mv;
+        mv.addObject("issuesByColumn", issuesByColumn);
+
+        // Prépare les informations WIP pour chaque colonne principale
+        Map<Long, Long> wipUsageByColumnId = new HashMap<>();
+        for (Column mainCol : b.getColumns()) {
+            long count = countIssuesInColumn(b, mainCol);
+            wipUsageByColumnId.put(mainCol.getId(), count);
+        }
+        mv.addObject("wipUsageByColumnId", wipUsageByColumnId);
+
+        return mv;
     }
 
     @PostMapping("/board/add-column")
@@ -239,20 +244,26 @@ public class BoardController {
         return mv;
     }
 
-        @PostMapping("/board/columns/{id}")
-        public String updateColumn(@PathVariable long id, @RequestParam("title") String title, @RequestParam(value = "wipLimit", required = false) Integer wipLimit) {
+    @PostMapping("/board/columns/{id}")
+    public String updateColumn(@PathVariable long id,
+                               @RequestParam("title") String title,
+                               @RequestParam(value = "wipLimit", required = false) Integer wipLimit) {
         Board board = getOrCreateDefaultBoard();
 
         board.getColumns().stream()
                 .filter(c -> c.getId() == id)
                 .findFirst()
-                .ifPresent(c -> {c.setTitle(title); c.setWipLimit(wipLimit);
+                .ifPresent(c -> {
+                    c.setTitle(title);
+                    c.setWipLimit(wipLimit);
+                });
 
         // Important : persister le board après la modification
         boards.save(board);
 
         return "redirect:/board";
     }
+
 
     @PostMapping("/board/reorder-column")
     @ResponseBody
