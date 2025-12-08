@@ -13,7 +13,9 @@
     </div>
 
     <form th:action="@{/board/add-column}" method="post" accept-charset="UTF-8" style="margin-bottom: 20px;">
-        <input type="text" name="title" placeholder="Titre de la nouvelle colonne" required maxlength="30"/>
+        <input type="text" name="title" placeholder="Titre de la nouvelle colonne"
+               aria-label="Titre de la nouvelle colonne"
+               required maxlength="30"/>
         <input type="submit" value="Ajouter Colonne"/>
     </form>
 
@@ -34,7 +36,7 @@
                     <a th:if="${!c.fixed}"
                        th:href="@{/board/columns/{id}/edit(id=${c.id})}"
                        class="btn btn-warning btn-sm"
-                       style="padding: 0px 5px; margin-right: 5px;"
+                       style="padding: 0 5px; margin-right: 5px;"
                        title="Renommer">edit</a>
 
                     <form th:if="${!c.fixed}"
@@ -43,7 +45,7 @@
                         <button type="submit" class="btn btn-danger btn-sm"
                                 onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette colonne ?')"
                                 value="Remove column"
-                                style="padding: 0px 5px;">
+                                style="padding: 0 5px;">
                             X
                         </button>
                     </form>
