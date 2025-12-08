@@ -6,8 +6,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
-import org.openqa.selenium.firefox.FirefoxDriver;
-import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.remote.RemoteWebDriver;
 
 import java.net.MalformedURLException;
@@ -17,7 +15,6 @@ import java.time.Duration;
 public abstract class AbstractIT {
 
     protected static WebDriver driver;
-    // Par défaut localhost (fonctionne sur ton PC ET sur le CI en mode local)
     private static String host = "localhost";
     private static String port = "8080";
 
@@ -25,54 +22,36 @@ public abstract class AbstractIT {
     public static void setupWebDriver() throws MalformedURLException {
         if (driver != null) return;
 
-        // Récupération des propriétés
-        String remoteBrowser = System.getProperty("selenium.remote.browser");
+        // 1. On récupère les propriétés comme demandé dans le doc
+        String remoteBrowser = System.getProperty("selenium.remote.browser"); //
         String envHost = System.getProperty("host");
         String envPort = System.getProperty("servlet.port");
         String remoteUrl = System.getProperty("selenium.remote.url");
-        // Choix du navigateur (par défaut chrome)
-        String browser = System.getProperty("browser", "chrome").toLowerCase();
 
         if (envHost != null) host = envHost;
         if (envPort != null) port = envPort;
 
-        System.out.println(">>> DEBUG CONFIG: Host=" + host + ":" + port + " | RemoteMode=" + remoteBrowser + " | Browser=" + browser);
+        System.out.println(">>> CONFIG: Host=" + host + " Port=" + port + " RemoteBrowser=" + remoteBrowser);
 
-        // --- OPTIONS CHROME (CRITIQUES POUR DOCKER) ---
-        ChromeOptions chromeOptions = new ChromeOptions();
-        chromeOptions.addArguments("--headless=new"); // Obligatoire CI
-        chromeOptions.addArguments("--no-sandbox"); // ANTI-CRASH DOCKER
-        chromeOptions.addArguments("--disable-dev-shm-usage"); // ANTI-CRASH DOCKER
-        chromeOptions.addArguments("--disable-gpu");
-        chromeOptions.addArguments("--remote-allow-origins=*");
-        chromeOptions.addArguments("--window-size=1920,1080");
+        ChromeOptions options = new ChromeOptions();
+        // Options standard pour éviter les crashs dans les environnements Linux/Docker
+        options.addArguments("--headless=new");
+        options.addArguments("--no-sandbox");
+        options.addArguments("--disable-dev-shm-usage");
+        options.addArguments("--disable-gpu");
+        options.addArguments("--window-size=1920,1080");
 
-        // --- OPTIONS FIREFOX ---
-        FirefoxOptions firefoxOptions = new FirefoxOptions();
-        firefoxOptions.addArguments("-headless");
-        firefoxOptions.addArguments("--width=1920");
-        firefoxOptions.addArguments("--height=1080");
-
-        // Logique de sélection
-        if ("1".equals(remoteBrowser) && remoteUrl != null) {
-            // Mode Remote (si on voulait utiliser un service selenium externe)
-            System.out.println(">>> MODE: REMOTE GRID");
-            if (browser.contains("firefox")) {
-                driver = new RemoteWebDriver(new URL(remoteUrl), firefoxOptions);
-            } else {
-                driver = new RemoteWebDriver(new URL(remoteUrl), chromeOptions);
-            }
+        // 2. La logique du Prof : Si remote.browser est défini, on passe en RemoteWebDriver
+        if ("1".equals(remoteBrowser)) { //
+            System.out.println(">>> MODE CI (Remote): Connexion au service Selenium...");
+            // Si remoteUrl n'est pas défini par Maven, on met l'URL par défaut du service
+            if (remoteUrl == null) remoteUrl = "http://selenium-chrome:4444/wd/hub";
+            driver = new RemoteWebDriver(new URL(remoteUrl), options);
         } else {
-            // Mode Local (Ton PC + CI méthode installation locale)
-            System.out.println(">>> MODE: LOCAL DRIVER");
-            if (browser.contains("firefox")) {
-                WebDriverManager.firefoxdriver().setup();
-                driver = new FirefoxDriver(firefoxOptions);
-            } else {
-                WebDriverManager.chromedriver().setup();
-                // On passe bien les options anti-crash ici !
-                driver = new ChromeDriver(chromeOptions);
-            }
+            // Sinon, on est en local (sur ton PC)
+            System.out.println(">>> MODE LOCAL: Démarrage Chrome local...");
+            WebDriverManager.chromedriver().setup(); //
+            driver = new ChromeDriver(options);
         }
 
         driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(2));

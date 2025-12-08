@@ -1,19 +1,19 @@
 image: maven:3-eclipse-temurin-21
 
-# --- CONFIGURATION GLOBALE ---
+# Config Prof: Création du settings.xml pour le Nexus de l'école
+before_script:
+  - echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd"><mirrors><mirror><id>ensisa</id><name>Nexus ENSISA</name><url>https://nexus.cluster.ensisa.uha.fr/repository/maven-public/</url><mirrorOf>*</mirrorOf></mirror></mirrors></settings>' > settings.xml
+
 variables:
-  # On utilise le settings.xml généré et le dossier libs pour le cache
+  # Prof: Batch mode, settings.xml et dossier libs
   MAVEN_CLI_OPTS: "--batch-mode -s settings.xml -Dmaven.repo.local=libs"
 
+# Prof: Cache sur "libs" et "target"
 cache:
   key: "$CI_COMMIT_REF_SLUG"
   paths:
     - "libs"
     - "**/target"
-
-# Création du fichier de config pour le Nexus de l'école
-before_script:
-  - echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd"><mirrors><mirror><id>ensisa</id><name>Nexus ENSISA</name><url>https://nexus.cluster.ensisa.uha.fr/repository/maven-public/</url><mirrorOf>*</mirrorOf></mirror></mirrors></settings>' > settings.xml
 
 stages:
   - build_and_test
@@ -21,13 +21,11 @@ stages:
   - package
   - run
 
-# --- ETAPE 1 : BUILD & QUALITÉ ---
+# --- ETAPE 1 : BUILD (Standard) ---
 build_job:
   stage: build_and_test
   script:
-    # Compile, Test Unitaires, SpotBugs et pré-téléchargement des plugins
     - 'mvn $MAVEN_CLI_OPTS clean install -DskipITs spotbugs:check failsafe:help'
-    # Génération du badge de couverture
     - "grep -v 'COMPLEXITY_MISSED,COMPLEXITY_COVERED' kanbin-projest-reporting/target/site/jacoco-aggregate/jacoco.csv | awk -F, '{missed += $10 ; covered += $11} END {print \"Jacoco Coverage:\", 100*covered/(covered+missed), \"%\"}'"
   artifacts:
     expire_in: 1 hour
@@ -40,7 +38,25 @@ build_job:
       - "kanbin-projest-reporting/target/site/jacoco-aggregate/*"
       - "**/target/spotbugs.xml"
 
+# --- ETAPE 2 : INTEGRATION (Selon le Doc du Prof) ---
+integration_test_job:
+  stage: integration
+  # Prof: "ajoutée en tant que service... utiliser selenium/standalone-chrome"
+  services:
+    - name: selenium/standalone-chrome
+      alias: selenium-chrome
+  script:
+    # --- Configuration Réseau (Indispensable pour que le service voit l'appli) ---
+    - 'export MY_IP=$(hostname -i)'
 
+    # --- Commande Maven (Selon le Doc) ---
+    # -nsu : Utilise le cache libs (offline partiel)
+    # -Dselenium.remote.browser=1 : Comme demandé par le prof
+    # -Dhost=$MY_IP : Pour dire à Chrome de venir sur CETTE adresse IP (pas localhost)
+    # -Djetty.http.host=0.0.0.0 : Pour que Jetty ouvre la porte à Chrome
+    - 'mvn -nsu $MAVEN_CLI_OPTS -Dselenium.remote.browser=1 -Dhost=$MY_IP -Djetty.http.host=0.0.0.0 failsafe:integration-test failsafe:verify -Dsurefire.skip=true'
+  dependencies:
+    - build_job
 
 # --- ETAPE 3 : DOCKER (KANIKO) ---
 docker-build:
@@ -48,7 +64,7 @@ docker-build:
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
-  before_script: [] # Pas de settings.xml ici
+  before_script: []
   script:
     - 'WARFILE=$(find kanbin-projest-app/target -name "*.war")'
     - 'echo "FROM jetty:12-jdk21-eclipse-temurin" > Dockerfile'
@@ -64,7 +80,7 @@ docker-build:
     - if: $CI_COMMIT_BRANCH =~ /^release-.*$/
     - if: $CI_COMMIT_TAG
 
-# --- ETAPE 4 : DEPLOIEMENT (KUBERNETES) ---
+# --- ETAPE 4 : KUBERNETES ---
 .kubernetes: &kubernetes
   stage: run
   image: docker-private.cluster.ensisa.uha.fr/docker/kubectl
