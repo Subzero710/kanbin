@@ -38,23 +38,19 @@ build_job:
       - "kanbin-projest-reporting/target/site/jacoco-aggregate/*"
       - "**/target/spotbugs.xml"
 
-# --- ETAPE 2 : INTEGRATION (Selon le Doc du Prof) ---
+# --- ETAPE 2 : INTEGRATION ---
 integration_test_job:
   stage: integration
-  # Prof: "ajoutée en tant que service... utiliser selenium/standalone-chrome"
   services:
     - name: selenium/standalone-chrome
       alias: selenium-chrome
   script:
-    # --- Configuration Réseau (Indispensable pour que le service voit l'appli) ---
     - 'export MY_IP=$(hostname -i)'
+    - 'echo "Application IP: $MY_IP"'
 
-    # --- Commande Maven (Selon le Doc) ---
-    # -nsu : Utilise le cache libs (offline partiel)
-    # -Dselenium.remote.browser=1 : Comme demandé par le prof
-    # -Dhost=$MY_IP : Pour dire à Chrome de venir sur CETTE adresse IP (pas localhost)
-    # -Djetty.http.host=0.0.0.0 : Pour que Jetty ouvre la porte à Chrome
-    - 'mvn -nsu $MAVEN_CLI_OPTS -Dselenium.remote.browser=1 -Dhost=$MY_IP -Djetty.http.host=0.0.0.0 failsafe:integration-test failsafe:verify -Dsurefire.skip=true'
+    # ON REMPLACE "failsafe:..." PAR "verify"
+    # Cela va activer le démarrage automatique de Jetty configuré dans le pom.xml
+    - 'mvn -nsu $MAVEN_CLI_OPTS -Dselenium.remote.browser=1 -Dselenium.remote.url=$SELENIUM_URL -Dhost=$MY_IP -Djetty.http.host=0.0.0.0 verify -Dsurefire.skip=true'
   dependencies:
     - build_job
 

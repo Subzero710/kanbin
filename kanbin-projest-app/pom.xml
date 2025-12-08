@@ -139,39 +139,30 @@
             <plugin>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-maven-plugin</artifactId>
-                <version>11.0.25</version>
+                <version>11.0.24</version>
+
                 <configuration>
                     <httpConnector>
-                        <port>${servlet.port}</port>
+                        <host>0.0.0.0</host>
+                        <port>8080</port>
                     </httpConnector>
-                    <stopKey>quit</stopKey>
-                    <stopPort>${jetty.stop.port}</stopPort>
-                    <webApp>
-                        <contextPath>/</contextPath>
-                    </webApp>
-                    <scan>5</scan>
-                    <scanTargetPatterns>
-                        <scanTargetPattern>
-                            <directory>src/main/webapp/WEB-INF</directory>
-                            <includes>
-                                <include>**/*.html</include>
-                            </includes>
-                            <excludes>
-                                <exclude>**/*.properties</exclude>
-                            </excludes>
-                        </scanTargetPattern>
-                    </scanTargetPatterns>
+
+                    <stopKey>STOP</stopKey>
+                    <stopPort>9999</stopPort>
+                    <scanIntervalSeconds>0</scanIntervalSeconds>
                 </configuration>
+
                 <executions>
                     <execution>
-                        <id>start-it</id>
+                        <id>start-jetty</id>
                         <phase>pre-integration-test</phase>
                         <goals>
                             <goal>start</goal>
                         </goals>
                     </execution>
+
                     <execution>
-                        <id>stop-it</id>
+                        <id>stop-jetty</id>
                         <phase>post-integration-test</phase>
                         <goals>
                             <goal>stop</goal>
