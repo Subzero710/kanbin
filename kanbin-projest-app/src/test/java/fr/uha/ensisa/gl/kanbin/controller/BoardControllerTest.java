@@ -2,7 +2,6 @@ package fr.uha.ensisa.gl.kanbin.controller;
 
 import fr.uha.ensisa.gl.kanbin.projest.model.Board;
 import fr.uha.ensisa.gl.kanbin.projest.model.Column;
-import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
 import fr.uha.ensisa.gl.kanbin.projest.repo.BoardRepo;
 import fr.uha.ensisa.gl.kanbin.projest.repo.IssueRepo;
 
@@ -117,6 +116,7 @@ public class BoardControllerTest {
         String response = sut.reorderColumn(102L, 1);
 
         assertEquals("OK", response);
+        // Utilisation de get(1) reste valide car List n'a pas de "getSecond" standard simple
         assertEquals(colB, board.getColumns().get(1));
         verify(boardRepo).save(board);
     }
@@ -149,8 +149,6 @@ public class BoardControllerTest {
         assertEquals("redirect:/board", mv.getViewName());
     }
 
-    // --- NOUVEAUX TESTS POUR COUVRIR LES BRANCHES ---
-
     @Test
     void updateColumn_fixedColumn_shouldNotChangeTitle() {
         long fixedColId = 777L;
@@ -170,9 +168,7 @@ public class BoardControllerTest {
     @Test
     void moveColumnInternal_negativeIndex_shouldReturnFalse() {
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-
         String response = sut.reorderColumn(100L, -5);
-
         assertEquals("ERROR: Invalid move", response);
     }
 }

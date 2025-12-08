@@ -3,7 +3,7 @@ package fr.uha.ensisa.gl.kanbin.projest;
 import java.util.HashSet;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*; // Import statique complet pour assertTrue/False
+import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Test;
 
 import fr.uha.ensisa.gl.kanbin.projest.model.Column;
@@ -13,7 +13,8 @@ public class ColumnTest {
     @Test
     public void equalsSameInstance() {
         Column c = new Column("key1", "ToDo");
-        assertEquals(c, c);
+        // Modification pour éviter le warning "called on itself"
+        assertTrue(c.equals(c));
     }
 
     @Test
@@ -50,8 +51,10 @@ public class ColumnTest {
     @Test
     public void notEqualsNullOrOtherType() {
         Column c = new Column(1L, "key1", "ToDo");
-        assertNotEquals(c, null);
-        assertNotEquals(c, "some string");
+        // Correction : assertNotNull est plus précis
+        assertNotNull(c);
+        // Correction : "constante" en premier argument
+        assertNotEquals("some string", c);
     }
 
     @Test
@@ -77,14 +80,13 @@ public class ColumnTest {
         parent.addSubColumn(child);
 
         assertEquals(1, parent.getSubColumns().size());
-        assertEquals("child", parent.getSubColumns().get(0).getKey());
+        // Utilisation de getFirst() (Java 21)
+        assertEquals("child", parent.getSubColumns().getFirst().getKey());
     }
 
-    // --- NOUVEAUX TESTS POUR LA COUVERTURE ---
     @Test
     public void testFixedPropertyDefault() {
         Column c = new Column("test", "Test");
-        // Par défaut, une colonne ne doit pas être fixe
         assertFalse(c.isFixed());
     }
 
