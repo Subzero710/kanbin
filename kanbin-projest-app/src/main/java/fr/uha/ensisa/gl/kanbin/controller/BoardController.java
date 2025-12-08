@@ -17,6 +17,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
 @Controller
 public class BoardController {
     private final BoardRepo boards;
@@ -44,7 +47,6 @@ public class BoardController {
         mv.addObject("board", b);
         mv.addObject("columns", b.getColumns());
 
-        // On prépare les boîtes pour les sous-colonnes
         Map<String, List<Issue>> issuesByColumn = new LinkedHashMap<>();
         String defaultKey = null;
         for (Column mainCol : b.getColumns()) {
@@ -54,13 +56,11 @@ public class BoardController {
                     if (defaultKey == null) defaultKey = sub.getKey();
                 }
             } else {
-                // Au cas où une ancienne colonne traîne sans sous-colonne
                 issuesByColumn.put(mainCol.getKey(), new ArrayList<>());
                 if (defaultKey == null) defaultKey = mainCol.getKey();
             }
         }
 
-        // On range les issues
         for (Issue issue : issues.findAll()) {
             String key = issue.getColumnKey();
             if (key == null || !issuesByColumn.containsKey(key)) {
@@ -79,24 +79,25 @@ public class BoardController {
         return mv;
     }
 
-    @PostMapping("/board/add-column")
-    public String addColumn(@RequestParam("title") String title) {
+    @PostMapping("/board/add-column") // Note : J'ai gardé ton URL "/board/add-column"
+    public String addColumn(@RequestParam("title") String title,
+                            @RequestParam(value = "type", defaultValue = "simple") String type) {
+
         Board board = getOrCreateDefaultBoard();
 
-        // 1. Créer la colonne Principale
-        String mainKey = title.toLowerCase().replaceAll("\\s+", "-");
-        Column mainColumn = new Column(mainKey, title);
+        String key = title.toLowerCase().trim().replaceAll("\\s+", "-");
+        Column newColumn = new Column(key, title);
 
-        // 2. Créer automatiquement les 2 sous-colonnes
-        Column subTodo = new Column(mainKey + "-todo", "À Faire");
-        Column subWip  = new Column(mainKey + "-wip",  "En Cours");
+        if ("double".equalsIgnoreCase(type)) {
+            // Création des 2 sous-colonnes (comme avant)
+            Column subTodo = new Column(key + "-todo", "À Faire");
+            Column subWip  = new Column(key + "-wip",  "En Cours");
 
-        // 3. Relier les enfants au parent
-        mainColumn.addSubColumn(subTodo);
-        mainColumn.addSubColumn(subWip);
+            newColumn.addSubColumn(subTodo);
+            newColumn.addSubColumn(subWip);
+        }
 
-        // 4. Ajouter le parent au board
-        boards.addColumn(board.getId(), mainColumn);
+        boards.addColumn(board.getId(), newColumn);
 
         return "redirect:/board";
     }
@@ -139,7 +140,6 @@ public class BoardController {
             return "redirect:/board";
         }
 
-        // Colonne vide : on peut la supprimer
         board.removeColumn(columnId);
         boards.save(board);
         return "redirect:/board";
@@ -151,7 +151,6 @@ public class BoardController {
                             @RequestParam("direction") String direction) {
         Board board = getOrCreateDefaultBoard();
 
-        // 1. APLATIR LA LISTE pour naviguer linéairement entre sous-colonnes
         List<Column> flatList = new ArrayList<>();
         for (Column mainCol : board.getColumns()) {
             if (!mainCol.getSubColumns().isEmpty()) {
@@ -241,10 +240,6 @@ public class BoardController {
         }
     }
 
-    /**
-     * Tente de déplacer une colonne. Retourne false si l'opération est illégale.
-     * Cette méthode ne gère PAS le HTTP, juste la liste Java.
-     */
     private boolean moveColumnInternal(Board board, long columnId, int newIndex) {
         // Interdit de placer en position 0 (Réservé)
         if (newIndex <= 0) {
@@ -263,22 +258,16 @@ public class BoardController {
                 break;
             }
         }
-
-        // Colonne introuvable OU on essaie de bouger la colonne fixe (index 0)
         if (columnToMove == null || oldIndex == 0) {
             return false;
         }
 
-        // Réorganisation
         columns.remove(oldIndex);
-
-        // Protection index hors limites
         if (newIndex >= columns.size()) {
             columns.add(columnToMove);
         } else {
             columns.add(newIndex, columnToMove);
         }
-
         return true;
     }
 }

@@ -62,8 +62,7 @@ public class BoardControllerTest {
     void addColumn_whenBoardExists_shouldAddColumnToIt() {
         String newColumnTitle = "Test Column #29";
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-
-        sut.addColumn(newColumnTitle);
+        sut.addColumn(newColumnTitle, "simple");
         verify(boardRepo, times(1)).addColumn(
                 eq(TEST_BOARD_ID),
                 any(Column.class)
@@ -78,7 +77,7 @@ public class BoardControllerTest {
             b.setId(TEST_BOARD_ID);
             return b;
         });
-        sut.addColumn("Ma Colonne");
+        sut.addColumn("Ma Colonne", "simple"); // Ajout de "simple"
         verify(boardRepo).save(any(Board.class));
         verify(boardRepo).addColumn(eq(TEST_BOARD_ID), any(Column.class));
     }
@@ -217,7 +216,7 @@ public class BoardControllerTest {
             Board b = i.getArgument(0); b.setId(1L); return b;
         });
 
-        sut.addColumn("ColonnePrincipale");
+        sut.addColumn("ColonnePrincipale", "double");
 
         ArgumentCaptor<Column> columnCaptor = ArgumentCaptor.forClass(Column.class);
         verify(boardRepo).addColumn(eq(1L), columnCaptor.capture());

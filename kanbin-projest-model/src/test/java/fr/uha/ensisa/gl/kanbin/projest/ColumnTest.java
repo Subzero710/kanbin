@@ -1,13 +1,14 @@
 package fr.uha.ensisa.gl.kanbin.projest;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import org.junit.jupiter.api.Test;
 
 import fr.uha.ensisa.gl.kanbin.projest.model.Column;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 public class ColumnTest {
 
@@ -82,6 +83,36 @@ public class ColumnTest {
 
         assertEquals(1, parent.getSubColumns().size());
         assertEquals("child", parent.getSubColumns().get(0).getKey());
+    }
+
+    @Test
+    void getSubColumnsOrSelf_shouldReturnSelf_whenNoSubColumns() {
+        // Arrange : Une colonne simple (pas de sous-colonnes)
+        Column simpleColumn = new Column("simple", "Simple Column");
+
+        // Act
+        List<Column> result = simpleColumn.getSubColumnsOrSelf();
+
+        // Assert
+        assertEquals(1, result.size(), "Doit retourner une liste de taille 1");
+        assertEquals(simpleColumn, result.get(0), "La liste doit contenir la colonne elle-même");
+    }
+
+    @Test
+    void getSubColumnsOrSelf_shouldReturnSubColumns_whenSubColumnsExist() {
+        // Une colonne parent avec 2 sous-colonnes
+        Column parentColumn = new Column("parent", "Parent Column");
+        Column sub1 = new Column("sub1", "Sub 1");
+        Column sub2 = new Column("sub2", "Sub 2");
+
+        parentColumn.addSubColumn(sub1);
+        parentColumn.addSubColumn(sub2);
+        List<Column> result = parentColumn.getSubColumnsOrSelf();
+
+        assertEquals(2, result.size(), "Doit retourner les 2 sous-colonnes");
+        assertTrue(result.contains(sub1));
+        assertTrue(result.contains(sub2));
+        assertFalse(result.contains(parentColumn), "Ne doit pas contenir le parent");
     }
 
 }

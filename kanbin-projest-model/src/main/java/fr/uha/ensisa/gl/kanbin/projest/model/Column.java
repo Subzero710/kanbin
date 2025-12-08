@@ -8,7 +8,6 @@ public class Column {
     private String title;
     private Integer pos;
     private List<Column> subColumns = new ArrayList<>();
-
     public Column() {}
     public Column(long id, String key, String title) {
         this.id = id; this.key = key; this.title = title;
@@ -26,5 +25,12 @@ public class Column {
     public void setPos(Integer pos) { this.pos = pos; }
     public void addSubColumn(Column sub) {
         this.subColumns.add(sub);
+    }
+
+    public List<Column> getSubColumnsOrSelf() {
+        if (this.subColumns.isEmpty()) {
+            return List.of(this);
+        }
+        return this.subColumns;
     }
 }
