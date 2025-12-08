@@ -28,7 +28,14 @@
                  th:draggable="${!iterStat.first}">
 
             <header class="kb-col-header">
-                <span th:text="${c.title}" th:id="'col-title-' + ${c.key}">Column</span>
+                <span th:id="'col-title-' + ${c.key}">
+                    <span th:text="${c.title}">Column</span>
+                    <span th:if="${c.wipLimit != null and c.wipLimit > 0}"
+                          class="badge bg-secondary ms-2"
+                          th:text="${wipUsageByColumnId[c.id]} + ' / ' + ${c.wipLimit}">
+                        0 / 0
+                    </span>
+		        </span>
 
                 <div style="display:inline-block; float:right;">
                     <a th:href="@{/board/columns/{id}/edit(id=${c.id})}"
