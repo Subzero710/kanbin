@@ -7,6 +7,8 @@ before_script:
 variables:
   # Prof: Batch mode, settings.xml et dossier libs
   MAVEN_CLI_OPTS: "--batch-mode -s settings.xml -Dmaven.repo.local=libs"
+  # URL du service Selenium défini plus bas
+  SELENIUM_URL: "http://selenium-chrome:4444/wd/hub"
 
 # Prof: Cache sur "libs" et "target"
 cache:
@@ -38,23 +40,22 @@ build_job:
       - "kanbin-projest-reporting/target/site/jacoco-aggregate/*"
       - "**/target/spotbugs.xml"
 
-# --- ETAPE 2 : INTEGRATION (INSTALLATION MANUELLE CHROME) ---
+# --- ETAPE 2 : INTEGRATION ---
 integration_test_job:
   stage: integration
+  services:
+    - name: selenium/standalone-chrome
+      alias: selenium-chrome
   script:
-    # 1. On installe wget (outil de téléchargement)
-    - apt-get update && apt-get install -y wget
+    # On ne calcule plus l'IP complexe. On fait confiance au réseau local du Pod.
 
-    # 2. On télécharge Google Chrome Officiel (.deb)
-    - wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-
-    # 3. On l'installe (apt install ./... gère les dépendances automatiquement)
-    - apt-get install -y ./google-chrome-stable_current_amd64.deb
-
-    # 4. On lance les tests (Mode Local)
-    # Ton code Java va détecter Chrome installé localement et l'utiliser.
-    # Tout se passe sur localhost, donc pas de problème de réseau !
-    - 'mvn $MAVEN_CLI_OPTS failsafe:integration-test failsafe:verify -Dsurefire.skip=true'
+    # COMMANDE MAVEN :
+    # 1. -nsu : Utilise le cache libs
+    # 2. -Dselenium.remote.browser=1 : Active le mode Remote dans ton Java (Doc Prof)
+    # 3. -Djetty.http.host=0.0.0.0 : Force Jetty à ouvrir ses ports (Fonctionne via CLI)
+    # 4. verify : Lance le cycle complet (start-jetty -> test -> stop-jetty)
+    # Note : On NE PASSE PAS -Dhost, donc ton Java utilisera "localhost" par défaut.
+    - 'mvn -nsu $MAVEN_CLI_OPTS -Dselenium.remote.browser=1 -Dselenium.remote.url=$SELENIUM_URL -Djetty.http.host=0.0.0.0 verify -Dsurefire.skip=true'
   dependencies:
     - build_job
 
