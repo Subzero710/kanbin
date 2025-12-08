@@ -5,15 +5,14 @@ import fr.uha.ensisa.gl.kanbin.projest.model.Column;
 import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
 import fr.uha.ensisa.gl.kanbin.projest.repo.BoardRepo;
 import fr.uha.ensisa.gl.kanbin.projest.repo.IssueRepo;
-import fr.uha.ensisa.gl.kanbin.projest.repo.mem.IssueRepoMem;
-import fr.uha.ensisa.gl.kanbin.projest.repo.mem.BoardRepoMem;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
@@ -25,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 public class BoardControllerTest {
 
     @Mock
@@ -37,12 +37,10 @@ public class BoardControllerTest {
     private BoardController sut;
 
     private final long TEST_BOARD_ID = 1L;
-    private final long TEST_ISSUE_ID = 42L;
     private Board testBoard;
 
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
         testBoard = new Board(TEST_BOARD_ID, "Test Board");
         testBoard.addColumn(new Column(100L, "initial", "Initial Column"));
     }
@@ -82,12 +80,11 @@ public class BoardControllerTest {
         assertTrue(saved.getColumns().stream().noneMatch(c -> c.getId() == columnToRemoveId));
     }
 
-    // TEST NOUVEAU : Supprimer une colonne FIXE doit échouer
     @Test
     void removeColumn_fixedColumn_shouldFail_andSetErrorMessage() {
         long fixedColId = 999L;
         Column fixedCol = new Column(fixedColId, "backlog", "Backlog");
-        fixedCol.setFixed(true); // On simule la colonne fixe
+        fixedCol.setFixed(true);
         testBoard.addColumn(fixedCol);
 
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
@@ -96,7 +93,6 @@ public class BoardControllerTest {
         String viewName = sut.removeColumn(fixedColId, redirectAttributes);
 
         assertEquals("redirect:/board", viewName);
-        // On vérifie qu'on n'a PAS sauvegardé (donc pas supprimé)
         verify(boardRepo, never()).save(any());
 
         assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorMessage"));
@@ -107,7 +103,6 @@ public class BoardControllerTest {
     @Test
     void reorderColumn_validMove_shouldUpdateOrderAndSave() {
         Board board = new Board(TEST_BOARD_ID, "Test Board");
-        // Colonne fixe en 0
         Column fixed = new Column(100L, "fixed", "Backlog");
         fixed.setFixed(true);
         Column colA = new Column(101L, "col-a", "Col A");
@@ -119,7 +114,6 @@ public class BoardControllerTest {
 
         when(boardRepo.findAll()).thenReturn(List.of(board));
 
-        // Déplacer "Col B" (index 2) vers index 1
         String response = sut.reorderColumn(102L, 1);
 
         assertEquals("OK", response);
@@ -131,13 +125,12 @@ public class BoardControllerTest {
     void reorderColumn_moveFixedColumn_shouldFail() {
         Board board = new Board(TEST_BOARD_ID, "Test Board");
         Column fixed = new Column(100L, "fixed", "Fixed");
-        fixed.setFixed(true); // C'est une colonne fixe !
+        fixed.setFixed(true);
         board.addColumn(fixed);
         board.addColumn(new Column(101L, "col-a", "Col A"));
 
         when(boardRepo.findAll()).thenReturn(List.of(board));
 
-        // Essayer de déplacer la colonne fixe
         String response = sut.reorderColumn(100L, 1);
 
         assertEquals("ERROR: Invalid move", response);
@@ -153,7 +146,6 @@ public class BoardControllerTest {
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
 
         ModelAndView mv = sut.editColumnForm(fixedColId);
-        // Redirection si on essaie d'éditer
         assertEquals("redirect:/board", mv.getViewName());
     }
 }
