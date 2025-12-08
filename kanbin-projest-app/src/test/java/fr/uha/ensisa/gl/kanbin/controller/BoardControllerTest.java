@@ -148,4 +148,31 @@ public class BoardControllerTest {
         ModelAndView mv = sut.editColumnForm(fixedColId);
         assertEquals("redirect:/board", mv.getViewName());
     }
+
+    // --- NOUVEAUX TESTS POUR COUVRIR LES BRANCHES ---
+
+    @Test
+    void updateColumn_fixedColumn_shouldNotChangeTitle() {
+        long fixedColId = 777L;
+        Column fixedCol = new Column(fixedColId, "fix", "Original Title");
+        fixedCol.setFixed(true);
+        testBoard.addColumn(fixedCol);
+
+        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+
+        String view = sut.updateColumn(fixedColId, "Hacked Title");
+
+        assertEquals("redirect:/board", view);
+        assertEquals("Original Title", fixedCol.getTitle());
+        verify(boardRepo, never()).save(any());
+    }
+
+    @Test
+    void moveColumnInternal_negativeIndex_shouldReturnFalse() {
+        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+
+        String response = sut.reorderColumn(100L, -5);
+
+        assertEquals("ERROR: Invalid move", response);
+    }
 }
