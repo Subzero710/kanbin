@@ -7,6 +7,8 @@ before_script:
 variables:
   # Prof: Batch mode, settings.xml et dossier libs
   MAVEN_CLI_OPTS: "--batch-mode -s settings.xml -Dmaven.repo.local=libs"
+  # URL du service Selenium défini plus bas
+  SELENIUM_URL: "http://selenium-chrome:4444/wd/hub"
 
 # Prof: Cache sur "libs" et "target"
 cache:
@@ -21,7 +23,7 @@ stages:
   - package
   - run
 
-# --- ETAPE 1 : BUILD (Standard) ---
+# --- ETAPE 1 : BUILD ---
 build_job:
   stage: build_and_test
   script:
@@ -45,12 +47,15 @@ integration_test_job:
     - name: selenium/standalone-chrome
       alias: selenium-chrome
   script:
-    - 'export MY_IP=$(hostname -i)'
-    - 'echo "Application IP: $MY_IP"'
+    # On ne calcule plus l'IP complexe. On fait confiance au réseau local du Pod.
 
-    # ON REMPLACE "failsafe:..." PAR "verify"
-    # Cela va activer le démarrage automatique de Jetty configuré dans le pom.xml
-    - 'mvn -nsu $MAVEN_CLI_OPTS -Dselenium.remote.browser=1 -Dselenium.remote.url=$SELENIUM_URL -Dhost=$MY_IP -Djetty.http.host=0.0.0.0 verify -Dsurefire.skip=true'
+    # COMMANDE MAVEN :
+    # 1. -nsu : Utilise le cache libs
+    # 2. -Dselenium.remote.browser=1 : Active le mode Remote dans ton Java (Doc Prof)
+    # 3. -Djetty.http.host=0.0.0.0 : Force Jetty à ouvrir ses ports (Fonctionne via CLI)
+    # 4. verify : Lance le cycle complet (start-jetty -> test -> stop-jetty)
+    # Note : On NE PASSE PAS -Dhost, donc ton Java utilisera "localhost" par défaut.
+    - 'mvn -nsu $MAVEN_CLI_OPTS -Dselenium.remote.browser=1 -Dselenium.remote.url=$SELENIUM_URL -Djetty.http.host=0.0.0.0 verify -Dsurefire.skip=true'
   dependencies:
     - build_job
 
