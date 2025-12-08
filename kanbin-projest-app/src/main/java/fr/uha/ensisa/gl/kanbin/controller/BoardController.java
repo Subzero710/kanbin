@@ -17,6 +17,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
 @Controller
 public class BoardController {
     private final BoardRepo boards;
@@ -79,24 +82,29 @@ public class BoardController {
         return mv;
     }
 
-    @PostMapping("/board/add-column")
-    public String addColumn(@RequestParam("title") String title) {
+    @PostMapping("/board/add-column") // Note : J'ai gardé ton URL "/board/add-column"
+    public String addColumn(@RequestParam("title") String title,
+                            @RequestParam(value = "type", defaultValue = "simple") String type) {
+
         Board board = getOrCreateDefaultBoard();
 
-        // 1. Créer la colonne Principale
-        String mainKey = title.toLowerCase().replaceAll("\\s+", "-");
-        Column mainColumn = new Column(mainKey, title);
+        // 1. Nettoyage du titre pour la clé
+        String key = title.toLowerCase().trim().replaceAll("\\s+", "-");
+        Column newColumn = new Column(key, title);
 
-        // 2. Créer automatiquement les 2 sous-colonnes
-        Column subTodo = new Column(mainKey + "-todo", "À Faire");
-        Column subWip  = new Column(mainKey + "-wip",  "En Cours");
+        // 2. Logique Simple vs Double
+        if ("double".equalsIgnoreCase(type)) {
+            // Création des 2 sous-colonnes (comme avant)
+            Column subTodo = new Column(key + "-todo", "À Faire");
+            Column subWip  = new Column(key + "-wip",  "En Cours");
 
-        // 3. Relier les enfants au parent
-        mainColumn.addSubColumn(subTodo);
-        mainColumn.addSubColumn(subWip);
+            newColumn.addSubColumn(subTodo);
+            newColumn.addSubColumn(subWip);
+        }
+        // Sinon (simple), on ne fait rien, la colonne est créée vide (sans sous-colonnes)
 
-        // 4. Ajouter le parent au board
-        boards.addColumn(board.getId(), mainColumn);
+        // 3. Ajout au board
+        boards.addColumn(board.getId(), newColumn);
 
         return "redirect:/board";
     }
