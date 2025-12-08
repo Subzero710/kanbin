@@ -7,6 +7,8 @@ public class Column {
     private String key;
     private String title;
     private Integer pos;
+    // NOUVEAU CHAMP : définit si c'est une colonne système (ex: Backlog)
+    private boolean fixed = false;
     private List<Column> subColumns = new ArrayList<>();
 
     public Column() {}
@@ -14,7 +16,8 @@ public class Column {
         this.id = id; this.key = key; this.title = title;
     }
     public Column(String key, String title) { this(0L, key, title); }
-    public List<Column> getSubColumns() { return subColumns; }// 0l à revoir si problème
+
+    public List<Column> getSubColumns() { return subColumns; }
 
     public long getId() { return id; }
     public void setId(long id) { this.id = id; }
@@ -24,7 +27,12 @@ public class Column {
     public void setTitle(String title) { this.title = title; }
     public Integer getPos() { return pos; }
     public void setPos(Integer pos) { this.pos = pos; }
+
     public void addSubColumn(Column sub) {
         this.subColumns.add(sub);
     }
+
+    // Getters et Setters pour fixed
+    public boolean isFixed() { return fixed; }
+    public void setFixed(boolean fixed) { this.fixed = fixed; }
 }
