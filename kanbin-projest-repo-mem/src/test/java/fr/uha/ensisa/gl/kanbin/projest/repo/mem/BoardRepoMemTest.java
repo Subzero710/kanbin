@@ -29,6 +29,12 @@ class BoardRepoMemTest {
         assertEquals("Default", boards.get(0).getName());
         assertFalse(boards.get(0).getColumns().isEmpty(), "Le seed doit créer des colonnes par défaut");
 
+        // --- VERIFICATION SUPPLEMENTAIRE ---
+        Column backlog = boards.get(0).getColumns().get(0);
+        assertEquals("backlog", backlog.getKey());
+        assertTrue(backlog.isFixed(), "La colonne Backlog générée par le seed doit être fixe");
+        // -----------------------------------
+
         // Deuxième appel ne doit rien faire
         repo.seed();
         assertEquals(1, repo.findAll().size());
@@ -52,23 +58,20 @@ class BoardRepoMemTest {
         Column c1 = new Column(0, "col1", "Col 1");
         b.addColumn(c1);
 
-        repo.save(b); // Sauvegarde globale
+        repo.save(b);
 
         assertTrue(c1.getId() > 0, "L'ID de la colonne doit être généré lors du save du board");
     }
 
     @Test
     void addColumn_shouldAddToExistingBoardAndGenerateId() {
-        // Setup board
         Board b = new Board("My Board");
         repo.save(b);
         long boardId = b.getId();
 
-        // Action
         Column newCol = new Column(0, "dev", "Dev");
         repo.addColumn(boardId, newCol);
 
-        // Verify
         Board reloaded = repo.findById(boardId).get();
         assertEquals(1, reloaded.getColumns().size());
         assertTrue(newCol.getId() > 0, "L'ID de la nouvelle colonne doit être généré");
@@ -109,15 +112,11 @@ class BoardRepoMemTest {
 
     @Test
     public void testFindAll() {
-
         BoardRepoMem repo = new BoardRepoMem();
-
         repo.save(new Board("Board 1"));
         repo.save(new Board("Board 2"));
 
         Collection<Board> allBoards = repo.findAll();
         assertTrue(allBoards.size() >= 2);
     }
-
-
 }
