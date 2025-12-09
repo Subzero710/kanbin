@@ -153,9 +153,9 @@
     font-size: 0.65em;
     line-height: 1.5;
     color: #6c757d;
+    overflow: hidden;
+    white-space: nowrap; /* Empêche le retour à la ligne */
 }
-
-
 
 .kb-card-detail span {
     white-space: pre-wrap;
@@ -167,4 +167,20 @@
     overflow: hidden;
     line-height: 1.5;
     color: #34393d;
+}
+
+/* Style pour la troncature de texte sur une seule ligne avec ellipsis */
+.story-detail-truncate {
+    max-height: 2em;
+    /* Cache l'excès de contenu */
+    overflow: hidden;
+
+    /* Force le contenu à ne pas revenir à la ligne */
+    white-space: nowrap; /* MAINTENUE pour la troncature horizontale */
+
+    /* Ajoute les points de suspension à la fin du texte coupé */
+    text-overflow: ellipsis;
+}
+.story-detail-truncate span{
+    white-space: pre-wrap;
 }

@@ -35,8 +35,8 @@
         <tr th:each="issue : ${issues}" class="issue_row" th:id="${'issue_' + issue.id}">
             <td th:text="${issue.id}">1</td>
             <td th:text="${issue.title}">Titre de l'Issue</td>
-            <td>
-                <div class="table-card-detail">
+            <td style="max-width: 250px;"> <!-- Column Detail -->
+                <div class="story-detail-truncate">
                     <span th:text="${issue.detail}">Détail de la story...</span>
                 </div>
             </td>
