@@ -71,7 +71,8 @@ public class BoardController {
                 }
             }
             if (key != null) {
-                issuesByColumn.get(key).add(issue);
+                // Utilisation de addFirst() (Java 21) pour mettre les plus récents en haut
+                issuesByColumn.get(key).addFirst(issue);
             }
         }
 
