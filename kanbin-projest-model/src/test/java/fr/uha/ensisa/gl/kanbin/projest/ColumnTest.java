@@ -14,7 +14,7 @@ public class ColumnTest {
     @Test
     public void equalsSameInstance() {
         Column c = new Column("key1", "ToDo");
-        assertTrue(c.equals(c));
+        assertEquals(c, c);
     }
 
     @Test
@@ -102,7 +102,7 @@ public class ColumnTest {
         Column simpleColumn = new Column("simple", "Simple Column");
         List<Column> result = simpleColumn.getSubColumnsOrSelf();
         assertEquals(1, result.size());
-        assertEquals(simpleColumn, result.get(0));
+        assertEquals(simpleColumn, result.getFirst());
     }
 
     @Test
@@ -116,5 +116,8 @@ public class ColumnTest {
         List<Column> result = parentColumn.getSubColumnsOrSelf();
         assertEquals(2, result.size());
         assertTrue(result.contains(sub1));
+        assertTrue(result.contains(sub2));
+        assertFalse(result.contains(parentColumn), "Ne doit pas contenir le parent");
+
     }
 }

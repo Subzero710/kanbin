@@ -97,6 +97,9 @@ public class BoardControllerTest {
         Column createdCol = columnCaptor.getValue();
         assertEquals("ColonnePrincipale", createdCol.getTitle());
         assertEquals(2, createdCol.getSubColumns().size());
+        assertEquals("À Faire", createdCol.getSubColumns().get(0).getTitle());
+        assertEquals("En Cours", createdCol.getSubColumns().get(1).getTitle());
+
     }
 
     // --- TESTS SUPPRESSION (Remove Column) & SÉCURITÉ ---
@@ -105,6 +108,7 @@ public class BoardControllerTest {
     void postRemoveColumn_shouldSaveBoardWithoutThatColumn() {
         long columnToRemoveId = 100L;
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+        assertTrue(testBoard.getColumns().stream().anyMatch(c -> c.getId() == columnToRemoveId));
         RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
         String viewName = sut.removeColumn(columnToRemoveId, redirectAttributes);
         assertEquals("redirect:/board", viewName);
@@ -173,7 +177,7 @@ public class BoardControllerTest {
         ArgumentCaptor<Board> boardCaptor = ArgumentCaptor.forClass(Board.class);
         verify(boardRepo).save(boardCaptor.capture());
         Column updatedCol = boardCaptor.getValue().getColumns().stream()
-                .filter(c -> c.getId() == colId).findFirst().get();
+                .filter(c -> c.getId() == colId).findFirst().orElseThrow();
         assertEquals(newTitle, updatedCol.getTitle());
     }
 
@@ -303,7 +307,11 @@ public class BoardControllerTest {
 
         String response = sut.reorderColumn(102L, 1);
         assertEquals("OK", response);
+        assertEquals(fixed, board.getColumns().get(0));
         assertEquals(colB, board.getColumns().get(1));
+        assertEquals(colA, board.getColumns().get(2));
+
+
         verify(boardRepo).save(board);
     }
 
@@ -316,6 +324,7 @@ public class BoardControllerTest {
         when(boardRepo.findAll()).thenReturn(List.of(board));
 
         String response = sut.reorderColumn(101L, 0);
+        assertEquals(fixed, board.getColumns().getFirst());
         assertEquals("ERROR: Invalid move", response);
         verify(boardRepo, never()).save(any());
     }
@@ -334,6 +343,8 @@ public class BoardControllerTest {
         assertEquals("OK", response);
         // Ordre attendu : Fixed, B, A
         List<Column> result = board.getColumns();
+        assertEquals(fixed, result.get(0));
+        assertEquals(colB, result.get(1));
         assertEquals(colA, result.get(2));
         verify(boardRepo).save(board);
     }
@@ -373,7 +384,7 @@ public class BoardControllerTest {
         String view = controller.removeColumn(col.getId(), redirectAttributes);
 
         assertEquals("redirect:/board", view);
-        assertTrue(boardRepo.findById(board.getId()).get().getColumns().isEmpty());
+        assertTrue(boardRepo.findById(board.getId()).orElseThrow().getColumns().isEmpty());
     }
 
     @Test
@@ -391,7 +402,8 @@ public class BoardControllerTest {
         String view = controller.removeColumn(col.getId(), redirectAttributes);
 
         assertEquals("redirect:/board", view);
-        assertFalse(boardRepo.findById(board.getId()).get().getColumns().isEmpty());
+        assertFalse(boardRepo.findById(board.getId()).orElseThrow().getColumns().isEmpty());
         assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorMessage"));
+        assertEquals("Impossible de supprimer une colonne non vide", redirectAttributes.getFlashAttributes().get("errorMessage"));
     }
 }
