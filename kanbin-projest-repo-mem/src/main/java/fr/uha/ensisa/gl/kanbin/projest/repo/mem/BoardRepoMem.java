@@ -17,8 +17,12 @@ public class BoardRepoMem implements BoardRepo {
         if (store.isEmpty()) {
             Board b = new Board("Default");
 
-            // Colonne principale "Backlog" construite comme celles de /board/add-column
+            // Colonne Backlog (Système)
             Column backlog = new Column("backlog", "Backlog");
+
+            // --- VERROUILLAGE ICI ---
+            backlog.setFixed(true);
+
             Column backlogTodo = new Column("backlog-todo", "À Faire");
             Column backlogWip  = new Column("backlog-wip",  "En Cours");
 
@@ -26,7 +30,7 @@ public class BoardRepoMem implements BoardRepo {
             backlog.addSubColumn(backlogWip);
             b.addColumn(backlog);
 
-            // On passe par save() pour avoir les mêmes règles d'IDs que partout ailleurs
+            // On passe par save() pour avoir les mêmes règles d'IDs
             save(b);
         }
     }

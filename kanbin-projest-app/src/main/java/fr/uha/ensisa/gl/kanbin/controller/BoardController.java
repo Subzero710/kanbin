@@ -17,9 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-
 @Controller
 public class BoardController {
     private final BoardRepo boards;
@@ -71,7 +68,6 @@ public class BoardController {
                 }
             }
             if (key != null) {
-                // Utilisation de addFirst() (Java 21) pour mettre les plus récents en haut
                 issuesByColumn.get(key).addFirst(issue);
             }
         }
@@ -80,26 +76,22 @@ public class BoardController {
         return mv;
     }
 
-    @PostMapping("/board/add-column") // Note : J'ai gardé ton URL "/board/add-column"
+    @PostMapping("/board/add-column")
     public String addColumn(@RequestParam("title") String title,
                             @RequestParam(value = "type", defaultValue = "simple") String type) {
 
         Board board = getOrCreateDefaultBoard();
-
         String key = title.toLowerCase().trim().replaceAll("\\s+", "-");
         Column newColumn = new Column(key, title);
 
         if ("double".equalsIgnoreCase(type)) {
-            // Création des 2 sous-colonnes (comme avant)
             Column subTodo = new Column(key + "-todo", "À Faire");
             Column subWip  = new Column(key + "-wip",  "En Cours");
-
             newColumn.addSubColumn(subTodo);
             newColumn.addSubColumn(subWip);
         }
 
         boards.addColumn(board.getId(), newColumn);
-
         return "redirect:/board";
     }
 
@@ -108,7 +100,6 @@ public class BoardController {
                                RedirectAttributes redirectAttributes) {
         Board board = getOrCreateDefaultBoard();
 
-        // On retrouve la colonne racine à supprimer
         Optional<Column> colOpt = board.getColumns().stream()
                 .filter(c -> c.getId() == columnId)
                 .findFirst();
@@ -117,27 +108,25 @@ public class BoardController {
         }
         Column column = colOpt.get();
 
-        // Clés de la colonne + de ses sous-colonnes
-        List<String> keys = new ArrayList<>();
-        if (column.getKey() != null) {
-            keys.add(column.getKey());
-        }
-        for (Column sub : column.getSubColumns()) {
-            if (sub.getKey() != null) {
-                keys.add(sub.getKey());
-            }
+        // SECURITÉ : COLONNE FIXE
+        if (column.isFixed()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Action interdite : Cette colonne système ne peut pas être supprimée.");
+            return "redirect:/board";
         }
 
-        // Vérifier s'il existe des Issue dans ces colonnes
+        // SECURITÉ : COLONNE NON VIDE
+        List<String> keys = new ArrayList<>();
+        if (column.getKey() != null) keys.add(column.getKey());
+        for (Column sub : column.getSubColumns()) {
+            if (sub.getKey() != null) keys.add(sub.getKey());
+        }
+
         boolean hasIssues = issues.findAll().stream()
-                .anyMatch(i -> i.getColumnKey() != null
-                        && keys.contains(i.getColumnKey()));
+                .anyMatch(i -> i.getColumnKey() != null && keys.contains(i.getColumnKey()));
 
         if (hasIssues) {
-            redirectAttributes.addFlashAttribute(
-                    "errorMessage",
-                    "Impossible de supprimer une colonne non vide"
-            );
+            redirectAttributes.addFlashAttribute("errorMessage", "Impossible de supprimer une colonne non vide");
             return "redirect:/board";
         }
 
@@ -146,12 +135,10 @@ public class BoardController {
         return "redirect:/board";
     }
 
-
     @PostMapping("/board/move-issue")
     public String moveIssue(@RequestParam("issueId") long issueId,
                             @RequestParam("direction") String direction) {
         Board board = getOrCreateDefaultBoard();
-
         List<Column> flatList = new ArrayList<>();
         for (Column mainCol : board.getColumns()) {
             if (!mainCol.getSubColumns().isEmpty()) {
@@ -162,7 +149,6 @@ public class BoardController {
         }
 
         if (flatList.isEmpty()) return "redirect:/board";
-
         Issue issue = issues.find(issueId);
         if (issue == null) return "redirect:/board";
 
@@ -181,7 +167,6 @@ public class BoardController {
             } else if ("next".equals(direction) && currentIndex < flatList.size() - 1) {
                 newIndex++;
             }
-
             if (newIndex != currentIndex) {
                 issue.setColumnKey(flatList.get(newIndex).getKey());
                 issues.persist(issue);
@@ -193,13 +178,12 @@ public class BoardController {
     @GetMapping("/board/columns/{id}/edit")
     public ModelAndView editColumnForm(@PathVariable long id) {
         Board board = getOrCreateDefaultBoard();
-
-        // On cherche la colonne principale par id
         Optional<Column> colOpt = board.getColumns().stream()
-                .filter(c -> c.getId() == id)
-                .findFirst();
+                .filter(c -> c.getId() == id).findFirst();
 
-        if (colOpt.isEmpty()) {
+        if (colOpt.isEmpty()) return new ModelAndView("redirect:/board");
+
+        if (colOpt.get().isFixed()) {
             return new ModelAndView("redirect:/board");
         }
 
@@ -212,15 +196,13 @@ public class BoardController {
     public String updateColumn(@PathVariable long id,
                                @RequestParam("title") String title) {
         Board board = getOrCreateDefaultBoard();
+        Optional<Column> colOpt = board.getColumns().stream()
+                .filter(c -> c.getId() == id).findFirst();
 
-        board.getColumns().stream()
-                .filter(c -> c.getId() == id)
-                .findFirst()
-                .ifPresent(c -> c.setTitle(title));
-
-        // Important : persister le board après la modification
-        boards.save(board);
-
+        if (colOpt.isPresent() && !colOpt.get().isFixed()) {
+            colOpt.get().setTitle(title);
+            boards.save(board);
+        }
         return "redirect:/board";
     }
 
@@ -228,13 +210,10 @@ public class BoardController {
     @ResponseBody
     public String reorderColumn(@RequestParam("columnId") long columnId,
                                 @RequestParam("newIndex") int newIndex) {
-
         Board board = getOrCreateDefaultBoard();
-
         boolean success = moveColumnInternal(board, columnId, newIndex);
-
         if (success) {
-            boards.save(board); // On sauvegarde uniquement si le mouvement est valide
+            boards.save(board);
             return "OK";
         } else {
             return "ERROR: Invalid move";
@@ -242,16 +221,12 @@ public class BoardController {
     }
 
     private boolean moveColumnInternal(Board board, long columnId, int newIndex) {
-        // Interdit de placer en position 0 (Réservé)
-        if (newIndex <= 0) {
-            return false;
-        }
+        if (newIndex < 0) return false;
 
         List<Column> columns = board.getColumns();
         int oldIndex = -1;
         Column columnToMove = null;
 
-        // Recherche de la colonne
         for (int i = 0; i < columns.size(); i++) {
             if (columns.get(i).getId() == columnId) {
                 columnToMove = columns.get(i);
@@ -259,10 +234,10 @@ public class BoardController {
                 break;
             }
         }
-        if (columnToMove == null || oldIndex == 0) {
-            return false;
-        }
 
+        if (columnToMove == null) return false;
+        if (columnToMove.isFixed()) return false;
+        if (newIndex < columns.size() && columns.get(newIndex).isFixed()) return false;
         columns.remove(oldIndex);
         if (newIndex >= columns.size()) {
             columns.add(columnToMove);

@@ -4,11 +4,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Test;
 
 import fr.uha.ensisa.gl.kanbin.projest.model.Column;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 public class ColumnTest {
 
@@ -22,7 +21,6 @@ public class ColumnTest {
     public void differentInstancesSamePropertiesAreNotEqualByDefault() {
         Column c1 = new Column(1L, "key1", "ToDo");
         Column c2 = new Column(1L, "key1", "ToDo");
-        // Column n'override pas equals(), donc deux instances distinctes ne sont pas égales
         assertNotEquals(c1, c2);
     }
 
@@ -47,15 +45,14 @@ public class ColumnTest {
         Set<Column> set = new HashSet<>();
         set.add(c1);
         set.add(c2);
-        // Sans equals/hashCode personnalisés, les deux instances sont considérées différentes
         assertEquals(2, set.size());
     }
 
     @Test
     public void notEqualsNullOrOtherType() {
         Column c = new Column(1L, "key1", "ToDo");
-        assertNotEquals(c, null);
-        assertNotEquals(c, "some string");
+        assertNotNull(c);
+        assertNotEquals("some string", c);
     }
 
     @Test
@@ -74,7 +71,6 @@ public class ColumnTest {
 
     @Test
     public void testSubColumnsManagement() {
-
         Column parent = new Column("parent", "Parent");
         assertEquals(0, parent.getSubColumns().size());
 
@@ -82,37 +78,46 @@ public class ColumnTest {
         parent.addSubColumn(child);
 
         assertEquals(1, parent.getSubColumns().size());
-        assertEquals("child", parent.getSubColumns().get(0).getKey());
+        assertEquals("child", parent.getSubColumns().getFirst().getKey());
+    }
+
+    @Test
+    public void testFixedPropertyDefault() {
+        Column c = new Column("test", "Test");
+        assertFalse(c.isFixed());
+    }
+
+    @Test
+    public void testSetFixed() {
+        Column c = new Column("test", "Test");
+        c.setFixed(true);
+        assertTrue(c.isFixed());
+
+        c.setFixed(false);
+        assertFalse(c.isFixed());
     }
 
     @Test
     void getSubColumnsOrSelf_shouldReturnSelf_whenNoSubColumns() {
-        // Arrange : Une colonne simple (pas de sous-colonnes)
         Column simpleColumn = new Column("simple", "Simple Column");
-
-        // Act
         List<Column> result = simpleColumn.getSubColumnsOrSelf();
-
-        // Assert
-        assertEquals(1, result.size(), "Doit retourner une liste de taille 1");
-        assertEquals(simpleColumn, result.get(0), "La liste doit contenir la colonne elle-même");
+        assertEquals(1, result.size());
+        assertEquals(simpleColumn, result.getFirst());
     }
 
     @Test
     void getSubColumnsOrSelf_shouldReturnSubColumns_whenSubColumnsExist() {
-        // Une colonne parent avec 2 sous-colonnes
         Column parentColumn = new Column("parent", "Parent Column");
         Column sub1 = new Column("sub1", "Sub 1");
         Column sub2 = new Column("sub2", "Sub 2");
-
         parentColumn.addSubColumn(sub1);
         parentColumn.addSubColumn(sub2);
-        List<Column> result = parentColumn.getSubColumnsOrSelf();
 
-        assertEquals(2, result.size(), "Doit retourner les 2 sous-colonnes");
+        List<Column> result = parentColumn.getSubColumnsOrSelf();
+        assertEquals(2, result.size());
         assertTrue(result.contains(sub1));
         assertTrue(result.contains(sub2));
         assertFalse(result.contains(parentColumn), "Ne doit pas contenir le parent");
-    }
 
+    }
 }
