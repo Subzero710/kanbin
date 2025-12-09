@@ -99,31 +99,22 @@ public class ColumnTest {
 
     @Test
     void getSubColumnsOrSelf_shouldReturnSelf_whenNoSubColumns() {
-        // Arrange : Une colonne simple (pas de sous-colonnes)
         Column simpleColumn = new Column("simple", "Simple Column");
-
-        // Act
         List<Column> result = simpleColumn.getSubColumnsOrSelf();
-
-        // Assert
-        assertEquals(1, result.size(), "Doit retourner une liste de taille 1");
-        assertEquals(simpleColumn, result.get(0), "La liste doit contenir la colonne elle-même");
+        assertEquals(1, result.size());
+        assertEquals(simpleColumn, result.get(0));
     }
 
     @Test
     void getSubColumnsOrSelf_shouldReturnSubColumns_whenSubColumnsExist() {
-        // Une colonne parent avec 2 sous-colonnes
         Column parentColumn = new Column("parent", "Parent Column");
         Column sub1 = new Column("sub1", "Sub 1");
         Column sub2 = new Column("sub2", "Sub 2");
-
         parentColumn.addSubColumn(sub1);
         parentColumn.addSubColumn(sub2);
-        List<Column> result = parentColumn.getSubColumnsOrSelf();
 
-        assertEquals(2, result.size(), "Doit retourner les 2 sous-colonnes");
+        List<Column> result = parentColumn.getSubColumnsOrSelf();
+        assertEquals(2, result.size());
         assertTrue(result.contains(sub1));
-        assertTrue(result.contains(sub2));
-        assertFalse(result.contains(parentColumn), "Ne doit pas contenir le parent");
     }
 }

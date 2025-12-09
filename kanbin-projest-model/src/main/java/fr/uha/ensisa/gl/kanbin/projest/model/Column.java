@@ -10,7 +10,6 @@ public class Column {
     private Integer pos;
 
     private boolean fixed = false;
-
     private final List<Column> subColumns = new ArrayList<>();
 
     public Column() {}

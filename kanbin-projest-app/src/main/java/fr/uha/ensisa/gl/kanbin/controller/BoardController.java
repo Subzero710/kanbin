@@ -44,7 +44,6 @@ public class BoardController {
         mv.addObject("board", b);
         mv.addObject("columns", b.getColumns());
 
-        // On prépare les boîtes pour les sous-colonnes
         Map<String, List<Issue>> issuesByColumn = new LinkedHashMap<>();
         String defaultKey = null;
         for (Column mainCol : b.getColumns()) {
@@ -59,7 +58,6 @@ public class BoardController {
             }
         }
 
-        // On range les issues
         for (Issue issue : issues.findAll()) {
             String key = issue.getColumnKey();
             if (key == null || !issuesByColumn.containsKey(key)) {
@@ -70,7 +68,6 @@ public class BoardController {
                 }
             }
             if (key != null) {
-                // Feature #55 : Les stories récentes en haut (addFirst)
                 issuesByColumn.get(key).addFirst(issue);
             }
         }
@@ -79,31 +76,25 @@ public class BoardController {
         return mv;
     }
 
-    // --- CHOIX : CODE SERVEUR (pour gérer le type simple/double) ---
     @PostMapping("/board/add-column")
     public String addColumn(@RequestParam("title") String title,
                             @RequestParam(value = "type", defaultValue = "simple") String type) {
 
         Board board = getOrCreateDefaultBoard();
-
         String key = title.toLowerCase().trim().replaceAll("\\s+", "-");
         Column newColumn = new Column(key, title);
 
         if ("double".equalsIgnoreCase(type)) {
-            // Création des 2 sous-colonnes (comme avant)
             Column subTodo = new Column(key + "-todo", "À Faire");
             Column subWip  = new Column(key + "-wip",  "En Cours");
-
             newColumn.addSubColumn(subTodo);
             newColumn.addSubColumn(subWip);
         }
 
         boards.addColumn(board.getId(), newColumn);
-
         return "redirect:/board";
     }
 
-    // --- CHOIX : CODE LOCAL (pour garder la sécurité sur les colonnes fixes) ---
     @PostMapping("/board/remove-column")
     public String removeColumn(@RequestParam("columnId") long columnId,
                                RedirectAttributes redirectAttributes) {
@@ -117,14 +108,14 @@ public class BoardController {
         }
         Column column = colOpt.get();
 
-        // --- SECURITÉ : COLONNE FIXE ---
+        // SECURITÉ : COLONNE FIXE
         if (column.isFixed()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     "Action interdite : Cette colonne système ne peut pas être supprimée.");
             return "redirect:/board";
         }
 
-        // --- SECURITÉ : COLONNE NON VIDE ---
+        // SECURITÉ : COLONNE NON VIDE
         List<String> keys = new ArrayList<>();
         if (column.getKey() != null) keys.add(column.getKey());
         for (Column sub : column.getSubColumns()) {
@@ -135,10 +126,7 @@ public class BoardController {
                 .anyMatch(i -> i.getColumnKey() != null && keys.contains(i.getColumnKey()));
 
         if (hasIssues) {
-            redirectAttributes.addFlashAttribute(
-                    "errorMessage",
-                    "Impossible de supprimer une colonne non vide"
-            );
+            redirectAttributes.addFlashAttribute("errorMessage", "Impossible de supprimer une colonne non vide");
             return "redirect:/board";
         }
 
@@ -146,7 +134,6 @@ public class BoardController {
         boards.save(board);
         return "redirect:/board";
     }
-
 
     @PostMapping("/board/move-issue")
     public String moveIssue(@RequestParam("issueId") long issueId,
@@ -162,7 +149,6 @@ public class BoardController {
         }
 
         if (flatList.isEmpty()) return "redirect:/board";
-
         Issue issue = issues.find(issueId);
         if (issue == null) return "redirect:/board";
 
@@ -189,17 +175,14 @@ public class BoardController {
         return "redirect:/board";
     }
 
-    // --- CHOIX : CODE LOCAL (Sécurité Fixed) ---
     @GetMapping("/board/columns/{id}/edit")
     public ModelAndView editColumnForm(@PathVariable long id) {
         Board board = getOrCreateDefaultBoard();
         Optional<Column> colOpt = board.getColumns().stream()
-                .filter(c -> c.getId() == id)
-                .findFirst();
+                .filter(c -> c.getId() == id).findFirst();
 
         if (colOpt.isEmpty()) return new ModelAndView("redirect:/board");
 
-        // --- SECURITÉ : PAS D'ÉDITION SUR COLONNE FIXE ---
         if (colOpt.get().isFixed()) {
             return new ModelAndView("redirect:/board");
         }
@@ -209,22 +192,17 @@ public class BoardController {
         return mv;
     }
 
-    // --- CHOIX : CODE LOCAL (Sécurité Fixed) ---
     @PostMapping("/board/columns/{id}")
     public String updateColumn(@PathVariable long id,
                                @RequestParam("title") String title) {
         Board board = getOrCreateDefaultBoard();
-
         Optional<Column> colOpt = board.getColumns().stream()
-                .filter(c -> c.getId() == id)
-                .findFirst();
+                .filter(c -> c.getId() == id).findFirst();
 
-        // --- SECURITÉ : PAS DE RENOMMAGE SUR COLONNE FIXE ---
         if (colOpt.isPresent() && !colOpt.get().isFixed()) {
             colOpt.get().setTitle(title);
             boards.save(board);
         }
-
         return "redirect:/board";
     }
 
@@ -242,7 +220,6 @@ public class BoardController {
         }
     }
 
-    // --- CHOIX : CODE LOCAL (Sécurité Fixed pour le déplacement) ---
     private boolean moveColumnInternal(Board board, long columnId, int newIndex) {
         if (newIndex < 0) return false;
 
@@ -259,18 +236,8 @@ public class BoardController {
         }
 
         if (columnToMove == null) return false;
-
-        // --- SECURITÉ : COLONNE FIXE IMMOBILE ---
-        if (columnToMove.isFixed()) {
-            return false;
-        }
-
-        // --- SECURITÉ : NE PAS VOLER LA PLACE D'UNE COLONNE FIXE ---
-        // Empêche de se mettre en position 0 si la pos 0 est une colonne fixe
-        if (newIndex < columns.size() && columns.get(newIndex).isFixed()) {
-            return false;
-        }
-
+        if (columnToMove.isFixed()) return false;
+        if (newIndex < columns.size() && columns.get(newIndex).isFixed()) return false;
         columns.remove(oldIndex);
         if (newIndex >= columns.size()) {
             columns.add(columnToMove);
