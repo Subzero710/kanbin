@@ -28,8 +28,19 @@ public class BoardController {
     }
 
     private Board getOrCreateDefaultBoard() {
-        return boards.findAll().stream().findFirst()
-                .orElseGet(() -> boards.save(new Board("Default")));
+        String boardName = "Test Board";
+
+        return boards.findAll().stream()
+                .filter(b -> boardName.equals(b.getName()))
+                .findFirst()
+                .orElseGet(() -> {
+                    Board newBoard = new Board(boardName);
+                    Column backlog = new Column("backlog", "Backlog");
+                    backlog.setFixed(true);
+                    newBoard.addColumn(backlog);
+
+                    return boards.save(newBoard);
+                });
     }
 
     @GetMapping("/")
@@ -221,7 +232,7 @@ public class BoardController {
     }
 
     private boolean moveColumnInternal(Board board, long columnId, int newIndex) {
-        if (newIndex < 0) return false;
+        if (newIndex <= 0) return false;
 
         List<Column> columns = board.getColumns();
         int oldIndex = -1;
