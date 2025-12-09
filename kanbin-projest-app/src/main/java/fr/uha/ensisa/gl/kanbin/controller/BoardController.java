@@ -79,24 +79,31 @@ public class BoardController {
         return mv;
     }
 
+    // --- CHOIX : CODE SERVEUR (pour gérer le type simple/double) ---
     @PostMapping("/board/add-column")
-    public String addColumn(@RequestParam("title") String title) {
+    public String addColumn(@RequestParam("title") String title,
+                            @RequestParam(value = "type", defaultValue = "simple") String type) {
+
         Board board = getOrCreateDefaultBoard();
 
-        String mainKey = title.toLowerCase().replaceAll("\\s+", "-");
-        Column mainColumn = new Column(mainKey, title);
+        String key = title.toLowerCase().trim().replaceAll("\\s+", "-");
+        Column newColumn = new Column(key, title);
 
-        Column subTodo = new Column(mainKey + "-todo", "À Faire");
-        Column subWip  = new Column(mainKey + "-wip",  "En Cours");
+        if ("double".equalsIgnoreCase(type)) {
+            // Création des 2 sous-colonnes (comme avant)
+            Column subTodo = new Column(key + "-todo", "À Faire");
+            Column subWip  = new Column(key + "-wip",  "En Cours");
 
-        mainColumn.addSubColumn(subTodo);
-        mainColumn.addSubColumn(subWip);
+            newColumn.addSubColumn(subTodo);
+            newColumn.addSubColumn(subWip);
+        }
 
-        boards.addColumn(board.getId(), mainColumn);
+        boards.addColumn(board.getId(), newColumn);
 
         return "redirect:/board";
     }
 
+    // --- CHOIX : CODE LOCAL (pour garder la sécurité sur les colonnes fixes) ---
     @PostMapping("/board/remove-column")
     public String removeColumn(@RequestParam("columnId") long columnId,
                                RedirectAttributes redirectAttributes) {
@@ -182,6 +189,7 @@ public class BoardController {
         return "redirect:/board";
     }
 
+    // --- CHOIX : CODE LOCAL (Sécurité Fixed) ---
     @GetMapping("/board/columns/{id}/edit")
     public ModelAndView editColumnForm(@PathVariable long id) {
         Board board = getOrCreateDefaultBoard();
@@ -201,6 +209,7 @@ public class BoardController {
         return mv;
     }
 
+    // --- CHOIX : CODE LOCAL (Sécurité Fixed) ---
     @PostMapping("/board/columns/{id}")
     public String updateColumn(@PathVariable long id,
                                @RequestParam("title") String title) {
@@ -233,6 +242,7 @@ public class BoardController {
         }
     }
 
+    // --- CHOIX : CODE LOCAL (Sécurité Fixed pour le déplacement) ---
     private boolean moveColumnInternal(Board board, long columnId, int newIndex) {
         if (newIndex < 0) return false;
 

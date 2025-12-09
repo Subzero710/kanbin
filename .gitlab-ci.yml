@@ -1,6 +1,6 @@
 image: maven:3-eclipse-temurin-21
 
-# --- CONFIGURATION GLOBALE ---
+
 before_script:
   - echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd"><mirrors><mirror><id>ensisa</id><name>Nexus ENSISA</name><url>https://nexus.cluster.ensisa.uha.fr/repository/maven-public/</url><mirrorOf>*</mirrorOf></mirror></mirrors></settings>' > settings.xml
 
@@ -15,16 +15,22 @@ cache:
     - "**/target"
 
 stages:
-  - build_and_test
+  - build
+  - test
   - integration
-  - deploy  # Nom demandé (Docker/Kaniko)
-  - run     # Nom demandé (Kubernetes)
+  - deploy
+  - run
 
-# --- ETAPE 1 : BUILD & TU ---
-build_job:
-  stage: build_and_test
+#BUILD
+compile_job:
+  stage: build
   script:
-    - 'mvn $MAVEN_CLI_OPTS clean install -DskipITs spotbugs:check failsafe:help'
+    - 'mvn $MAVEN_CLI_OPTS clean compile'
+
+unit_test_job:
+  stage: test
+  script:
+    - 'mvn $MAVEN_CLI_OPTS test spotbugs:check install -DskipITs failsafe:help'
     - "grep -v 'COMPLEXITY_MISSED,COMPLEXITY_COVERED' kanbin-projest-reporting/target/site/jacoco-aggregate/jacoco.csv | awk -F, '{missed += $10 ; covered += $11} END {print \"Jacoco Coverage:\", 100*covered/(covered+missed), \"%\"}'"
   artifacts:
     expire_in: 1 hour
@@ -32,12 +38,10 @@ build_job:
       junit: "**/target/surefire-reports/TEST-*.xml"
     paths:
       - "**/target/*.war"
-      - "**/target/classes"
-      - "**/target/test-classes"
       - "kanbin-projest-reporting/target/site/jacoco-aggregate/*"
       - "**/target/spotbugs.xml"
 
-# --- ETAPE 2 : INTEGRATION (Service + Paramètres) ---
+#INTEGRATION
 integration_test_job:
   stage: integration
   services:
@@ -45,13 +49,11 @@ integration_test_job:
       alias: selenium-chrome
   script:
     - export MY_IP=$(hostname -i)
-    # On passe -Djetty.http.host=0.0.0.0 ici en ligne de commande.
-    # Cela permet d'ouvrir Jetty SANS modifier le pom.xml.
     - 'mvn -nsu $MAVEN_CLI_OPTS -Dselenium.remote.browser=1 -Dselenium.remote.url=$SELENIUM_URL -Dhost=$MY_IP -Djetty.http.host=0.0.0.0 verify -Dsurefire.skip=true'
   dependencies:
-    - build_job
+    - unit_test_job
 
-# --- ETAPE 3 : DOCKER (Snippet Prof adapté) ---
+#ETAPE 3 : DOCKER
 deploy-docker:
   stage: deploy
   image:
@@ -69,13 +71,13 @@ deploy-docker:
     # Construction
     - /kaniko/executor --cleanup --registry-mirror docker.cluster.ensisa.uha.fr --context $CI_PROJECT_DIR --destination "$CI_REGISTRY_IMAGE:${CI_COMMIT_TAG:-latest}"
   dependencies:
-    - build_job
+    - unit_test_job
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH =~ /^release-.*$/
     - if: $CI_COMMIT_TAG
 
-# --- ETAPE 4 : KUBERNETES (Snippet Prof adapté) ---
+#ETAPE 4 : KUBERNETES
 .kubernetes: &kubernetes
   stage: run
   image: docker-private.cluster.ensisa.uha.fr/docker/kubectl

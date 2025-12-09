@@ -1,4 +1,5 @@
 package fr.uha.ensisa.gl.kanbin.projest.model;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -7,15 +8,17 @@ public class Column {
     private String key;
     private String title;
     private Integer pos;
+
     private boolean fixed = false;
 
-    // CORRECTION ICI : Ajout de 'final'
     private final List<Column> subColumns = new ArrayList<>();
 
     public Column() {}
+
     public Column(long id, String key, String title) {
         this.id = id; this.key = key; this.title = title;
     }
+
     public Column(String key, String title) { this(0L, key, title); }
 
     public List<Column> getSubColumns() { return subColumns; }
@@ -35,4 +38,10 @@ public class Column {
 
     public boolean isFixed() { return fixed; }
     public void setFixed(boolean fixed) { this.fixed = fixed; }
+    public List<Column> getSubColumnsOrSelf() {
+        if (this.subColumns.isEmpty()) {
+            return List.of(this);
+        }
+        return this.subColumns;
+    }
 }

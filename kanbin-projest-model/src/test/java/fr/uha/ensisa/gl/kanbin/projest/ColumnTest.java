@@ -1,6 +1,7 @@
 package fr.uha.ensisa.gl.kanbin.projest;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -13,7 +14,6 @@ public class ColumnTest {
     @Test
     public void equalsSameInstance() {
         Column c = new Column("key1", "ToDo");
-        // Modification pour éviter le warning "called on itself"
         assertTrue(c.equals(c));
     }
 
@@ -51,9 +51,7 @@ public class ColumnTest {
     @Test
     public void notEqualsNullOrOtherType() {
         Column c = new Column(1L, "key1", "ToDo");
-        // Correction : assertNotNull est plus précis
         assertNotNull(c);
-        // Correction : "constante" en premier argument
         assertNotEquals("some string", c);
     }
 
@@ -80,7 +78,6 @@ public class ColumnTest {
         parent.addSubColumn(child);
 
         assertEquals(1, parent.getSubColumns().size());
-        // Utilisation de getFirst() (Java 21)
         assertEquals("child", parent.getSubColumns().getFirst().getKey());
     }
 
@@ -98,5 +95,35 @@ public class ColumnTest {
 
         c.setFixed(false);
         assertFalse(c.isFixed());
+    }
+
+    @Test
+    void getSubColumnsOrSelf_shouldReturnSelf_whenNoSubColumns() {
+        // Arrange : Une colonne simple (pas de sous-colonnes)
+        Column simpleColumn = new Column("simple", "Simple Column");
+
+        // Act
+        List<Column> result = simpleColumn.getSubColumnsOrSelf();
+
+        // Assert
+        assertEquals(1, result.size(), "Doit retourner une liste de taille 1");
+        assertEquals(simpleColumn, result.get(0), "La liste doit contenir la colonne elle-même");
+    }
+
+    @Test
+    void getSubColumnsOrSelf_shouldReturnSubColumns_whenSubColumnsExist() {
+        // Une colonne parent avec 2 sous-colonnes
+        Column parentColumn = new Column("parent", "Parent Column");
+        Column sub1 = new Column("sub1", "Sub 1");
+        Column sub2 = new Column("sub2", "Sub 2");
+
+        parentColumn.addSubColumn(sub1);
+        parentColumn.addSubColumn(sub2);
+        List<Column> result = parentColumn.getSubColumnsOrSelf();
+
+        assertEquals(2, result.size(), "Doit retourner les 2 sous-colonnes");
+        assertTrue(result.contains(sub1));
+        assertTrue(result.contains(sub2));
+        assertFalse(result.contains(parentColumn), "Ne doit pas contenir le parent");
     }
 }
