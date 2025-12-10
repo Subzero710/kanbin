@@ -12,9 +12,15 @@
         </a>
     </div>
 
-    <form th:action="@{/board/add-column}" method="post" accept-charset="UTF-8" style="margin-bottom: 20px;">
-        <input type="text" name="title" placeholder="Titre de la nouvelle colonne" required maxlength="30"/>
-        <input type="submit" value="Ajouter Colonne"/>
+    <form th:action="@{/board/add-column}" method="post" accept-charset="UTF-8" style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
+        <input type="text" name="title" placeholder="Titre de la nouvelle colonne" required maxlength="30" style="padding: 5px;"/>
+
+        <select name="type" style="padding: 5px;">
+            <option value="simple">Simple</option>
+            <option value="double" selected>Double</option>
+        </select>
+
+        <input type="submit" value="Ajouter Colonne" class="btn btn-primary btn-sm"/>
     </form>
 
     <h1 class="page-title">Kanbin</h1>
@@ -24,8 +30,8 @@
         <section class="kb-col kb-main-col"
                  th:each="c, iterStat : ${columns}"
                  th:attr="data-col=${c.key}, data-id=${c.id}"
-                 th:classappend="${iterStat.first} ? 'kb-col-fixed' : 'kb-col-draggable'"
-                 th:draggable="${!iterStat.first}">
+                 th:classappend="${c.fixed} ? 'kb-col-fixed' : 'kb-col-draggable'"
+                 th:draggable="${!c.fixed}">
 
             <header class="kb-col-header">
                 <span th:id="'col-title-' + ${c.key}">
@@ -38,17 +44,19 @@
 		        </span>
 
                 <div style="display:inline-block; float:right;">
-                    <a th:href="@{/board/columns/{id}/edit(id=${c.id})}"
+                    <a th:if="${!c.fixed}"
+                       th:href="@{/board/columns/{id}/edit(id=${c.id})}"
                        class="btn btn-warning btn-sm"
-                       style="padding: 0px 5px; margin-right: 5px;"
+                       style="padding: 0 5px; margin-right: 5px;"
                        title="Renommer">edit</a>
 
-                    <form th:action="@{/board/remove-column}" method="post" style="display:inline;">
+                    <form th:if="${!c.fixed}"
+                          th:action="@{/board/remove-column}" method="post" style="display:inline;">
                         <input type="hidden" name="columnId" th:value="${c.id}"/>
                         <button type="submit" class="btn btn-danger btn-sm"
                                 onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette colonne ?')"
                                 value="Remove column"
-                                style="padding: 0px 5px;">
+                                style="padding: 0 5px;">
                             X
                         </button>
                     </form>
@@ -56,10 +64,11 @@
             </header>
 
             <div class="kb-sub-wrapper">
+                <div class="kb-col sub-col"
+                     th:each="sub : ${c.subColumnsOrSelf}"
+                     th:attr="data-col=${sub.key}">
 
-                <div class="kb-col sub-col" th:each="sub : ${c.subColumns}" th:attr="data-col=${sub.key}">
-
-                    <header class="kb-col-header sub-header">
+                    <header class="kb-col-header sub-header" th:unless="${c.subColumns.isEmpty()}">
                         <span th:text="${sub.title}">Sous-titre</span>
                     </header>
 
@@ -70,8 +79,7 @@
 
                         <article class="kb-card" th:each="issue : ${issuesByColumn[sub.key]}">
                             <div class="kb-card-title" th:text="${issue.title}">Titre</div>
-
-                            <div class="kb-card-actions"> <!-- Buton change column -->
+                            <div class="kb-card-actions">
                                 <form th:action="@{/board/move-issue}" method="post" style="display:inline;">
                                     <input type="hidden" name="issueId" th:value="${issue.id}"/>
                                     <input type="hidden" name="direction" value="prev"/>
@@ -84,7 +92,6 @@
                                     <button type="submit" class="kb-move-btn kb-move-next">+</button>
                                 </form>
                             </div>
-                            <!-- Detail -->
                             <div class="kb-card-detail">
                                 <span th:text="${issue.detail}">Détail de la story...</span>
                             </div>

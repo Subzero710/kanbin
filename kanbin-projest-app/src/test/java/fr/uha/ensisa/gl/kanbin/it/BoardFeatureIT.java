@@ -6,6 +6,7 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import java.time.Duration;
+import org.openqa.selenium.support.ui.Select;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -18,6 +19,13 @@ public class BoardFeatureIT extends AbstractIT {
         String expectedKey = newColumnTitle.toLowerCase().replaceAll("\\s+", "-");
 
         WebElement titleInput = driver.findElement(By.name("title"));
+
+        // --- AJOUT : Sélection du type "Simple" pour garder le comportement d'avant ---
+        WebElement typeSelectElement = driver.findElement(By.name("type"));
+        Select typeSelect = new Select(typeSelectElement);
+        typeSelect.selectByValue("simple");
+        // -----------------------------------------------------------------------------
+
         WebElement submitButton = driver.findElement(By.cssSelector("input[type='submit'][value='Ajouter Colonne']"));
 
         titleInput.sendKeys(newColumnTitle);
@@ -30,6 +38,37 @@ public class BoardFeatureIT extends AbstractIT {
                 ))
         );
         assertTrue(newColumnHeader.isDisplayed(), "La page devrait contenir le titre de la nouvelle colonne.");
+    }
+
+    @Test
+    public void testAddColumnDoubleFeature() {
+        driver.get(getBaseUrl() + "board");
+        String newColumnTitle = "Test Colonne Double";
+        String expectedKey = newColumnTitle.toLowerCase().replaceAll("\\s+", "-");
+
+        WebElement titleInput = driver.findElement(By.name("title"));
+        WebElement typeSelectElement = driver.findElement(By.name("type"));
+        Select typeSelect = new Select(typeSelectElement);
+        typeSelect.selectByValue("double");
+
+        WebElement submitButton = driver.findElement(By.cssSelector("input[type='submit'][value='Ajouter Colonne']"));
+
+        titleInput.sendKeys(newColumnTitle);
+        submitButton.click();
+
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
+
+        WebElement newColumnHeader = wait.until(
+                ExpectedConditions.visibilityOfElementLocated(By.xpath(
+                        "//section[@data-col='" + expectedKey + "']//span[contains(text(), '" + newColumnTitle + "')]"
+                ))
+        );
+        assertTrue(newColumnHeader.isDisplayed(), "Le titre de la colonne double doit s'afficher.");
+        boolean hasTodo = !driver.findElements(By.xpath("//section[@data-col='" + expectedKey + "']//span[contains(text(), 'À Faire')]")).isEmpty();
+        boolean hasWip = !driver.findElements(By.xpath("//section[@data-col='" + expectedKey + "']//span[contains(text(), 'En Cours')]")).isEmpty();
+
+        assertTrue(hasTodo, "La sous-colonne 'À Faire' doit être présente.");
+        assertTrue(hasWip, "La sous-colonne 'En Cours' doit être présente.");
     }
 
     @Test
@@ -94,24 +133,12 @@ public class BoardFeatureIT extends AbstractIT {
         driver.findElement(By.cssSelector("button[type='submit']")).click();
 
         wait.until(ExpectedConditions.urlContains("/board"));
+
+        wait.until(ExpectedConditions.textToBePresentInElementLocated(By.tagName("body"), newTitle));
+
         boolean newPresent = driver.getPageSource().contains(newTitle);
         assertTrue(newPresent, "Le nouveau titre de colonne devrait être affiché");
     }
 
-    @Test
-    public void testAddColumnDisplaysSubColumns() {
-        driver.get(getBaseUrl() + "board");
 
-        //  Ajouter une colonne "Integration"
-        driver.findElement(By.name("title")).sendKeys("Integration");
-        driver.findElement(By.cssSelector("input[type='submit'][value='Ajouter Colonne']")).click();
-
-        // Vérifier que le titre principal est là
-        String pageSource = driver.getPageSource();
-        assertTrue(pageSource.contains("Integration"), "Le parent doit être affiché");
-
-        // Vérifier que les sous-titres sont là
-        assertTrue(pageSource.contains("À Faire"), "La sous-colonne 'À Faire' doit exister");
-        assertTrue(pageSource.contains("En Cours"), "La sous-colonne 'En Cours' doit exister");
-    }
 }

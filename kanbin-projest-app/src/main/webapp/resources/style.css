@@ -145,17 +145,25 @@
 }
 
 .kb-card-detail {
-
+    /* Calcul de la hauteur pour 3 lignes (1.5 * 3 = 4.5em) */
     max-height: 4.5em;
     overflow: hidden;
     margin-top: 5px;
     margin-bottom: 5px;
-    font-size: 0.65em;
+    font-size: 0.85em; /* Taille ajustée pour lisibilité */
     line-height: 1.5;
     color: #6c757d;
+
+    /* Le moteur de troncature multi-lignes */
+    display: -webkit-box;
+    -webkit-line-clamp: 3; /* <--- Coupe ici et ajoute "..." */
+    -webkit-box-orient: vertical;
+
+    /* Propriétés de coupure des mots longs, déjà bonnes */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+
 }
-
-
 
 .kb-card-detail span {
     white-space: pre-wrap;
@@ -167,4 +175,25 @@
     overflow: hidden;
     line-height: 1.5;
     color: #34393d;
+}
+
+/* Style pour la troncature de texte sur une seule ligne avec ellipsis */
+.story-detail-truncate {
+    /* 1. FORCE L'AFFICHAGE SUR UNE SEULE LIGNE */
+    white-space: nowrap;
+
+    /* 2. CACHE L'EXCÈS DE CONTENU */
+    overflow: hidden;
+
+    /* 3. AJOUTE LES POINTS DE SUSPENSION */
+    text-overflow: ellipsis;
+
+    /* Nettoyage : Retire les styles multi-lignes qui ne sont plus nécessaires */
+    max-height: none; /* Retiré */
+    display: block; /* Évite les conflits avec -webkit-box */
+    -webkit-box-orient: unset; /* Retiré */
+
+    /* Garde ces propriétés pour gérer les mots très longs, même si nowrap est actif */
+    word-wrap: normal;
+    overflow-wrap: normal;
 }
