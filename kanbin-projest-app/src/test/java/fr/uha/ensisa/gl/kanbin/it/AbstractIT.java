@@ -35,7 +35,6 @@ public abstract class AbstractIT {
 
         ChromeOptions options = new ChromeOptions();
         // Options standard pour éviter les crashs dans les environnements Linux/Docker
-        options.addArguments("--headless=new");
         options.addArguments("--no-sandbox");
         options.addArguments("--disable-dev-shm-usage");
         options.addArguments("--disable-gpu");
