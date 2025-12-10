@@ -2,12 +2,12 @@ package fr.uha.ensisa.gl.kanbin.controller;
 
 import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
 import fr.uha.ensisa.gl.kanbin.projest.repo.IssueRepo;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor; // Import nécessaire
+import org.junit.jupiter.api.extension.ExtendWith; // Pour JUnit 5
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension; // Pour l'extension Mockito
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -21,6 +21,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class) // Remplace le openMocks(this)
 public class IssueControllerTest {
 
     @Mock
@@ -31,11 +32,6 @@ public class IssueControllerTest {
 
     @InjectMocks
     private IssueController sut;
-
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-    }
 
     @Test
     void listIssues_shouldReturnListViewWithIssues() {
@@ -90,18 +86,14 @@ public class IssueControllerTest {
         );
     }
 
-    // Vérifie que le contrôleur persiste une version tronquée
+    // Le test pour la limite de 30 caractères
     @Test
     void createIssue_withLongTitle_shouldTruncateAndPersist() {
-        // Arrange
         Issue longIssue = new Issue();
-        // Le setter va tronquer ici, mais simulons le flux complet
         longIssue.setTitle("Un titre vraiment super long qui fait plus de trente caractères");
 
-        // Act
         sut.createIssue(longIssue, redirectAttributes);
 
-        // Assert
         ArgumentCaptor<Issue> captor = ArgumentCaptor.forClass(Issue.class);
         verify(issueRepo).persist(captor.capture());
 
