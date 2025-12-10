@@ -164,7 +164,7 @@ public class BoardControllerTest {
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
         String newTitle = "Renamed Column";
 
-        String view = sut.updateColumn(colId, newTitle);
+        String view = sut.updateColumn(colId, newTitle, null);
         assertEquals("redirect:/board", view);
 
         ArgumentCaptor<Board> boardCaptor = ArgumentCaptor.forClass(Board.class);
@@ -182,7 +182,7 @@ public class BoardControllerTest {
         testBoard.addColumn(fixedCol);
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
 
-        String view = sut.updateColumn(fixedColId, "Hacked Title");
+        String view = sut.updateColumn(fixedColId, "Hacked Title", null);
         assertEquals("redirect:/board", view);
         verify(boardRepo, never()).save(any());
     }
@@ -201,7 +201,8 @@ public class BoardControllerTest {
         Issue issue = new Issue(TEST_ISSUE_ID, "Test issue", first.getKey());
         when(issueRepo.find(TEST_ISSUE_ID)).thenReturn(issue);
 
-        String view = sut.moveIssue(TEST_ISSUE_ID, "next");
+        RedirectAttributes redirectAttributesNext = new RedirectAttributesModelMap();
+        String view = sut.moveIssue(TEST_ISSUE_ID, "next", redirectAttributesNext);
 
         assertEquals("redirect:/board", view);
         assertEquals(second.getKey(), issue.getColumnKey());
@@ -221,7 +222,8 @@ public class BoardControllerTest {
         Issue issue = new Issue(TEST_ISSUE_ID, "Test issue", second.getKey());
         when(issueRepo.find(TEST_ISSUE_ID)).thenReturn(issue);
 
-        String view = sut.moveIssue(TEST_ISSUE_ID, "prev");
+        RedirectAttributes redirectAttributesPrev = new RedirectAttributesModelMap();
+        String view = sut.moveIssue(TEST_ISSUE_ID, "prev", redirectAttributesPrev);
 
         assertEquals("redirect:/board", view);
         assertEquals(first.getKey(), issue.getColumnKey());
@@ -234,7 +236,8 @@ public class BoardControllerTest {
         Issue issue = new Issue(TEST_ISSUE_ID, "Test issue", "backlog");
         when(issueRepo.find(TEST_ISSUE_ID)).thenReturn(issue);
 
-        String view = sut.moveIssue(TEST_ISSUE_ID, "prev");
+        RedirectAttributes redirectAttributesPrev = new RedirectAttributesModelMap();
+        String view = sut.moveIssue(TEST_ISSUE_ID, "prev", redirectAttributesPrev);
 
         assertEquals("redirect:/board", view);
         assertEquals("backlog", issue.getColumnKey());
@@ -306,7 +309,7 @@ public class BoardControllerTest {
         // On utilise bien issueRepo (et pas issues)
         when(issueRepo.find(99L)).thenReturn(issue);
 
-        sut.moveIssue(99L, "next");
+        sut.moveIssue(99L, "next", new RedirectAttributesModelMap());
 
         // On vérifie sur issueRepo
         verify(issueRepo).persist(issue);
