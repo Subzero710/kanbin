@@ -59,17 +59,29 @@ deploy-docker:
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
-  before_script: [] # Désactive le settings.xml global
+  before_script: []
   script:
     - WARFILE=$(find kanbin-projest-app/target -name "*.war")
+
     - mkdir -p /kaniko/.docker
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+
+    # 3. Création du Dockerfile
     - |
       echo "FROM jetty:11.0-jre21
       EXPOSE 8080
       ADD $WARFILE \${JETTY_BASE}/webapps/${CI_PROJECT_NAMESPACE}-${CI_PROJECT_NAME}.war" > Dockerfile
-    # Construction
-    - /kaniko/executor --cleanup --registry-mirror docker.cluster.ensisa.uha.fr --context $CI_PROJECT_DIR --destination "$CI_REGISTRY_IMAGE:${CI_COMMIT_TAG:-latest}"
+
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        DOCKER_TAG=$CI_COMMIT_TAG
+      else
+        DOCKER_TAG=$CI_COMMIT_REF_SLUG
+      fi
+      echo "L'image sera construite avec le tag : $DOCKER_TAG"
+
+    - /kaniko/executor --cleanup --registry-mirror docker.cluster.ensisa.uha.fr --context $CI_PROJECT_DIR --destination "$CI_REGISTRY_IMAGE:$DOCKER_TAG"
+
   dependencies:
     - unit_test_job
   rules:
