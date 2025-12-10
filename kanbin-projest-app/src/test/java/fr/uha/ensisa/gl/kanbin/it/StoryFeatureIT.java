@@ -16,21 +16,31 @@ public class StoryFeatureIT extends AbstractIT {
     @Test
     public void testCreateAndDeleteStory() {
         driver.get(getBaseUrl() + "issues/new");
-        String storyTitle = "Story Test Selenium " + System.currentTimeMillis();
+
+        // 1. On génère un titre long
+        String fullTitle = "Story Test Selenium " + System.currentTimeMillis();
+
+        // 2. On calcule ce qu'on s'attend à voir (tronqué à 30 chars)
+        String expectedTitle = fullTitle.length() > 30 ? fullTitle.substring(0, 30) : fullTitle;
+
         WebElement titleInput = driver.findElement(By.name("title"));
         WebElement submitBtn = driver.findElement(By.cssSelector("button[type='submit']"));
-        titleInput.sendKeys(storyTitle);
+
+        // On envoie le titre long
+        titleInput.sendKeys(fullTitle);
         submitBtn.click();
 
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
         wait.until(ExpectedConditions.urlContains("/issues"));
 
+        // 3. On cherche le titre TRONQUÉ
         WebElement storyCell = wait.until(ExpectedConditions.visibilityOfElementLocated(
-                By.xpath("//td[contains(text(), '" + storyTitle + "')]")
+                By.xpath("//td[contains(text(), '" + expectedTitle + "')]")
         ));
-        assertTrue(storyCell.isDisplayed(), "La story créée devrait être visible.");
+        assertTrue(storyCell.isDisplayed(), "La story créée (tronquée) devrait être visible.");
 
-        WebElement deleteBtn = driver.findElement(By.xpath("//tr[td[contains(text(), '" + storyTitle + "')]]//form//button"));
+        // Suppression
+        WebElement deleteBtn = driver.findElement(By.xpath("//tr[td[contains(text(), '" + expectedTitle + "')]]//form//button"));
         deleteBtn.click();
 
         wait.until(ExpectedConditions.alertIsPresent());
@@ -38,7 +48,7 @@ public class StoryFeatureIT extends AbstractIT {
         wait.until(ExpectedConditions.invisibilityOf(storyCell));
 
         String pageSource = driver.getPageSource();
-        assertFalse(pageSource.contains(storyTitle), "La story devrait avoir disparu après suppression.");
+        assertFalse(pageSource.contains(expectedTitle), "La story devrait avoir disparu après suppression.");
     }
 
     @Test
@@ -56,6 +66,9 @@ public class StoryFeatureIT extends AbstractIT {
     public void testRenameStory() {
         driver.get(getBaseUrl() + "issues/new");
         String originalTitle = "Original Name " + System.currentTimeMillis();
+        // Troncature préventive pour la recherche
+        String expectedOriginal = originalTitle.length() > 30 ? originalTitle.substring(0, 30) : originalTitle;
+
         WebElement titleInput = driver.findElement(By.name("title"));
         titleInput.sendKeys(originalTitle);
         driver.findElement(By.cssSelector("button[type='submit']")).click();
@@ -63,11 +76,11 @@ public class StoryFeatureIT extends AbstractIT {
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
         wait.until(ExpectedConditions.urlContains("/issues"));
 
-        By rowLocator = By.xpath("//tr[td[contains(text(), '" + originalTitle + "')]]");
+        By rowLocator = By.xpath("//tr[td[contains(text(), '" + expectedOriginal + "')]]");
         wait.until(ExpectedConditions.presenceOfElementLocated(rowLocator));
 
         WebElement editBtn = driver.findElement(
-                By.xpath("//tr[td[contains(text(), '" + originalTitle + "')]]//a[contains(@href, '/edit')]")
+                By.xpath("//tr[td[contains(text(), '" + expectedOriginal + "')]]//a[contains(@href, '/edit')]")
         );
         editBtn.click();
         // ----------------------
@@ -75,15 +88,18 @@ public class StoryFeatureIT extends AbstractIT {
         WebElement input = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("issueTitle")));
         input.clear();
         String newTitle = "Renamed Name " + System.currentTimeMillis();
+        // Calcul du nouveau titre attendu (tronqué)
+        String expectedNew = newTitle.length() > 30 ? newTitle.substring(0, 30) : newTitle;
+
         input.sendKeys(newTitle);
         driver.findElement(By.cssSelector("button[type='submit']")).click();
 
         wait.until(ExpectedConditions.urlContains("/issues"));
         wait.until(ExpectedConditions.visibilityOfElementLocated(
-                By.xpath("//td[contains(text(), '" + newTitle + "')]")
+                By.xpath("//td[contains(text(), '" + expectedNew + "')]")
         ));
         String pageSource = driver.getPageSource();
-        assertFalse(pageSource.contains(originalTitle), "L'ancien titre ne devrait plus être visible");
-        assertTrue(pageSource.contains(newTitle), "Le nouveau titre devrait être affiché");
+        assertFalse(pageSource.contains(expectedOriginal), "L'ancien titre ne devrait plus être visible");
+        assertTrue(pageSource.contains(expectedNew), "Le nouveau titre (tronqué) devrait être affiché");
     }
 }
