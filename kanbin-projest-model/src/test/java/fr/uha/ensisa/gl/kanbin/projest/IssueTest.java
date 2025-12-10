@@ -1,6 +1,5 @@
 package fr.uha.ensisa.gl.kanbin.projest;
 
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -33,7 +32,7 @@ public class IssueTest {
     public void anIssueHasStableDetail(){
         String detail = "Ceci est un détail complet de l'issue";
         Issue sut = new Issue(1L, "Test Title", "todo", detail);
-        
+
         assertEquals(detail, sut.getDetail());
         assertEquals(detail, sut.getDetail());
         assertEquals(detail, sut.getDetail());
@@ -43,10 +42,10 @@ public class IssueTest {
     public void detailCanBeSetAfterCreation() {
         Issue sut = new Issue(1L, "Test Title");
         assertNull(sut.getDetail());
-        
+
         String detail = "Nouveau détail";
         sut.setDetail(detail);
-        
+
         assertEquals(detail, sut.getDetail());
     }
 
@@ -54,13 +53,27 @@ public class IssueTest {
     public void detailCanBeModified() {
         String initialDetail = "Détail initial";
         Issue sut = new Issue(1L, "Title", "todo", initialDetail);
-        
+
         assertEquals(initialDetail, sut.getDetail());
-        
+
         String updatedDetail = "Détail modifié";
         sut.setDetail(updatedDetail);
-        
+
         assertEquals(updatedDetail, sut.getDetail());
         assertNotEquals(initialDetail, sut.getDetail());
+    }
+
+    // TEST POUR LA LIMITE DE 30 CARACTÈRES
+    @Test
+    public void titleShouldBeTruncatedTo30Chars() {
+        String longTitle = "Ceci est un titre vraiment très très long qui dépasse 30";
+        // On s'attend à ce qu'il soit coupé après "trè"
+        String expected = "Ceci est un titre vraiment trè";
+
+        Issue sut = new Issue();
+        sut.setTitle(longTitle);
+
+        assertEquals(30, sut.getTitle().length());
+        assertEquals(expected, sut.getTitle());
     }
 }
