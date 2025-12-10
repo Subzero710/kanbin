@@ -146,45 +146,6 @@ public class BoardController {
         return "redirect:/board";
     }
 
-    @PostMapping("/board/move-issue")
-    public String moveIssue(@RequestParam("issueId") long issueId,
-                            @RequestParam("direction") String direction) {
-        Board board = getOrCreateDefaultBoard();
-        List<Column> flatList = new ArrayList<>();
-        for (Column mainCol : board.getColumns()) {
-            if (!mainCol.getSubColumns().isEmpty()) {
-                flatList.addAll(mainCol.getSubColumns());
-            } else {
-                flatList.add(mainCol);
-            }
-        }
-
-        if (flatList.isEmpty()) return "redirect:/board";
-        Issue issue = issues.find(issueId);
-        if (issue == null) return "redirect:/board";
-
-        int currentIndex = -1;
-        for (int i = 0; i < flatList.size(); i++) {
-            if (flatList.get(i).getKey().equals(issue.getColumnKey())) {
-                currentIndex = i;
-                break;
-            }
-        }
-
-        if (currentIndex != -1) {
-            int newIndex = currentIndex;
-            if ("prev".equals(direction) && currentIndex > 0) {
-                newIndex--;
-            } else if ("next".equals(direction) && currentIndex < flatList.size() - 1) {
-                newIndex++;
-            }
-            if (newIndex != currentIndex) {
-                issue.setColumnKey(flatList.get(newIndex).getKey());
-                issues.persist(issue);
-            }
-        }
-        return "redirect:/board";
-    }
 
     @GetMapping("/board/columns/{id}/edit")
     public ModelAndView editColumnForm(@PathVariable long id) {

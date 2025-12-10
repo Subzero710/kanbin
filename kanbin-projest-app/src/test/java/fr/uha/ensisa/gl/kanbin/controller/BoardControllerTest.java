@@ -187,60 +187,6 @@ public class BoardControllerTest {
         verify(boardRepo, never()).save(any());
     }
 
-    // --- TESTS DÉPLACEMENT STORIES (Move Issue) ---
-
-    @Test
-    void moveIssue_next_shouldMoveIssueToNextColumnAndPersist() {
-        Board board = new Board(TEST_BOARD_ID, "Test Board");
-        Column first = new Column(101L, "col-1", "First");
-        Column second = new Column(102L, "col-2", "Second");
-        board.addColumn(first);
-        board.addColumn(second);
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        Issue issue = new Issue(TEST_ISSUE_ID, "Test issue", first.getKey());
-        when(issueRepo.find(TEST_ISSUE_ID)).thenReturn(issue);
-
-        String view = sut.moveIssue(TEST_ISSUE_ID, "next");
-
-        assertEquals("redirect:/board", view);
-        assertEquals(second.getKey(), issue.getColumnKey());
-        verify(issueRepo, times(1)).persist(issue);
-    }
-
-    @Test
-    void moveIssue_prev_shouldMoveIssueToPreviousColumnAndPersist() {
-        Board board = new Board(TEST_BOARD_ID, "Test Board");
-        Column first = new Column(101L, "col-1", "First");
-        Column second = new Column(102L, "col-2", "Second");
-        board.addColumn(first);
-        board.addColumn(second);
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-
-        Issue issue = new Issue(TEST_ISSUE_ID, "Test issue", second.getKey());
-        when(issueRepo.find(TEST_ISSUE_ID)).thenReturn(issue);
-
-        String view = sut.moveIssue(TEST_ISSUE_ID, "prev");
-
-        assertEquals("redirect:/board", view);
-        assertEquals(first.getKey(), issue.getColumnKey());
-        verify(issueRepo, times(1)).persist(issue);
-    }
-
-    @Test
-    void moveIssue_prevOnFirstColumn_shouldNotPersistAndLeaveColumnUnchanged() {
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        Issue issue = new Issue(TEST_ISSUE_ID, "Test issue", "backlog");
-        when(issueRepo.find(TEST_ISSUE_ID)).thenReturn(issue);
-
-        String view = sut.moveIssue(TEST_ISSUE_ID, "prev");
-
-        assertEquals("redirect:/board", view);
-        assertEquals("backlog", issue.getColumnKey());
-        verify(issueRepo, never()).persist(any(Issue.class));
-    }
-
     @Test
     void board_shouldAssignOrphanIssuesToDefaultColumn() {
         Board b = new Board(TEST_BOARD_ID, BOARD_NAME);
@@ -284,34 +230,6 @@ public class BoardControllerTest {
 
     }
 
-    @Test
-    void moveIssue_nextFromEndOfParent1_shouldJumpToStartOfParent2() {
-        // ICI : On remplace "Board" par BOARD_NAME
-        Board b = new Board(1L, BOARD_NAME);
-
-        Column parent1 = new Column("p1", "Parent 1");
-        parent1.addSubColumn(new Column("p1-todo", "Todo"));
-        parent1.addSubColumn(new Column("p1-wip", "Wip"));
-
-        Column parent2 = new Column("p2", "Parent 2");
-        parent2.addSubColumn(new Column("p2-todo", "Todo"));
-
-        b.addColumn(parent1);
-        b.addColumn(parent2);
-
-        when(boardRepo.findAll()).thenReturn(List.of(b));
-
-        Issue issue = new Issue(1L, "Task 1");
-        issue.setColumnKey("p1-wip");
-        // On utilise bien issueRepo (et pas issues)
-        when(issueRepo.find(99L)).thenReturn(issue);
-
-        sut.moveIssue(99L, "next");
-
-        // On vérifie sur issueRepo
-        verify(issueRepo).persist(issue);
-        assertEquals("p2-todo", issue.getColumnKey());
-    }
 
     @Test
     void board_withMixedColumns_shouldMapAllKeys() {
