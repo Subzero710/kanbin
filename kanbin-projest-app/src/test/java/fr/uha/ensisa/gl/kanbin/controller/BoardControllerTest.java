@@ -496,8 +496,36 @@ public class BoardControllerTest {
 
         Board createdBoard = captor.getValue();
         assertEquals(BOARD_NAME, createdBoard.getName());
-        Column backlog = createdBoard.getColumns().get(0);
+        Column backlog = createdBoard.getColumns().getFirst();
         assertEquals("Backlog", backlog.getTitle());
+    }
+
+
+    @Test
+    void moveIssueDnD_shouldUpdateColumnKeyAndPersist_whenIssueExists() {
+        long issueId = 55L;
+        String targetKey = "col-done";
+        String initialKey = "col-todo";
+        Issue issue = new Issue(issueId, "Moving Story", initialKey);
+
+        when(issueRepo.find(issueId)).thenReturn(issue);
+
+        String result = sut.moveIssueDnD(issueId, targetKey);
+
+        assertEquals("OK", result, "Le contrôleur doit retourner OK en cas de succès");
+        assertEquals(targetKey, issue.getColumnKey(), "La clé de colonne de l'issue doit être mise à jour");
+        verify(issueRepo, times(1)).persist(issue);
+    }
+
+    @Test
+    void moveIssueDnD_shouldReturnError_whenIssueDoesNotExist() {
+        long issueId = 999L;
+        when(issueRepo.find(issueId)).thenReturn(null);
+
+        String result = sut.moveIssueDnD(issueId, "any-column");
+
+        assertEquals("ERROR: Issue not found", result, "Doit retourner un message d'erreur explicite");
+        verify(issueRepo, never()).persist(any());
     }
 
 }
