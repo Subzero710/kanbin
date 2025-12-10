@@ -8,8 +8,10 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.time.Duration;
 
+// AJOUT : Import de assertNotNull
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class StoryFeatureIT extends AbstractIT {
 
@@ -17,29 +19,24 @@ public class StoryFeatureIT extends AbstractIT {
     public void testCreateAndDeleteStory() {
         driver.get(getBaseUrl() + "issues/new");
 
-        // 1. On génère un titre long
         String fullTitle = "Story Test Selenium " + System.currentTimeMillis();
-
-        // 2. On calcule ce qu'on s'attend à voir (tronqué à 30 chars)
+        // Troncature à 30 chars
         String expectedTitle = fullTitle.length() > 30 ? fullTitle.substring(0, 30) : fullTitle;
 
         WebElement titleInput = driver.findElement(By.name("title"));
         WebElement submitBtn = driver.findElement(By.cssSelector("button[type='submit']"));
 
-        // On envoie le titre long
         titleInput.sendKeys(fullTitle);
         submitBtn.click();
 
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
         wait.until(ExpectedConditions.urlContains("/issues"));
 
-        // 3. On cherche le titre TRONQUÉ
         WebElement storyCell = wait.until(ExpectedConditions.visibilityOfElementLocated(
                 By.xpath("//td[contains(text(), '" + expectedTitle + "')]")
         ));
         assertTrue(storyCell.isDisplayed(), "La story créée (tronquée) devrait être visible.");
 
-        // Suppression
         WebElement deleteBtn = driver.findElement(By.xpath("//tr[td[contains(text(), '" + expectedTitle + "')]]//form//button"));
         deleteBtn.click();
 
@@ -48,6 +45,8 @@ public class StoryFeatureIT extends AbstractIT {
         wait.until(ExpectedConditions.invisibilityOf(storyCell));
 
         String pageSource = driver.getPageSource();
+        // CORRECTION WARNING : On vérifie que pageSource n'est pas null avant de l'utiliser
+        assertNotNull(pageSource, "Le code source de la page ne doit pas être null");
         assertFalse(pageSource.contains(expectedTitle), "La story devrait avoir disparu après suppression.");
     }
 
@@ -58,7 +57,15 @@ public class StoryFeatureIT extends AbstractIT {
         WebElement toBoardBtn = wait.until(ExpectedConditions.elementToBeClickable(By.id("btn-to-board")));
         toBoardBtn.click();
         wait.until(ExpectedConditions.urlContains("/board"));
-        assertTrue(driver.getTitle().contains("Board") || driver.getPageSource().contains("Kanbin"),
+
+        // CORRECTION WARNING : On extrait les variables et on gère le null
+        String title = driver.getTitle();
+        String content = driver.getPageSource();
+
+        boolean titleOk = title != null && title.contains("Board");
+        boolean contentOk = content != null && content.contains("Kanbin");
+
+        assertTrue(titleOk || contentOk,
                 "Devrait être arrivé sur la page du Board");
     }
 
@@ -66,7 +73,6 @@ public class StoryFeatureIT extends AbstractIT {
     public void testRenameStory() {
         driver.get(getBaseUrl() + "issues/new");
         String originalTitle = "Original Name " + System.currentTimeMillis();
-        // Troncature préventive pour la recherche
         String expectedOriginal = originalTitle.length() > 30 ? originalTitle.substring(0, 30) : originalTitle;
 
         WebElement titleInput = driver.findElement(By.name("title"));
@@ -83,12 +89,10 @@ public class StoryFeatureIT extends AbstractIT {
                 By.xpath("//tr[td[contains(text(), '" + expectedOriginal + "')]]//a[contains(@href, '/edit')]")
         );
         editBtn.click();
-        // ----------------------
 
         WebElement input = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("issueTitle")));
         input.clear();
         String newTitle = "Renamed Name " + System.currentTimeMillis();
-        // Calcul du nouveau titre attendu (tronqué)
         String expectedNew = newTitle.length() > 30 ? newTitle.substring(0, 30) : newTitle;
 
         input.sendKeys(newTitle);
@@ -98,7 +102,11 @@ public class StoryFeatureIT extends AbstractIT {
         wait.until(ExpectedConditions.visibilityOfElementLocated(
                 By.xpath("//td[contains(text(), '" + expectedNew + "')]")
         ));
+
         String pageSource = driver.getPageSource();
+        // CORRECTION WARNING : Vérification nullité
+        assertNotNull(pageSource, "Le code source de la page ne doit pas être null");
+
         assertFalse(pageSource.contains(expectedOriginal), "L'ancien titre ne devrait plus être visible");
         assertTrue(pageSource.contains(expectedNew), "Le nouveau titre (tronqué) devrait être affiché");
     }
