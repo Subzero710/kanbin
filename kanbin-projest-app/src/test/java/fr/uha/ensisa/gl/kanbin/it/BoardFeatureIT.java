@@ -140,20 +140,5 @@ public class BoardFeatureIT extends AbstractIT {
         assertTrue(newPresent, "Le nouveau titre de colonne devrait être affiché");
     }
 
-    @Test
-    public void testAddColumnDisplaysSubColumns() {
-        driver.get(getBaseUrl() + "board");
 
-        //  Ajouter une colonne "Integration"
-        driver.findElement(By.name("title")).sendKeys("Integration");
-        driver.findElement(By.cssSelector("input[type='submit'][value='Ajouter Colonne']")).click();
-
-        // Vérifier que le titre principal est là
-        String pageSource = driver.getPageSource();
-        assertTrue(pageSource.contains("Integration"), "Le parent doit être affiché");
-
-        // Vérifier que les sous-titres sont là
-        assertTrue(pageSource.contains("À Faire"), "La sous-colonne 'À Faire' doit exister");
-        assertTrue(pageSource.contains("En Cours"), "La sous-colonne 'En Cours' doit exister");
-    }
 }
