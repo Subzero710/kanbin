@@ -70,21 +70,13 @@
                             Aucune carte
                         </div>
 
-                        <article class="kb-card" th:each="issue : ${issuesByColumn[sub.key]}">
-                            <div class="kb-card-title" th:text="${issue.title}">Titre</div>
-                            <div class="kb-card-actions">
-                                <form th:action="@{/board/move-issue}" method="post" style="display:inline;">
-                                    <input type="hidden" name="issueId" th:value="${issue.id}"/>
-                                    <input type="hidden" name="direction" value="prev"/>
-                                    <button type="submit" class="kb-move-btn kb-move-prev">-</button>
-                                </form>
+                        <article class="kb-card issue-draggable"
+                                 draggable="true"
+                                 th:attr="data-id=${issue.id}"
+                                 th:each="issue : ${issuesByColumn[sub.key]}">
 
-                                <form th:action="@{/board/move-issue}" method="post" style="display:inline;">
-                                    <input type="hidden" name="issueId" th:value="${issue.id}"/>
-                                    <input type="hidden" name="direction" value="next"/>
-                                    <button type="submit" class="kb-move-btn kb-move-next">+</button>
-                                </form>
-                            </div>
+                            <div class="kb-card-title" th:text="${issue.title}">Titre</div>
+
                             <div class="kb-card-detail">
                                 <span th:text="${issue.detail}">Détail de la story...</span>
                             </div>

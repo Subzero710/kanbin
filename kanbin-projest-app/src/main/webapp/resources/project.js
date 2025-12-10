@@ -136,4 +136,87 @@ document.addEventListener("DOMContentLoaded", function() {
             location.reload(); // On recharge pour remettre l'ordre correct
         }, 500);
     }
+
+    // ============================================================
+    // GESTION DU DRAG & DROP DES STORIES (ISSUES)
+    // ============================================================
+
+    const draggableIssues = document.querySelectorAll('.issue-draggable');
+    let draggedIssue = null;
+
+    // 1. Début du drag sur une story
+    draggableIssues.forEach(issue => {
+        issue.addEventListener('dragstart', function(e) {
+            draggedIssue = this;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', this.getAttribute('data-id'));
+            setTimeout(() => this.style.opacity = '0.5', 0);
+            e.stopPropagation(); // Empêche la colonne de bouger
+        });
+
+        issue.addEventListener('dragend', function() {
+            this.style.opacity = '1';
+            draggedIssue = null;
+            document.querySelectorAll('.kb-col-body').forEach(b => b.style.background = "");
+        });
+    });
+
+    // 2. Zone de dépôt (Corps des colonnes)
+    const issueDropZones = document.querySelectorAll('.kb-col-body');
+
+    issueDropZones.forEach(zone => {
+        zone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+        });
+
+        zone.addEventListener('dragenter', function(e) {
+            e.preventDefault();
+            if (draggedIssue) this.style.background = "#eef0f3";
+        });
+
+        zone.addEventListener('dragleave', function() {
+            this.style.background = "";
+        });
+
+        zone.addEventListener('drop', function(e) {
+            this.style.background = "";
+            if (!draggedIssue) return; // Sécurité
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const targetCol = this.closest('[data-col]');
+            if (!targetCol) return;
+
+            // Déplacement visuel
+            this.appendChild(draggedIssue);
+
+            // Sauvegarde AJAX
+            const issueId = draggedIssue.getAttribute('data-id');
+            const targetKey = targetCol.getAttribute('data-col');
+            saveIssueMove(draggedIssue, issueId, targetKey);
+        });
+    });
+
+    function saveIssueMove(element, issueId, targetColumnKey) {
+        const formData = new URLSearchParams();
+        formData.append('issueId', issueId);
+        formData.append('targetColumnKey', targetColumnKey);
+
+        fetch('/board/move-issue-dnd', {
+            method: 'POST',
+            body: formData,
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'}
+        })
+            .then(response => response.text())
+            .then(data => {
+                if (data === "OK") {
+                    element.classList.add('flash-success');
+                    setTimeout(() => element.classList.remove('flash-success'), 1500);
+                } else {
+                    element.classList.add('flash-error');
+                    console.error("Erreur:", data);
+                }
+            });
+    }
 });

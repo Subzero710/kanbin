@@ -257,4 +257,19 @@ public class BoardController {
         }
         return true;
     }
+
+    // --- NOUVELLE MÉTHODE POUR LE DRAG & DROP ---
+    @PostMapping("/board/move-issue-dnd")
+    @ResponseBody
+    public String moveIssueDnD(@RequestParam("issueId") long issueId,
+                               @RequestParam("targetColumnKey") String targetColumnKey) {
+        Issue issue = issues.find(issueId);
+        if (issue == null) return "ERROR: Issue not found";
+
+        // On met à jour la colonne
+        issue.setColumnKey(targetColumnKey);
+        issues.persist(issue);
+
+        return "OK";
+    }
 }
