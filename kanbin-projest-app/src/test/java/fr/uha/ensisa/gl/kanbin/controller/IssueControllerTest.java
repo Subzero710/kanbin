@@ -4,6 +4,7 @@ import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
 import fr.uha.ensisa.gl.kanbin.projest.repo.IssueRepo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor; // Import nécessaire
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -50,7 +51,6 @@ public class IssueControllerTest {
         verify(issueRepo).findAll();
     }
 
-    // 1. Test du cas critique "Sauvegarde avec perte de colonne" (Le bug qu'on a corrigé)
     @Test
     void createIssue_withExistingIdAndNullKey_shouldRestoreOldKey() {
         long id = 50L;
@@ -65,7 +65,6 @@ public class IssueControllerTest {
         verify(issueRepo).persist(newVersion);
     }
 
-    // 2. Test du cas "Sauvegarde normale avec clé existante" (Pas de restauration nécessaire)
     @Test
     void createIssue_withExistingIdAndNewKey_shouldKeepNewKey() {
         long id = 51L;
@@ -78,6 +77,7 @@ public class IssueControllerTest {
         assertEquals("col-done", newVersion.getColumnKey());
         verify(issueRepo).persist(newVersion);
     }
+
     @Test
     void createIssue_whenNew_shouldAddCreationMessage() {
         Issue newIssue = new Issue();
@@ -88,6 +88,25 @@ public class IssueControllerTest {
                 eq("message"),
                 eq("La nouvelle story a été ajoutée.")
         );
+    }
+
+    // Vérifie que le contrôleur persiste une version tronquée
+    @Test
+    void createIssue_withLongTitle_shouldTruncateAndPersist() {
+        // Arrange
+        Issue longIssue = new Issue();
+        // Le setter va tronquer ici, mais simulons le flux complet
+        longIssue.setTitle("Un titre vraiment super long qui fait plus de trente caractères");
+
+        // Act
+        sut.createIssue(longIssue, redirectAttributes);
+
+        // Assert
+        ArgumentCaptor<Issue> captor = ArgumentCaptor.forClass(Issue.class);
+        verify(issueRepo).persist(captor.capture());
+
+        Issue capturedIssue = captor.getValue();
+        assertEquals(30, capturedIssue.getTitle().length());
     }
 
     @Test
@@ -139,7 +158,7 @@ public class IssueControllerTest {
         assertEquals("todo", updatedData.getColumnKey());
         verify(redirectAttributes).addFlashAttribute(eq("message"), anyString());
     }
-    
+
     @Test
     void updateIssue_shouldPreserveColumnKey_whenUpdating() {
         long id = 15L;
