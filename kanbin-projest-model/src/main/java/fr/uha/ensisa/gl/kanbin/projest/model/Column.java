@@ -7,6 +7,7 @@ public class Column {
     private long id;
     private String key;
     private String title;
+    private int wipLimit;
     private Integer pos;
 
     private boolean fixed = false;
@@ -28,6 +29,8 @@ public class Column {
     public void setKey(String key) { this.key = key; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
+    public Integer getWipLimit() {return wipLimit;}
+    public void setWipLimit(Integer wipLimit) {this.wipLimit = wipLimit;}
     public Integer getPos() { return pos; }
     public void setPos(Integer pos) { this.pos = pos; }
 

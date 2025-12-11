@@ -18,6 +18,18 @@
                    required
                    maxlength="50">
         </div>
+        <div class="mb-3">
+            <label for="wipLimit" class="form-label">Limite de stories</label>
+            <input type="number"
+                   class="form-control"
+                   id="wipLimit"
+                   name="wipLimit"
+                   min="0"
+                   th:value="${column.wipLimit}">
+            <div class="form-text">
+                Laissez vide ou mettez 0 pour ne pas limiter cette colonne.
+            </div>
+        </div>
 
         <button type="submit" class="btn btn-primary">Enregistrer</button>
         <a th:href="@{/board}" class="btn btn-secondary">Annuler</a>

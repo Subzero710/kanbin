@@ -1,7 +1,5 @@
 package fr.uha.ensisa.gl.kanbin.projest.model;
 
-import java.util.random.RandomGenerator;
-
 public class Issue {
 
     private long id;
@@ -17,26 +15,35 @@ public class Issue {
 
     public Issue(long id, String title) {
         this.id = id;
-        this.title = title;
+        setTitle(title);
         this.columnKey = null;
     }
 
     public Issue(long id, String title, String columnKey) {
         this.id = id;
-        this.title = title;
+        setTitle(title);
         this.columnKey = columnKey;
     }
 
     public Issue(long id, String title, String columnKey, String detail) {
         this.id = id;
-        this.title = title;
+        setTitle(title);
         this.columnKey = columnKey;
         this.detail = detail;
     }
 
     public String getTitle() { return this.title; }
     public long getId(){ return this.id; }
-    public void setTitle(String title) { this.title = title; }
+
+    //Limitation à 30 caractères
+    public void setTitle(String title) {
+        if (title != null && title.length() > 30) {
+            this.title = title.substring(0, 30);
+        } else {
+            this.title = title;
+        }
+    }
+
     public void setId(long id) { this.id = id; }
     public String getColumnKey() { return columnKey; }
     public void setColumnKey(String columnKey) { this.columnKey = columnKey; }

@@ -13,12 +13,16 @@
     </div>
 
     <form th:action="@{/board/add-column}" method="post" accept-charset="UTF-8" style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
-        <input type="text" name="title" placeholder="Titre de la nouvelle colonne" required maxlength="30" style="padding: 5px;"/>
+        <label>
+            <input type="text" name="title" placeholder="Titre de la nouvelle colonne" required maxlength="30" style="padding: 5px;"/>
+        </label>
 
-        <select name="type" style="padding: 5px;">
-            <option value="simple">Simple</option>
-            <option value="double" selected>Double</option>
-        </select>
+        <label>
+            <select name="type" style="padding: 5px;">
+                <option value="simple">Simple</option>
+                <option value="double" selected>Double</option>
+            </select>
+        </label>
 
         <input type="submit" value="Ajouter Colonne" class="btn btn-primary btn-sm"/>
     </form>
@@ -34,7 +38,14 @@
                  th:draggable="${!c.fixed}">
 
             <header class="kb-col-header">
-                <span th:text="${c.title}" th:id="'col-title-' + ${c.key}">Column</span>
+                <span th:id="'col-title-' + ${c.key}">
+                    <span th:text="${c.title}">Column</span>
+                    <span th:if="${c.wipLimit != null and c.wipLimit > 0}"
+                          class="badge bg-secondary ms-2"
+                          th:text="${wipUsageByColumnId[c.id]} + ' / ' + ${c.wipLimit}">
+                        0 / 0
+                    </span>
+		        </span>
 
                 <div style="display:inline-block; float:right;">
                     <a th:if="${!c.fixed}"

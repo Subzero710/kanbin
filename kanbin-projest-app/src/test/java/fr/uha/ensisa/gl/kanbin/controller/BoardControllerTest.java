@@ -164,7 +164,7 @@ public class BoardControllerTest {
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
         String newTitle = "Renamed Column";
 
-        String view = sut.updateColumn(colId, newTitle);
+        String view = sut.updateColumn(colId, newTitle, null);
         assertEquals("redirect:/board", view);
 
         ArgumentCaptor<Board> boardCaptor = ArgumentCaptor.forClass(Board.class);
@@ -182,7 +182,7 @@ public class BoardControllerTest {
         testBoard.addColumn(fixedCol);
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
 
-        String view = sut.updateColumn(fixedColId, "Hacked Title");
+        String view = sut.updateColumn(fixedColId, "Hacked Title", null);
         assertEquals("redirect:/board", view);
         verify(boardRepo, never()).save(any());
     }
@@ -312,7 +312,7 @@ public class BoardControllerTest {
         assertEquals("ERROR: Invalid move", response);
 
         // L'ordre ne doit pas changer
-        assertEquals(fixed, board.getColumns().get(0));
+        assertEquals(fixed, board.getColumns().getFirst());
         verify(boardRepo, never()).save(any());
     }
 
