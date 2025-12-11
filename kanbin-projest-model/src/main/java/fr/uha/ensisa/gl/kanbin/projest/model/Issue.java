@@ -1,7 +1,5 @@
 package fr.uha.ensisa.gl.kanbin.projest.model;
 
-import java.util.random.RandomGenerator;
-
 public class Issue {
 
     private long id;

@@ -5,13 +5,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
     columns.forEach(col => {
         // Restriction du drag à l'en-tête
-
-        // VARIABLE D'ÉTAT : On stocke ici si le clic était valide
         let isCursorInHeader = false;
 
         // 1. ÉTAPE DE DÉTECTION (Avant le drag)
         col.addEventListener('mousedown', function(e) {
-            // On regarde si l'élément cliqué est dans le header
             if (e.target.closest('.kb-col-header')) {
                 isCursorInHeader = true;
             } else {
@@ -21,7 +18,6 @@ document.addEventListener("DOMContentLoaded", function() {
 
         // 2. DÉMARRAGE DU DRAG
         col.addEventListener('dragstart', function(e) {
-            // Si le clic initial n'était pas dans le header, on coupe tout
             if (!isCursorInHeader) {
                 e.preventDefault();
                 return;
@@ -36,7 +32,6 @@ document.addEventListener("DOMContentLoaded", function() {
         col.addEventListener('dragend', function() {
             this.style.opacity = '1';
             draggedItem = null;
-            // Retirer les indicateurs visuels s'il y en a
             document.querySelectorAll('.kb-col').forEach(c => c.style.border = "");
         });
 
@@ -65,8 +60,6 @@ document.addEventListener("DOMContentLoaded", function() {
             // Sécurité : ne rien faire si on drop sur soi-même
             if (this === draggedItem) return;
 
-            // Logique d'insertion dans le DOM
-            // On insère "draggedItem" devant ou après "this" (la cible)
             const mainCols = Array.from(board.querySelectorAll('.kb-main-col'));
 
             const draggedIndex = mainCols.indexOf(draggedItem);
@@ -77,26 +70,22 @@ document.addEventListener("DOMContentLoaded", function() {
                 return;
             }
 
-            // Interdit de toucher à l'index 0 (La première colonne fixe)
             if (targetIndex === 0) {
                 alert("Impossible de placer une colonne avant la colonne de départ.");
                 return;
             }
 
-            // Déplacement visuel (DOM)
             if (draggedIndex < targetIndex) {
                 this.after(draggedItem);
             } else {
                 this.before(draggedItem);
             }
 
-            // Sauvegarde AJAX
             saveNewOrder(draggedItem, draggedItem.getAttribute('data-id'), targetIndex);
         });
     });
 
     function saveNewOrder(element, columnId, newIndex) {
-        // On construit les données du formulaire
         const formData = new URLSearchParams();
         formData.append('columnId', columnId);
         formData.append('newIndex', newIndex);
@@ -104,27 +93,22 @@ document.addEventListener("DOMContentLoaded", function() {
         fetch('/board/reorder-column', {
             method: 'POST',
             body: formData,
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            }
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         })
-        .then(response => response.text())
-        .then(data => {
-            if (data === "OK") {
-                // SUCCÈS : On ajoute la classe verte
-                element.classList.add('flash-success');
-                // On la retire après l'animation pour pouvoir la rejouer plus tard
-                setTimeout(() => element.classList.remove('flash-success'), 1500);
-            } else {
-                // ERREUR SERVEUR
-                console.error("Erreur:", data);
+            .then(response => response.text())
+            .then(data => {
+                if (data === "OK") {
+                    element.classList.add('flash-success');
+                    setTimeout(() => element.classList.remove('flash-success'), 1500);
+                } else {
+                    console.error("Erreur:", data);
+                    handleError(element);
+                }
+            })
+            .catch(err => {
+                console.error(err);
                 handleError(element);
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            handleError(element);
-        });
+            });
     }
 
     function handleError(element) {
@@ -133,7 +117,117 @@ document.addEventListener("DOMContentLoaded", function() {
         setTimeout(() => {
             element.classList.remove('flash-error');
             alert("Erreur lors de la sauvegarde du déplacement. La page va être rechargée.");
-            location.reload(); // On recharge pour remettre l'ordre correct
+            location.reload();
         }, 500);
+    }
+
+    // ============================================================
+    // GESTION DU DRAG & DROP DES STORIES (ISSUES)
+    // ============================================================
+
+    const draggableIssues = document.querySelectorAll('.issue-draggable');
+    let draggedIssue = null;
+    let sourceContainer = null; // Pour stocker la colonne d'origine en cas de rollback
+
+    // 1. Début du drag sur une story
+    draggableIssues.forEach(issue => {
+        issue.addEventListener('dragstart', function(e) {
+            draggedIssue = this;
+            sourceContainer = this.parentNode; // On mémorise le parent actuel
+
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', this.getAttribute('data-id'));
+            setTimeout(() => this.style.opacity = '0.5', 0);
+            e.stopPropagation(); // Empêche la colonne de bouger
+        });
+
+        issue.addEventListener('dragend', function() {
+            this.style.opacity = '1';
+            draggedIssue = null;
+            sourceContainer = null;
+            document.querySelectorAll('.kb-col-body').forEach(b => b.style.background = "");
+        });
+    });
+
+    // 2. Zone de dépôt (Corps des colonnes)
+    const issueDropZones = document.querySelectorAll('.kb-col-body');
+
+    issueDropZones.forEach(zone => {
+        zone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+        });
+
+        zone.addEventListener('dragenter', function(e) {
+            e.preventDefault();
+            if (draggedIssue && this !== sourceContainer) {
+                this.style.background = "#eef0f3";
+            }
+        });
+
+        zone.addEventListener('dragleave', function() {
+            this.style.background = "";
+        });
+
+        zone.addEventListener('drop', function(e) {
+            this.style.background = "";
+            if (!draggedIssue) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const targetCol = this.closest('[data-col]');
+            if (!targetCol) return;
+
+            // Optimistic UI : On déplace tout de suite
+            if (this === sourceContainer) return; // Même colonne, rien à faire
+
+            this.appendChild(draggedIssue);
+
+            // Sauvegarde AJAX avec gestion d'erreur et Rollback
+            const issueId = draggedIssue.getAttribute('data-id');
+            const targetKey = targetCol.getAttribute('data-col');
+
+            saveIssueMove(draggedIssue, issueId, targetKey, sourceContainer, this);
+        });
+    });
+
+    function saveIssueMove(element, issueId, targetColumnKey, oldParent, newParent) {
+        const formData = new URLSearchParams();
+        formData.append('issueId', issueId);
+        formData.append('targetColumnKey', targetColumnKey);
+
+        fetch('/board/move-issue-dnd', {
+            method: 'POST',
+            body: formData,
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'}
+        })
+            .then(response => response.json()) // On attend du JSON maintenant
+            .then(data => {
+                if (data.success) {
+                    // SUCCÈS
+                    element.classList.add('flash-success');
+                    setTimeout(() => element.classList.remove('flash-success'), 1500);
+                } else {
+                    // ÉCHEC (Limite atteinte, etc.)
+                    console.warn("Move rejected:", data.message);
+
+                    // 1. ROLLBACK : On remet la carte dans sa colonne d'origine
+                    if (oldParent) {
+                        oldParent.appendChild(element);
+                    }
+
+                    // 2. Feedback visuel rouge + Message
+                    element.classList.add('flash-error');
+                    setTimeout(() => element.classList.remove('flash-error'), 1000);
+
+                    alert("Erreur : " + data.message);
+                }
+            })
+            .catch(err => {
+                console.error("Network error:", err);
+                // En cas de crash réseau, on annule aussi par sécurité
+                if (oldParent) oldParent.appendChild(element);
+                alert("Erreur de connexion serveur.");
+            });
     }
 });

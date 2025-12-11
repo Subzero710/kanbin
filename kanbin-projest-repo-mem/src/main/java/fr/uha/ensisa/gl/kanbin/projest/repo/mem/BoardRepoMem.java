@@ -23,11 +23,6 @@ public class BoardRepoMem implements BoardRepo {
             // --- VERROUILLAGE ICI ---
             backlog.setFixed(true);
 
-            Column backlogTodo = new Column("backlog-todo", "À Faire");
-            Column backlogWip  = new Column("backlog-wip",  "En Cours");
-
-            backlog.addSubColumn(backlogTodo);
-            backlog.addSubColumn(backlogWip);
             b.addColumn(backlog);
 
             // On passe par save() pour avoir les mêmes règles d'IDs
