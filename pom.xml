@@ -109,6 +109,9 @@
                     </dependency>
                 </dependencies>
                 <configuration>
+                    <excludedClasses>
+                        <param>fr.uha.ensisa.gl.kanbin.config.*</param>
+                    </excludedClasses>
                     <targetClasses>
                         <param>fr.uha.ensisa.gl.kanbin.*</param>
                     </targetClasses>
