@@ -75,6 +75,11 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.12</version>
+                <configuration>
+                    <excludes>
+                        <exclude>fr/uha/ensisa/gl/kanbin/config/**/*</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
@@ -104,6 +109,9 @@
                     </dependency>
                 </dependencies>
                 <configuration>
+                    <excludedClasses>
+                        <param>fr.uha.ensisa.gl.kanbin.config.*</param>
+                    </excludedClasses>
                     <targetClasses>
                         <param>fr.uha.ensisa.gl.kanbin.*</param>
                     </targetClasses>
