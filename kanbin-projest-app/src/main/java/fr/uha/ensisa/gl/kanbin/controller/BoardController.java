@@ -1,5 +1,6 @@
 package fr.uha.ensisa.gl.kanbin.controller;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
@@ -83,11 +84,7 @@ public class BoardController {
                 }
             }
             if (key != null) {
-                // On empile en fin de liste (ordre d'insertion)
-                List<Issue> list = issuesByColumn.get(key);
-                if (list != null) {
-                    list.add(issue);
-                }
+                issuesByColumn.get(key).addFirst(issue);
             }
         }
 
@@ -339,15 +336,57 @@ public class BoardController {
 
     @PostMapping("/board/move-issue-dnd")
     @ResponseBody
-    public String moveIssueDnD(@RequestParam("issueId") long issueId,
-                               @RequestParam("targetColumnKey") String targetColumnKey) {
-        Issue issue = issues.find(issueId);
-        if (issue == null) return "ERROR: Issue not found";
+    public ResponseEntity<Map<String, Object>> moveIssueDnD(@RequestParam("issueId") long issueId,
+                                                            @RequestParam("targetColumnKey") String targetColumnKey) {
 
-        // On met à jour la colonne
+        Map<String, Object> response = new HashMap<>();
+        Board board = getOrCreateDefaultBoard();
+        Issue issue = issues.find(issueId);
+
+        if (issue == null) {
+            response.put("success", false);
+            response.put("message", "Story introuvable.");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        // Trouver la colonne cible (parcours du board pour la trouver par sa clé)
+        Column targetCol = null;
+        for (Column col : board.getColumns()) {
+            if (targetColumnKey.equals(col.getKey())) { targetCol = col; break; }
+            for (Column sub : col.getSubColumns()) {
+                if (targetColumnKey.equals(sub.getKey())) { targetCol = sub; break; }
+            }
+        }
+
+        if (targetCol == null) {
+            response.put("success", false);
+            response.put("message", "Colonne cible introuvable.");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        Integer wipLimit = resolveWipLimit(board, targetCol);
+        if (wipLimit != null && wipLimit > 0) {
+            long currentCount = countIssuesInColumn(board, targetCol);
+            boolean alreadyInTargetColumn = isIssueAlreadyInLogicalColumn(board, targetCol, issue);
+
+            long afterMove = currentCount + (alreadyInTargetColumn ? 0L : 1L);
+
+            if (afterMove > wipLimit) {
+                Column main = findMainColumn(board, targetCol);
+                String colTitle = (main != null ? main.getTitle() : targetCol.getTitle());
+
+                response.put("success", false);
+                response.put("message", "Limite atteinte (" + wipLimit + ") pour la colonne \"" + colTitle + "\".");
+                // On retourne OK (200) mais avec success=false pour gestion JS
+                return ResponseEntity.ok(response);
+            }
+        }
+
+        // Succès
         issue.setColumnKey(targetColumnKey);
         issues.persist(issue);
 
-        return "OK";
+        response.put("success", true);
+        return ResponseEntity.ok(response);
     }
 }
