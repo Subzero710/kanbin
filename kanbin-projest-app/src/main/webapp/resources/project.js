@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", function() {
-    const columns = document.querySelectorAll('.kb-col-draggable');
+    const columns = document.querySelectorAll('.kb-main-col');
     const board = document.getElementById('board');
     let draggedItem = null;
 
@@ -9,6 +9,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
         // 1. ÉTAPE DE DÉTECTION (Avant le drag)
         col.addEventListener('mousedown', function(e) {
+            if (!col.classList.contains('kb-col-draggable')) {
+                isCursorInHeader = false;
+                return;
+            }
             if (e.target.closest('.kb-col-header')) {
                 isCursorInHeader = true;
             } else {
@@ -18,7 +22,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         // 2. DÉMARRAGE DU DRAG
         col.addEventListener('dragstart', function(e) {
-            if (!isCursorInHeader) {
+            if (!col.classList.contains('kb-col-draggable') || !isCursorInHeader) {
                 e.preventDefault();
                 return;
             }
@@ -37,29 +41,34 @@ document.addEventListener("DOMContentLoaded", function() {
 
         // Au survol d'une zone de dépôt
         col.addEventListener('dragover', function(e) {
+            if (!draggedItem) return;
+            // On interdit explicitement le drop sur la colonne backlog
+            if (this.dataset.col === 'backlog') return;
             e.preventDefault(); // Nécessaire pour autoriser le drop
         });
 
         col.addEventListener('dragenter', function(e) {
+            if (!draggedItem) return;
+            if (this === draggedItem || this.dataset.col === 'backlog') return;
             e.preventDefault();
             // On ne met une bordure que si ce n'est pas l'élément qu'on traine
-            if (this !== draggedItem) {
-                this.style.border = "4px dashed #666";
-            }
+            this.style.border = "4px dashed #666";
         });
 
         col.addEventListener('dragleave', function() {
+            if (this.dataset.col === 'backlog') return;
             this.style.border = "";
         });
 
         // Le relachement (DROP)
         col.addEventListener('drop', function(e) {
             this.style.border = "";
+            if (!draggedItem) return;
             e.preventDefault();
 
             // Sécurité : ne rien faire si on drop sur soi-même
             if (this === draggedItem) return;
-
+            if (this.dataset.col === 'backlog') return;
             const mainCols = Array.from(board.querySelectorAll('.kb-main-col'));
 
             const draggedIndex = mainCols.indexOf(draggedItem);

@@ -40,10 +40,13 @@ public class BoardController {
                     Board newBoard = new Board(boardName);
                     Column backlog = new Column("backlog", "Backlog");
                     backlog.setFixed(true);
+                    Column closed = new Column("closed", "Closed");
+                    closed.setFixed(true);
                     newBoard.addColumn(backlog);
-
+                    newBoard.addColumn(closed);
                     return boards.save(newBoard);
                 });
+
     }
 
     @GetMapping("/")
@@ -244,7 +247,6 @@ public class BoardController {
 
         if (columnToMove == null) return false;
         if (columnToMove.isFixed()) return false;
-        if (newIndex < columns.size() && columns.get(newIndex).isFixed()) return false;
         columns.remove(oldIndex);
         if (newIndex >= columns.size()) {
             columns.add(columnToMove);
