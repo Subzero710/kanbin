@@ -111,6 +111,83 @@ class BoardRepoMemTest {
     }
 
     @Test
+    void addNonFixedColumn_isInsertedBeforeClosedIfPresent() {
+        BoardRepoMem repo = new BoardRepoMem();
+        Board board = new Board("Default");
+
+        Column backlog = new Column("backlog", "Backlog");
+        backlog.setFixed(true);
+        Column closed = new Column("closed", "Closed");
+        closed.setFixed(true);
+
+        board.addColumn(backlog);
+        board.addColumn(closed);
+
+        repo.save(board);
+
+        Column inProgress = new Column("in-progress", "In progress");
+        Column returned = repo.addColumn(board.getId(), inProgress);
+
+        assertSame(inProgress, returned);
+
+        List<Column> cols = repo.findById(board.getId())
+                .orElseThrow()
+                .getColumns();
+
+        assertEquals(3, cols.size());
+        assertEquals("backlog", cols.get(0).getKey());
+        assertEquals("in-progress", cols.get(1).getKey());
+        assertEquals("closed", cols.get(2).getKey());
+    }
+
+    @Test
+    void addNonFixedColumn_appendsWhenClosedDoesNotExist() {
+        BoardRepoMem repo = new BoardRepoMem();
+        Board board = new Board("Default");
+
+        Column backlog = new Column("backlog", "Backlog");
+        backlog.setFixed(true);
+        board.addColumn(backlog);
+
+        repo.save(board);
+
+        Column todo = new Column("todo", "Todo");
+        repo.addColumn(board.getId(), todo);
+
+        List<Column> cols = repo.findById(board.getId())
+                .orElseThrow()
+                .getColumns();
+
+        assertEquals(2, cols.size());
+        assertEquals("backlog", cols.get(0).getKey());
+        assertEquals("todo", cols.get(1).getKey());
+    }
+
+    @Test
+    void addFixedColumn_keepsSimpleAppendBehaviour() {
+        BoardRepoMem repo = new BoardRepoMem();
+        Board board = new Board("Default");
+
+        Column backlog = new Column("backlog", "Backlog");
+        backlog.setFixed(true);
+        board.addColumn(backlog);
+
+        repo.save(board);
+
+        Column closed = new Column("closed", "Closed");
+        closed.setFixed(true);
+
+        repo.addColumn(board.getId(), closed);
+
+        List<Column> cols = repo.findById(board.getId())
+                .orElseThrow()
+                .getColumns();
+        assertEquals(2, cols.size());
+        assertEquals("backlog", cols.get(0).getKey());
+        assertEquals("closed", cols.get(1).getKey());
+    }
+
+    @Test
     public void testFindAll() {
         BoardRepoMem repo = new BoardRepoMem();
         repo.save(new Board("Board 1"));
