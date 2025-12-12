@@ -904,17 +904,18 @@ public class BoardControllerTest {
     @Test
     void updateColumn_shouldResetWipLimit_whenValueIsZeroOrNegative() {
         long colId = 100L;
-        Column col = new Column(colId, "col", "Title");
-        col.setWipLimit(5);
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        board.addColumn(col);
+        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
 
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-
+        // Test 0
         sut.updateColumn(colId, "Title", 0);
-
         ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
         verify(boardRepo).save(captor.capture());
+        assertEquals(0, captor.getValue().getColumns().getFirst().getWipLimit());
+
+        // Test Négatif
+        sut.updateColumn(colId, "Title", -5);
+        // (Mockito note: on capture la 2ème invocation)
+        verify(boardRepo, times(2)).save(captor.capture());
         assertEquals(0, captor.getValue().getColumns().getFirst().getWipLimit());
     }
 
@@ -1319,6 +1320,8 @@ public class BoardControllerTest {
         assertTrue(msg.contains(parentTitle));
     }
 
+    // --- NOUVEAUX TESTS POUR LA DATE DE FERMETURE ET LE TRI ---
+
     @Test
     void moveIssueDnD_shouldSetClosedAt_whenMovedToClosed() {
         long issueId = 1L;
@@ -1331,8 +1334,6 @@ public class BoardControllerTest {
 
         when(boardRepo.findAll()).thenReturn(List.of(board));
         when(issueRepo.find(issueId)).thenReturn(issue);
-        // Simulation que l'issue existe déjà pour éviter d'autres erreurs logiques
-        when(issueRepo.findAll()).thenReturn(List.of(issue));
 
         // Action : Déplacement vers closed
         sut.moveIssueDnD(issueId, closedKey);
@@ -1354,7 +1355,6 @@ public class BoardControllerTest {
 
         when(boardRepo.findAll()).thenReturn(List.of(board));
         when(issueRepo.find(issueId)).thenReturn(issue);
-        when(issueRepo.findAll()).thenReturn(List.of(issue));
 
         // Action : Déplacement hors de closed
         sut.moveIssueDnD(issueId, "todo");
