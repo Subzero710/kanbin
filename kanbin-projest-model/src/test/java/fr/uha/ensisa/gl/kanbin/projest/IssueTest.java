@@ -3,9 +3,11 @@ package fr.uha.ensisa.gl.kanbin.projest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
 import org.junit.jupiter.api.Test;
+import java.time.LocalDateTime;
 
 public class IssueTest {
 
@@ -102,7 +104,6 @@ public class IssueTest {
 
     @Test
     void setColumnKey_shouldAcceptNull() {
-
         Issue issue = new Issue();
         issue.setColumnKey("todo");
 
@@ -124,5 +125,16 @@ public class IssueTest {
         Issue i = new Issue();
         i.setTitle(null);
         assertNull(i.getTitle());
+    }
+
+    @Test
+    public void testClosedAtField() {
+        Issue issue = new Issue();
+        assertNull(issue.getClosedAt(), "La date doit être nulle par défaut");
+
+        LocalDateTime now = LocalDateTime.now();
+        issue.setClosedAt(now);
+
+        assertEquals(now, issue.getClosedAt(), "Le getter doit retourner la date définie");
     }
 }

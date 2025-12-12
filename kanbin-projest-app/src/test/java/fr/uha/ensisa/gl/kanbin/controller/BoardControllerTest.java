@@ -20,6 +20,7 @@ import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -1316,5 +1317,79 @@ public class BoardControllerTest {
 
         String msg = (String) body.get("message");
         assertTrue(msg.contains(parentTitle));
+    }
+
+    @Test
+    void moveIssueDnD_shouldSetClosedAt_whenMovedToClosed() {
+        long issueId = 1L;
+        String closedKey = "closed";
+        Issue issue = new Issue(issueId, "Task");
+
+        // Setup : colonne closed existe
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+        board.addColumn(new Column("closed", "Closed"));
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+        when(issueRepo.find(issueId)).thenReturn(issue);
+        // Simulation que l'issue existe déjà pour éviter d'autres erreurs logiques
+        when(issueRepo.findAll()).thenReturn(List.of(issue));
+
+        // Action : Déplacement vers closed
+        sut.moveIssueDnD(issueId, closedKey);
+
+        // Vérification
+        assertNotNull(issue.getClosedAt(), "La date de fermeture doit être définie");
+        verify(issueRepo).persist(issue);
+    }
+
+    @Test
+    void moveIssueDnD_shouldClearClosedAt_whenMovedOutOfClosed() {
+        long issueId = 1L;
+        Issue issue = new Issue(issueId, "Task");
+        issue.setColumnKey("closed");
+        issue.setClosedAt(LocalDateTime.now()); // Déjà fermé
+
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+        board.addColumn(new Column("todo", "To Do")); // Colonne destination
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+        when(issueRepo.find(issueId)).thenReturn(issue);
+        when(issueRepo.findAll()).thenReturn(List.of(issue));
+
+        // Action : Déplacement hors de closed
+        sut.moveIssueDnD(issueId, "todo");
+
+        // Vérification
+        assertNull(issue.getClosedAt(), "La date de fermeture doit être effacée (null)");
+        assertEquals("todo", issue.getColumnKey());
+    }
+
+    @Test
+    void board_shouldSortClosedIssuesByDateDescending() {
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+        board.addColumn(new Column("closed", "Closed"));
+
+        // Issue 1: Fermée hier (Vieux)
+        Issue oldIssue = new Issue(1L, "Old", "closed");
+        oldIssue.setClosedAt(LocalDateTime.now().minusDays(1));
+
+        // Issue 2: Fermée maintenant (Récent)
+        Issue recentIssue = new Issue(2L, "Recent", "closed");
+        recentIssue.setClosedAt(LocalDateTime.now());
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+        // Note: l'ordre retourné par le repo n'est pas trié
+        when(issueRepo.findAll()).thenReturn(List.of(oldIssue, recentIssue));
+
+        ModelAndView mv = sut.board();
+
+        @SuppressWarnings("unchecked")
+        Map<String, List<Issue>> issuesByCol = (Map<String, List<Issue>>) mv.getModel().get("issuesByColumn");
+        List<Issue> closedList = issuesByCol.get("closed");
+
+        // Vérification du tri
+        assertEquals(2, closedList.size());
+        assertEquals(recentIssue, closedList.get(0), "La story la plus récente doit être en premier (haut de colonne)");
+        assertEquals(oldIssue, closedList.get(1), "La story la plus ancienne doit être en dessous");
     }
 }
