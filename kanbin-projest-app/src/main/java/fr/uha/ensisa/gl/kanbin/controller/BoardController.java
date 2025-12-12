@@ -366,8 +366,8 @@ public class BoardController {
             return ResponseEntity.badRequest().body(response);
         }
 
-        Integer wipLimit = resolveWipLimit(board, targetCol);
-        if (wipLimit != null && wipLimit > 0) {
+        int wipLimit = resolveWipLimit(board, targetCol);
+        if (wipLimit > 0) {
             long currentCount = countIssuesInColumn(board, targetCol);
             boolean alreadyInTargetColumn = isIssueAlreadyInLogicalColumn(board, targetCol, issue);
 

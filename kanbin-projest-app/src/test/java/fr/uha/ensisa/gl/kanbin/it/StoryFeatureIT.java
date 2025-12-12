@@ -58,7 +58,6 @@ public class StoryFeatureIT extends AbstractIT {
         toBoardBtn.click();
         wait.until(ExpectedConditions.urlContains("/board"));
 
-        // CORRECTION WARNING : On extrait les variables et on gère le null
         String title = driver.getTitle();
         String content = driver.getPageSource();
 
@@ -140,7 +139,7 @@ public class StoryFeatureIT extends AbstractIT {
         // 5. Vérif
         wait.until((d) -> {
             String text = targetZone.getText();
-            return text != null && text.contains(fullTitle);
+            return text.contains(fullTitle);
         });
         assertTrue(targetZone.getText().contains(fullTitle));
     }
@@ -216,7 +215,7 @@ public class StoryFeatureIT extends AbstractIT {
             alert.accept();
 
             // 9. Vérif Finale (Rollback)
-            try { Thread.sleep(500); } catch (Exception e) {}
+            try { Thread.sleep(500); } catch (Exception ignored) {}
             assertFalse(limitedColBody.getText().contains("Story-Mover"), "La limite a été ignorée !");
 
         } finally {
@@ -263,7 +262,7 @@ public class StoryFeatureIT extends AbstractIT {
 
     private void createStory(String title) {
         driver.get(getBaseUrl() + "issues/new");
-        try { driver.switchTo().alert().accept(); } catch (Exception e) {}
+        try { driver.switchTo().alert().accept(); } catch (Exception ignored) {}
 
         driver.findElement(By.name("title")).sendKeys(title);
         driver.findElement(By.cssSelector("button[type='submit']")).click();
@@ -301,5 +300,33 @@ public class StoryFeatureIT extends AbstractIT {
                         "emit('dragend', src);";
 
         ((org.openqa.selenium.JavascriptExecutor) driver).executeScript(script, source, target);
+    }
+
+    @Test
+    public void testUpdateStoryDetail() {
+        driver.get(getBaseUrl() + "issues/new");
+        String title = "Detail Test " + System.currentTimeMillis();
+        driver.findElement(By.name("title")).sendKeys(title);
+        driver.findElement(By.cssSelector("button[type='submit']")).click();
+
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
+        wait.until(ExpectedConditions.urlContains("/issues"));
+
+        driver.findElement(By.xpath("//tr[td[contains(text(), '" + title + "')]]//a[contains(@href, '/edit')]")).click();
+
+        String newDetail = "Ceci est une description détaillée mise à jour.";
+        WebElement detailInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.name("detail")));
+        detailInput.clear();
+        detailInput.sendKeys(newDetail);
+        driver.findElement(By.cssSelector("button[type='submit']")).click();
+
+        WebElement toBoardBtn = wait.until(ExpectedConditions.elementToBeClickable(By.id("btn-to-board")));
+        toBoardBtn.click();
+
+        WebElement card = wait.until(ExpectedConditions.presenceOfElementLocated(
+                By.xpath("//article[.//div[contains(text(), '" + title + "')]]")
+        ));
+
+        assertTrue(card.getText().contains(newDetail), "Le détail mis à jour devrait apparaître sur la carte");
     }
 }
