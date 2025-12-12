@@ -23,6 +23,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 import java.util.List;
 import java.util.Map;
+import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -106,6 +107,23 @@ public class BoardControllerTest {
     }
 
     @Test
+    void addColumn_duplicateKeyOnExistingSubColumn_shouldNotCallRepoAndSetErrorMessage() {
+        // Board existant avec une colonne "Parent" qui a déjà une sous-colonne foo-todo
+        Column parent = new Column("parent", "Parent");
+        parent.addSubColumn(new Column("foo-todo", "À Faire"));
+        parent.addSubColumn(new Column("foo-wip", "En Cours"));
+        testBoard.addColumn(parent);
+        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+        String view = sut.addColumn("Foo", "double", redirectAttributes);
+
+        assertEquals("redirect:/board", view);
+        assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorMessage"));
+        verify(boardRepo, never()).addColumn(anyLong(), any(Column.class));
+    }
+
+    @Test
     void homeRedirect_shouldRedirectToBoard() {
         String viewName = sut.homeRedirect();
         assertEquals("redirect:/board", viewName);
@@ -115,6 +133,7 @@ public class BoardControllerTest {
     void postRemoveColumn_shouldSaveBoardWithoutThatColumn() {
         long columnToRemoveId = 100L;
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+        when(issueRepo.findAll()).thenReturn(List.of());
         assertTrue(testBoard.getColumns().stream().anyMatch(c -> c.getId() == columnToRemoveId));
 
         RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
@@ -137,6 +156,58 @@ public class BoardControllerTest {
 
         RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
         String viewName = sut.removeColumn(fixedColId, redirectAttributes);
+
+        assertEquals("redirect:/board", viewName);
+        verify(boardRepo, never()).save(any());
+        assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorMessage"));
+    }
+
+    @Test
+    void removeColumn_columnNotFound_shouldRedirectWithoutSavingAndWithoutErrorMessage() {
+        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+        String viewName = sut.removeColumn(999_999L, redirectAttributes);
+
+        assertEquals("redirect:/board", viewName);
+        verify(boardRepo, never()).save(any());
+        assertTrue(redirectAttributes.getFlashAttributes().isEmpty());
+    }
+
+    @Test
+    void removeColumn_withSubColumnsAndNoIssues_shouldRemoveColumn() {
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+        Column parent = new Column(200L, "parent", "Parent");
+        parent.addSubColumn(new Column("parent-todo", "Todo"));
+        parent.addSubColumn(new Column("parent-wip", "Wip"));
+        board.addColumn(parent);
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+        when(issueRepo.findAll()).thenReturn(List.of());
+
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+        String viewName = sut.removeColumn(200L, redirectAttributes);
+
+        assertEquals("redirect:/board", viewName);
+        verify(boardRepo).save(board);
+        assertTrue(board.getColumns().isEmpty(), "La colonne principale (avec ses sous-colonnes) doit être supprimée");
+    }
+
+    @Test
+    void removeColumn_withSubColumnsButIssueInside_shouldFailAndSetErrorMessage() {
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+        Column parent = new Column(201L, "parent", "Parent");
+        parent.addSubColumn(new Column("sub-1", "Sub 1"));
+        parent.addSubColumn(new Column("sub-2", "Sub 2"));
+        board.addColumn(parent);
+
+        Issue issueInSub2 = new Issue(1L, "Issue", "sub-2");
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+        when(issueRepo.findAll()).thenReturn(List.of(issueInSub2));
+
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+        String viewName = sut.removeColumn(201L, redirectAttributes);
 
         assertEquals("redirect:/board", viewName);
         verify(boardRepo, never()).save(any());
@@ -190,13 +261,121 @@ public class BoardControllerTest {
     }
 
     @Test
+    void updateColumn_whenColumnDoesNotExist_shouldRedirectAndNotSave() {
+        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+        String view = sut.updateColumn(999_999L, "Does not matter", 3, redirectAttributes);
+
+        assertEquals("redirect:/board", view);
+        verify(boardRepo, never()).save(any());
+        assertTrue(redirectAttributes.getFlashAttributes().isEmpty());
+    }
+
+    @Test
+    void updateColumn_duplicateTitle_shouldNotSaveAndSetErrorMessage() {
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+        Column colA = new Column(100L, "a", "Col A");
+        Column colB = new Column(101L, "b", "Col B");
+        board.addColumn(colA);
+        board.addColumn(colB);
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+        String view = sut.updateColumn(101L, "Col A", null, redirectAttributes);
+
+        assertEquals("redirect:/board", view);
+        verify(boardRepo, never()).save(any());
+        assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorMessage"));
+
+        assertEquals("Col B", board.getColumns().stream()
+                .filter(c -> c.getId() == 101L)
+                .findFirst().orElseThrow()
+                .getTitle());
+    }
+
+    @Test
+    void updateColumn_shouldTrimTitleAndApplyWipLimitRules() {
+        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+        sut.updateColumn(100L, "   New Title   ", -5, redirectAttributes);
+
+        ArgumentCaptor<Board> boardCaptor = ArgumentCaptor.forClass(Board.class);
+        verify(boardRepo).save(boardCaptor.capture());
+
+        Column updated = boardCaptor.getValue().getColumns().stream()
+                .filter(c -> c.getId() == 100L)
+                .findFirst().orElseThrow();
+
+        assertEquals("New Title", updated.getTitle());
+        assertEquals(0, updated.getWipLimit());
+        reset(boardRepo);
+        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+
+        RedirectAttributes redirectAttributes2 = new RedirectAttributesModelMap();
+        sut.updateColumn(100L, "Title", 7, redirectAttributes2);
+
+        ArgumentCaptor<Board> boardCaptor2 = ArgumentCaptor.forClass(Board.class);
+        verify(boardRepo).save(boardCaptor2.capture());
+        Column updated2 = boardCaptor2.getValue().getColumns().stream()
+                .filter(c -> c.getId() == 100L)
+                .findFirst().orElseThrow();
+
+        assertEquals(7, updated2.getWipLimit());
+    }
+
+    @Test
+    void collectLogicalColumnKeys_orphanColumn_shouldReturnItsOwnKey() throws Exception {
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+        Column orphan = new Column("orphan-key", "Orphan");
+
+        @SuppressWarnings("unchecked")
+        List<String> keys = (List<String>) invokePrivate(
+                sut,
+                "collectLogicalColumnKeys",
+                new Class<?>[]{Board.class, Column.class},
+                board,
+                orphan
+        );
+
+        assertEquals(List.of("orphan-key"), keys);
+    }
+
+    @Test
+    void resolveWipLimit_orphanColumn_shouldReturnItsOwnLimit() throws Exception {
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+        Column orphan = new Column("orphan", "Orphan");
+        orphan.setWipLimit(3);
+
+        Integer limit = (Integer) invokePrivate(
+                sut,
+                "resolveWipLimit",
+                new Class<?>[]{Board.class, Column.class},
+                board,
+                orphan
+        );
+
+        assertEquals(3, limit);
+    }
+
+    private static Object invokePrivate(Object target,
+                                        String methodName,
+                                        Class<?>[] paramTypes,
+                                        Object... args) throws Exception {
+        Method m = target.getClass().getDeclaredMethod(methodName, paramTypes);
+        m.setAccessible(true);
+        return m.invoke(target, args);
+    }
+
+    @Test
     void updateColumn_fixedColumn_shouldNotChangeTitle() {
         long fixedColId = 777L;
         Column fixedCol = new Column(fixedColId, "fix", "Original Title");
         fixedCol.setFixed(true);
         testBoard.addColumn(fixedCol);
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-
+    
         RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
         String view = sut.updateColumn(fixedColId, "Hacked Title", null, redirectAttributes);
         assertEquals("redirect:/board", view);
