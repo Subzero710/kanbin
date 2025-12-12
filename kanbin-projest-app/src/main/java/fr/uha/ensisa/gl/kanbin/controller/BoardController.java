@@ -15,9 +15,11 @@ import fr.uha.ensisa.gl.kanbin.projest.repo.IssueRepo;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Controller
 public class BoardController {
@@ -106,10 +108,41 @@ public class BoardController {
 
     @PostMapping("/board/add-column")
     public String addColumn(@RequestParam("title") String title,
-                            @RequestParam(value = "type", defaultValue = "simple") String type) {
-
+                            @RequestParam(value = "type", defaultValue = "simple") String type,
+                            RedirectAttributes redirectAttributes) {
         Board board = getOrCreateDefaultBoard();
         String key = title.toLowerCase().trim().replaceAll("\\s+", "-");
+
+        // Clés qui seraient utilisées par cette nouvelle colonne
+        List<String> newKeys = new ArrayList<>();
+        newKeys.add(key);
+        if ("double".equalsIgnoreCase(type)) {
+            newKeys.add(key + "-todo");
+            newKeys.add(key + "-wip");
+        }
+
+        // Clés déjà existantes (colonnes principales + sous-colonnes)
+        Set<String> existingKeys = new HashSet<>();
+        for (Column col : board.getColumns()) {
+            if (col.getKey() != null) {
+                existingKeys.add(col.getKey());
+            }
+            for (Column sub : col.getSubColumns()) {
+                if (sub.getKey() != null) {
+                    existingKeys.add(sub.getKey());
+                }
+            }
+        }
+
+        boolean conflict = newKeys.stream().anyMatch(existingKeys::contains);
+        if (conflict) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    "Impossible de créer la colonne : une colonne portant déjà ce nom existe."
+            );
+            return "redirect:/board";
+        }
+
         Column newColumn = new Column(key, title);
 
         if ("double".equalsIgnoreCase(type)) {
@@ -187,7 +220,8 @@ public class BoardController {
     @PostMapping("/board/columns/{id}")
     public String updateColumn(@PathVariable long id,
                                @RequestParam("title") String title,
-                               @RequestParam(value = "wipLimit", required = false) Integer wipLimit) {
+                               @RequestParam(value = "wipLimit", required = false) Integer wipLimit,
+                               RedirectAttributes redirectAttributes) {
         Board board = getOrCreateDefaultBoard();
         Optional<Column> colOpt = board.getColumns().stream()
                 .filter(c -> c.getId() == id)
@@ -205,8 +239,22 @@ public class BoardController {
             return "redirect:/board";
         }
 
+        // Empêche d'avoir deux colonnes principales avec le même titre (hors colonne courante)
+        String normalizedTitle = title.trim();
+        boolean titleAlreadyUsed = board.getColumns().stream()
+                .filter(c -> c.getId() != id)
+                .anyMatch(c -> c.getTitle() != null && c.getTitle().equalsIgnoreCase(normalizedTitle));
+
+        if (titleAlreadyUsed) {
+            redirectAttributes.addFlashAttribute(
+                    "errorMessage",
+                    "Impossible de renommer la colonne : une autre colonne porte déjà ce nom."
+            );
+            return "redirect:/board";
+        }
+
         // On met à jour le titre
-        column.setTitle(title);
+        column.setTitle(normalizedTitle);
 
         // wipLimit nul ou <= 0 => pas de limite (stocké comme 0)
         int finalLimit = (wipLimit != null && wipLimit > 0) ? wipLimit : 0;
