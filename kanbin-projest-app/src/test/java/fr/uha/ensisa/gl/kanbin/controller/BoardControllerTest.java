@@ -70,7 +70,8 @@ public class BoardControllerTest {
     void addColumn_whenBoardExists_shouldAddColumnToIt() {
         String newColumnTitle = "Test Column #29";
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        sut.addColumn(newColumnTitle, "simple");
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+        sut.addColumn(newColumnTitle, "simple", redirectAttributes);
         verify(boardRepo, times(1)).addColumn(eq(TEST_BOARD_ID), any(Column.class));
     }
 
@@ -83,9 +84,25 @@ public class BoardControllerTest {
             return b;
         });
 
-        sut.addColumn("Ma Colonne", "simple");
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+        sut.addColumn("Ma Colonne", "simple", redirectAttributes);
         verify(boardRepo).save(any(Board.class));
         verify(boardRepo).addColumn(eq(TEST_BOARD_ID), any(Column.class));
+    }
+
+    @Test
+    void addColumn_duplicateName_shouldNotCallRepoAndSetErrorMessage() {
+        // Board existant avec une colonne "Dev"
+        Column existing = new Column("dev", "Dev");
+        testBoard.addColumn(existing);
+        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+        String view = sut.addColumn("Dev", "simple", redirectAttributes);
+
+        assertEquals("redirect:/board", view);
+        assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorMessage"));
+        verify(boardRepo, never()).addColumn(anyLong(), any(Column.class));
     }
 
     @Test
@@ -161,7 +178,8 @@ public class BoardControllerTest {
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
         String newTitle = "Renamed Column";
 
-        String view = sut.updateColumn(colId, newTitle, null);
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+        String view = sut.updateColumn(colId, newTitle, null, redirectAttributes);
         assertEquals("redirect:/board", view);
 
         ArgumentCaptor<Board> boardCaptor = ArgumentCaptor.forClass(Board.class);
@@ -179,7 +197,8 @@ public class BoardControllerTest {
         testBoard.addColumn(fixedCol);
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
 
-        String view = sut.updateColumn(fixedColId, "Hacked Title", null);
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+        String view = sut.updateColumn(fixedColId, "Hacked Title", null, redirectAttributes);
         assertEquals("redirect:/board", view);
         verify(boardRepo, never()).save(any());
     }
@@ -213,7 +232,8 @@ public class BoardControllerTest {
             Board b = i.getArgument(0); b.setId(1L); return b;
         });
 
-        sut.addColumn("ColonnePrincipale", "double");
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+        sut.addColumn("ColonnePrincipale", "double", redirectAttributes);
 
         ArgumentCaptor<Column> columnCaptor = ArgumentCaptor.forClass(Column.class);
         verify(boardRepo).addColumn(eq(1L), columnCaptor.capture());
