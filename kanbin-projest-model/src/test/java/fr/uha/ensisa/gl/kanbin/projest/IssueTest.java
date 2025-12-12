@@ -67,7 +67,7 @@ public class IssueTest {
     @Test
     public void titleShouldBeTruncatedTo30Chars() {
         String longTitle = "Ceci est un titre vraiment très très long qui dépasse 30";
-        // On s'attend à ce qu'il soit coupé après "trè"
+
         String expected = "Ceci est un titre vraiment trè";
 
         Issue sut = new Issue();
@@ -75,5 +75,54 @@ public class IssueTest {
 
         assertEquals(30, sut.getTitle().length());
         assertEquals(expected, sut.getTitle());
+    }
+
+    @Test
+    void setTitle_shouldHandleNull_gracefully() {
+        Issue issue = new Issue();
+        issue.setTitle(null);
+        assertNull(issue.getTitle());
+    }
+
+    @Test
+    void setTitle_shouldHandleEmptyString() {
+        Issue issue = new Issue();
+        issue.setTitle("");
+        assertEquals("", issue.getTitle());
+    }
+
+    @Test
+    void setDetail_shouldAcceptNull() {
+        Issue issue = new Issue();
+        issue.setDetail("Some detail");
+
+        issue.setDetail(null);
+        assertNull(issue.getDetail());
+    }
+
+    @Test
+    void setColumnKey_shouldAcceptNull() {
+
+        Issue issue = new Issue();
+        issue.setColumnKey("todo");
+
+        issue.setColumnKey(null);
+        assertNull(issue.getColumnKey());
+    }
+
+    @Test
+    void constructor_full_shouldInitializeAllFields() {
+        Issue issue = new Issue(10L, "Title", "Key", "Detail");
+        assertEquals(10L, issue.getId());
+        assertEquals("Title", issue.getTitle());
+        assertEquals("Key", issue.getColumnKey());
+        assertEquals("Detail", issue.getDetail());
+    }
+
+    @Test
+    void setTitle_shouldAcceptNull() {
+        Issue i = new Issue();
+        i.setTitle(null);
+        assertNull(i.getTitle());
     }
 }
