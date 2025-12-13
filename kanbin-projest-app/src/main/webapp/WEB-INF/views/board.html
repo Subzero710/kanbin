@@ -84,7 +84,19 @@
                                  th:attr="data-id=${issue.id}"
                                  th:each="issue : ${issuesByColumn[sub.key]}">
 
-                            <div class="kb-card-title" th:text="${issue.title}">Titre</div>
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+
+                                <div class="kb-card-title" th:text="${issue.title}" style="margin-right: 5px;">
+                                    Titre de la story
+                                </div>
+
+                                <a th:href="@{/issues/{id}/edit(id=${issue.id})}"
+                                   class="btn btn-outline-secondary btn-sm"
+                                   title="Modifier"
+                                   style="padding: 0px 5px; border: none;">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            </div>
 
                             <div class="kb-card-detail">
                                 <span th:text="${issue.detail}">Détail de la story...</span>
