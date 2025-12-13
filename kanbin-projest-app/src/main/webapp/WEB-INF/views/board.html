@@ -35,7 +35,8 @@
                  th:each="c, iterStat : ${columns}"
                  th:attr="data-col=${c.key}, data-id=${c.id}"
                  th:classappend="${c.fixed} ? 'kb-col-fixed' : 'kb-col-draggable'"
-                 th:draggable="${!c.fixed}">
+                 th:draggable="${!c.fixed}"
+                 th:style="'width:' + (${c.subColumns.isEmpty() ? 260 : (260 * c.subColumns.size()) + 20}) + 'px;'">
 
             <header class="kb-col-header">
                 <span th:id="'col-title-' + ${c.key}">
