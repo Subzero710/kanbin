@@ -735,7 +735,7 @@ public class BoardControllerTest {
     void updateColumn_nonExistingColumn_shouldNotSaveBoard() {
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
 
-        String view = sut.updateColumn(999L, "New Title", null);
+        String view = sut.updateColumn(999L, "New Title", null, mock(RedirectAttributes.class));
 
         assertEquals("redirect:/board", view);
         verify(boardRepo, never()).save(any());
@@ -924,7 +924,7 @@ public class BoardControllerTest {
     void updateColumn_shouldRedirect_whenColumnNotFound() {
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
 
-        String result = sut.updateColumn(9999L, "New Title", 0);
+        String result = sut.updateColumn(9999L, "New Title", 0, mock(RedirectAttributes.class));
 
         assertEquals("redirect:/board", result);
         verify(boardRepo, never()).save(any());
@@ -1109,7 +1109,7 @@ public class BoardControllerTest {
 
         when(boardRepo.findAll()).thenReturn(List.of(board));
 
-        sut.updateColumn(colId, "Title", 0);
+        sut.updateColumn(colId, "Title", 0, mock(RedirectAttributes.class));
 
         ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
         verify(boardRepo).save(captor.capture());
@@ -1125,7 +1125,7 @@ public class BoardControllerTest {
     @Test
     void addColumn_doubleType_shouldCreateCorrectHierarchy() {
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        sut.addColumn("Dev", "double");
+        sut.addColumn("Dev", "double", mock(RedirectAttributes.class));
 
         ArgumentCaptor<Column> captor = ArgumentCaptor.forClass(Column.class);
         verify(boardRepo).addColumn(eq(TEST_BOARD_ID), captor.capture());
@@ -1137,7 +1137,7 @@ public class BoardControllerTest {
     void updateColumn_withPositiveWipLimit_shouldSaveThatLimit() {
         long colId = 100L;
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        sut.updateColumn(colId, "Title", 5);
+        sut.updateColumn(colId, "Title", 5, mock(RedirectAttributes.class));
 
         ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
         verify(boardRepo).save(captor.capture());
@@ -1148,7 +1148,7 @@ public class BoardControllerTest {
     void updateColumn_withNegativeWipLimit_shouldSaveZero() {
         long colId = 100L;
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        sut.updateColumn(colId, "Title", -1);
+        sut.updateColumn(colId, "Title", -1, mock(RedirectAttributes.class));
 
         ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
         verify(boardRepo).save(captor.capture());
@@ -1159,7 +1159,7 @@ public class BoardControllerTest {
     void updateColumn_withZeroWipLimit_shouldSaveZero() {
         long colId = 100L;
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        sut.updateColumn(colId, "Title", 0);
+        sut.updateColumn(colId, "Title", 0, mock(RedirectAttributes.class));
 
         ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
         verify(boardRepo).save(captor.capture());
@@ -1395,13 +1395,13 @@ public class BoardControllerTest {
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
 
         // Test 0
-        sut.updateColumn(colId, "Title", 0);
+        sut.updateColumn(colId, "Title", 0, mock(RedirectAttributes.class));
         ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
         verify(boardRepo).save(captor.capture());
         assertEquals(0, captor.getValue().getColumns().getFirst().getWipLimit());
 
         // Test Négatif
-        sut.updateColumn(colId, "Title", -5);
+        sut.updateColumn(colId, "Title", -5, mock(RedirectAttributes.class));
         // (Mockito note: on capture la 2ème invocation)
         verify(boardRepo, times(2)).save(captor.capture());
         assertEquals(0, captor.getValue().getColumns().getFirst().getWipLimit());

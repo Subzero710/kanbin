@@ -136,12 +136,13 @@ public class StoryFeatureIT extends AbstractIT {
 
         simulateDragAndDrop(issueCard, targetZone);
 
-        // 5. Vérif
         wait.until((d) -> {
-            String text = targetZone.getText();
-            return text.contains(fullTitle);
+            // On récupère la liste fraîche des colonnes
+            WebElement freshTarget = d.findElements(By.className("kb-col-body")).getLast();
+            return freshTarget.getText().contains(fullTitle);
         });
-        assertTrue(targetZone.getText().contains(fullTitle));
+        String finalStateText = driver.findElements(By.className("kb-col-body")).getLast().getText();
+        assertTrue(finalStateText.contains(fullTitle));
     }
 
     @Test
