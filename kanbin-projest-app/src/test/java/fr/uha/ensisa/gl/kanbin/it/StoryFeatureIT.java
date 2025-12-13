@@ -30,7 +30,7 @@ public class StoryFeatureIT extends AbstractIT {
         submitBtn.click();
 
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
-        wait.until(ExpectedConditions.urlContains("/issues"));
+        wait.until(ExpectedConditions.urlContains("/board"));
 
         // On vérifie que la carte est bien sur le board
         WebElement storyCard = wait.until(ExpectedConditions.visibilityOfElementLocated(
@@ -74,38 +74,41 @@ public class StoryFeatureIT extends AbstractIT {
 
     @Test
     public void testRenameStory() {
+        // 1. Création
         driver.get(getBaseUrl() + "issues/new");
         String originalTitle = "RenameTest " + System.currentTimeMillis();
-        driver.findElement(By.name("title")).sendKeys(originalTitle);
-        String expectedOriginal = originalTitle.length() > 30 ? originalTitle.substring(0, 30) : originalTitle;
+        // Gestion de la limite backend
+        if (originalTitle.length() > 30) originalTitle = originalTitle.substring(0, 30);
 
         driver.findElement(By.name("title")).sendKeys(originalTitle);
         driver.findElement(By.cssSelector("button[type='submit']")).click();
 
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
+
+        // On attend d'être sur le Board
         wait.until(ExpectedConditions.urlContains("/board"));
 
-        // 2. CLIC SUR LE CRAYON (Sur le board)
-        // On cherche le lien 'edit' à l'intérieur de la carte qui a le bon titre
+        // --- CORRECTION ICI (On cherche dans <article>, pas <tr>) ---
         WebElement editBtn = wait.until(ExpectedConditions.elementToBeClickable(
                 By.xpath("//article[contains(., '" + originalTitle + "')]//a[contains(@href, '/edit')]")
         ));
         editBtn.click();
 
-        driver.findElement(
-                By.xpath("//tr[td[contains(text(), '" + expectedOriginal + "')]]//a[contains(@href, '/edit')]")
-        ).click();
-
+        // 2. Modification
         WebElement input = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("issueTitle")));
         input.clear();
-        String newTitle = "Renamed Name " + System.currentTimeMillis();
-        String expectedNew = newTitle.length() > 30 ? newTitle.substring(0, 30) : newTitle;
+        String newTitle = "Renamed " + System.currentTimeMillis();
+        if (newTitle.length() > 30) newTitle = newTitle.substring(0, 30);
+
         input.sendKeys(newTitle);
         driver.findElement(By.cssSelector("button[type='submit']")).click();
 
-        // 4. Vérif retour board
+        // Retour Board et vérif
         wait.until(ExpectedConditions.urlContains("/board"));
         wait.until(ExpectedConditions.textToBePresentInElementLocated(By.id("board"), newTitle));
+
+        String pageSource = driver.getPageSource();
+        assertFalse(pageSource.contains(originalTitle));
     }
 
     @Test
