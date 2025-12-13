@@ -396,6 +396,26 @@ public class BoardControllerTest {
         assertEquals("todo", issueCaptor.getValue().getColumnKey());
     }
 
+    @Test
+    void coverage_updateColumn_ignoreColumnsWithNullTitles() {
+        // SETUP : Un tableau avec une colonne "corrompue" qui a un titre NULL
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+        Column corruptCol = new Column(100L, "key1", null); // Titre NULL
+        board.addColumn(corruptCol);
+
+        // Une autre colonne normale qu'on veut renommer
+        Column normalCol = new Column(101L, "key2", "OldName");
+        board.addColumn(normalCol);
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
+
+        sut.updateColumn(101L, "NewName", 0, redirectAttributes);
+
+        verify(boardRepo).save(board);
+    }
+
 
     // --- TESTS POUR LES SOUS-COLONNES ---
 
@@ -735,7 +755,7 @@ public class BoardControllerTest {
     void updateColumn_nonExistingColumn_shouldNotSaveBoard() {
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
 
-        String view = sut.updateColumn(999L, "New Title", null);
+        String view = sut.updateColumn(999L, "New Title", null, mock(RedirectAttributes.class));
 
         assertEquals("redirect:/board", view);
         verify(boardRepo, never()).save(any());
@@ -924,7 +944,7 @@ public class BoardControllerTest {
     void updateColumn_shouldRedirect_whenColumnNotFound() {
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
 
-        String result = sut.updateColumn(9999L, "New Title", 0);
+        String result = sut.updateColumn(9999L, "New Title", 0, mock(RedirectAttributes.class));
 
         assertEquals("redirect:/board", result);
         verify(boardRepo, never()).save(any());
@@ -1109,7 +1129,7 @@ public class BoardControllerTest {
 
         when(boardRepo.findAll()).thenReturn(List.of(board));
 
-        sut.updateColumn(colId, "Title", 0);
+        sut.updateColumn(colId, "Title", 0, mock(RedirectAttributes.class));
 
         ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
         verify(boardRepo).save(captor.capture());
@@ -1125,7 +1145,7 @@ public class BoardControllerTest {
     @Test
     void addColumn_doubleType_shouldCreateCorrectHierarchy() {
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        sut.addColumn("Dev", "double");
+        sut.addColumn("Dev", "double", mock(RedirectAttributes.class));
 
         ArgumentCaptor<Column> captor = ArgumentCaptor.forClass(Column.class);
         verify(boardRepo).addColumn(eq(TEST_BOARD_ID), captor.capture());
@@ -1137,7 +1157,7 @@ public class BoardControllerTest {
     void updateColumn_withPositiveWipLimit_shouldSaveThatLimit() {
         long colId = 100L;
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        sut.updateColumn(colId, "Title", 5);
+        sut.updateColumn(colId, "Title", 5, mock(RedirectAttributes.class));
 
         ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
         verify(boardRepo).save(captor.capture());
@@ -1148,7 +1168,7 @@ public class BoardControllerTest {
     void updateColumn_withNegativeWipLimit_shouldSaveZero() {
         long colId = 100L;
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        sut.updateColumn(colId, "Title", -1);
+        sut.updateColumn(colId, "Title", -1, mock(RedirectAttributes.class));
 
         ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
         verify(boardRepo).save(captor.capture());
@@ -1159,7 +1179,7 @@ public class BoardControllerTest {
     void updateColumn_withZeroWipLimit_shouldSaveZero() {
         long colId = 100L;
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        sut.updateColumn(colId, "Title", 0);
+        sut.updateColumn(colId, "Title", 0, mock(RedirectAttributes.class));
 
         ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
         verify(boardRepo).save(captor.capture());
@@ -1395,13 +1415,13 @@ public class BoardControllerTest {
         when(boardRepo.findAll()).thenReturn(List.of(testBoard));
 
         // Test 0
-        sut.updateColumn(colId, "Title", 0);
+        sut.updateColumn(colId, "Title", 0, mock(RedirectAttributes.class));
         ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
         verify(boardRepo).save(captor.capture());
         assertEquals(0, captor.getValue().getColumns().getFirst().getWipLimit());
 
         // Test Négatif
-        sut.updateColumn(colId, "Title", -5);
+        sut.updateColumn(colId, "Title", -5, mock(RedirectAttributes.class));
         // (Mockito note: on capture la 2ème invocation)
         verify(boardRepo, times(2)).save(captor.capture());
         assertEquals(0, captor.getValue().getColumns().getFirst().getWipLimit());
@@ -1516,4 +1536,338 @@ public class BoardControllerTest {
         String msg = (String) body.get("message");
         assertTrue(msg.contains(parentTitle));
     }
+
+    @Test
+    void coverage_moveIssueDnD_withNullKeysInBoardStructure() {
+        // SETUP : Créer une structure avec des clés NULL partout
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+
+        // 1. Colonne principale avec clé NULL
+        Column nullKeyMain = new Column(null, "NoKey Main");
+
+        // 2. Colonne parent avec sous-colonne clé NULL
+        Column parent = new Column("parent", "Parent");
+        Column nullKeySub = new Column(null, "NoKey Sub");
+        parent.addSubColumn(nullKeySub);
+
+        board.addColumn(nullKeyMain);
+        board.addColumn(parent);
+
+        Column target = new Column("target", "Target");
+        board.addColumn(target);
+
+        long issueId = 1L;
+        Issue issue = new Issue(issueId, "Story", "start");
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+        when(issueRepo.find(issueId)).thenReturn(issue);
+
+        sut.moveIssueDnD(issueId, "target");
+
+        verify(issueRepo).persist(issue);
+    }
+
+    @Test
+    void coverage_moveIssueDnD_wipError_ForceMainNullPath() {
+        long issueId = 99L;
+        String targetKey = "simple-col";
+
+        // SETUP : Colonne SIMPLE (pas de parent) avec limite atteinte
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+        Column simple = new Column(targetKey, "Simple");
+        simple.setWipLimit(1); // Limite stricte
+        board.addColumn(simple);
+
+        Issue issue = new Issue(issueId, "Mover", "start");
+        Issue blocker = new Issue(100L, "Blocker", targetKey);
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+        when(issueRepo.find(issueId)).thenReturn(issue);
+        when(issueRepo.findAll()).thenReturn(List.of(blocker, issue)); // 2 issues > limite 1
+
+        // ACTION
+        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(issueId, targetKey);
+
+        // ASSERT
+        String msg = (String) response.getBody().get("message");
+        assertTrue(msg.contains("Simple"));
+    }
+    @Test
+    void coverage_board_orphanIssue_withNoDefaultColumn() {
+
+        Board emptyBoard = new Board(TEST_BOARD_ID, BOARD_NAME);
+        when(boardRepo.findAll()).thenReturn(List.of(emptyBoard));
+
+        Issue orphanIssue = new Issue(1L, "Lost", null);
+        when(issueRepo.findAll()).thenReturn(List.of(orphanIssue));
+
+        sut.board();
+        verify(issueRepo, never()).persist(any());
+    }
+
+    @Test
+    void coverage_updateColumn_structuralNullChecks() {
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+
+        // Cas A : Colonne avec clé NULL
+        board.addColumn(new Column(null, "NoKey Col"));
+
+        // Cas B : Colonne avec titre NULL (pour le anyMatch)
+        board.addColumn(new Column("key-null-title", null));
+
+        // Cas C : Parent avec sous-colonne clé NULL
+        Column parent = new Column("parent", "Parent");
+        parent.addSubColumn(new Column(null, "Sub NoKey"));
+        board.addColumn(parent);
+
+        // Cas D : Une colonne valide à modifier
+        Column valid = new Column(100L, "valid", "Valid");
+        board.addColumn(valid);
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+        sut.updateColumn(100L, "New Name", 0, mock(RedirectAttributes.class));
+
+        verify(boardRepo).save(board);
+    }
+
+    @Test
+    void coverage_moveIssueDnD_wipError_onSimpleColumn_MainIsNull() {
+        long issueId = 99L;
+        String targetKey = "simple-limit";
+
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+        Column simple = new Column(targetKey, "Simple Col");
+        simple.setWipLimit(1);
+        board.addColumn(simple);
+
+        Issue moveIssue = new Issue(issueId, "Mover", "start");
+        Issue blocker = new Issue(100L, "Blocker", targetKey);
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+        when(issueRepo.find(issueId)).thenReturn(moveIssue);
+        when(issueRepo.findAll()).thenReturn(List.of(blocker, moveIssue)); // 2 issues > limite 1
+        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(issueId, targetKey);
+        String msg = (String) response.getBody().get("message");
+        assertTrue(msg.contains("Simple Col"));
+    }
+
+    @Test
+    void coverage_board_ghostKey_shouldReassignToDefault() {
+        Board b = new Board(TEST_BOARD_ID, BOARD_NAME);
+        b.addColumn(new Column("todo", "Todo")); // Colonne par défaut
+
+        // Une issue avec une clé "deleted-column-key" qui N'EXISTE PAS dans le board
+        Issue ghostIssue = new Issue(1L, "Ghost", "deleted-column-key");
+
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        when(issueRepo.findAll()).thenReturn(List.of(ghostIssue));
+
+        // Action
+        sut.board();
+
+        // Vérif : Le code doit entrer dans le '|| !issuesByColumn.containsKey(key)'
+        // et réassigner la story à la colonne par défaut.
+        ArgumentCaptor<Issue> captor = ArgumentCaptor.forClass(Issue.class);
+        verify(issueRepo).persist(captor.capture());
+        assertEquals("todo", captor.getValue().getColumnKey());
+    }
+
+    @Test
+    void coverage_collectLogicalKeys_WithNullMainKey_Forced() {
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+
+        // 1. Une colonne orpheline avec clé NULL (Celle qu'on veut tester)
+        Column orphanNull = new Column(null, "Orphan Null");
+        board.addColumn(orphanNull);
+
+        // 2. IMPORTANT : Une cible avec une LIMITE WIP pour FORCER le scan des clés
+        Column target = new Column("target", "Target");
+        target.setWipLimit(5);
+        board.addColumn(target);
+
+        long issueId = 1L;
+        Issue issue = new Issue(issueId, "Story", "start");
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+        when(issueRepo.find(issueId)).thenReturn(issue);
+        when(issueRepo.findAll()).thenReturn(List.of(issue));
+
+        // Action : moveIssueDnD -> resolveWipLimit -> countIssues -> collectLogicalColumnKeys
+        sut.moveIssueDnD(issueId, "target");
+
+        // On vérifie juste que ça ne plante pas et que ça a traversé le code
+        verify(issueRepo).persist(issue);
+    }
+
+    // --------------------------------------------------------
+    // TESTS "DIRTY DATA" POUR LE 100% DE COUVERTURE (FINALE)
+    // --------------------------------------------------------
+
+    @Test
+    void coverage_addColumn_Loop_WithNullKeys_ShouldIgnoreThem() {
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+
+        // 1. Colonne principale "sale" (Clé NULL)
+        board.addColumn(new Column(null, "Dirty Main"));
+
+        // 2. Colonne parent avec sous-colonne "sale" (Clé NULL)
+        Column parent = new Column("parent", "Parent");
+        parent.addSubColumn(new Column(null, "Dirty Sub"));
+        board.addColumn(parent);
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+        RedirectAttributes attr = new RedirectAttributesModelMap();
+        sut.addColumn("New Clean Column", "simple", attr);
+
+        verify(boardRepo).addColumn(eq(TEST_BOARD_ID), any(Column.class));
+    }
+
+
+    @Test
+    void coverage_collectLogicalKeys_ForceNullKeyBranch() {
+        // CIBLE : collectLogicalColumnKeys (Branch missed)
+        // SCENARIO : Une colonne n'a PAS de sous-colonnes (on tombe dans le else)
+        // ET sa clé est NULL (on teste le false du else if).
+
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+
+        // 1. Colonne "Sale" : Pas de sous-colonne, Clé NULL
+        Column dirtyCol = new Column(null, "Dirty");
+        board.addColumn(dirtyCol);
+
+        // 2. Colonne Cible : Avec limite WIP (pour forcer le scan de tout le board)
+        Column target = new Column("target", "Target");
+        target.setWipLimit(5);
+        board.addColumn(target);
+
+        Issue issue = new Issue(1L, "Story", "start");
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+        when(issueRepo.find(1L)).thenReturn(issue);
+        when(issueRepo.findAll()).thenReturn(List.of(issue));
+
+        // Action : Le déplacement déclenche le calcul WIP, qui scanne dirtyCol.
+        // Il voit que c'est une feuille (pas de sub), check la clé (null), et passe au suivant.
+        sut.moveIssueDnD(1L, "target");
+
+        verify(issueRepo).persist(issue);
+    }
+
+    @Test
+    void coverage_moveIssueDnD_WipLimit_RootColumn_MainIsNull() {
+        // CIBLE : moveIssueDnD (Branch missed sur le ternaire)
+        // SCENARIO : Erreur de limite WIP sur une colonne RACINE.
+        // findMainColumn va retourner NULL. Le code doit exécuter "targetCol.getTitle()".
+
+        String targetKey = "root-limit";
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+
+        // Colonne racine simple (pas de parent) avec limite stricte de 1
+        Column root = new Column(targetKey, "TITRE_RACINE");
+        root.setWipLimit(1);
+        board.addColumn(root);
+
+        Issue moveIssue = new Issue(1L, "Mover", "start");
+        Issue blocker = new Issue(2L, "Blocker", targetKey);
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+        when(issueRepo.find(1L)).thenReturn(moveIssue);
+        // On simule qu'il y a déjà 2 issues (le bloqueur + celle qu'on déplace) -> Limite dépassée
+        when(issueRepo.findAll()).thenReturn(List.of(blocker, moveIssue));
+
+        // Action : Déclenche l'erreur
+        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(1L, targetKey);
+
+        // Vérif : Le message doit contenir le titre, prouvant qu'il est passé par le chemin "main == null"
+        String msg = (String) response.getBody().get("message");
+        assertTrue(msg.contains("TITRE_RACINE"));
+    }
+
+    // -------------------------------------------------------------
+    // TESTS FINAUX CORRIGÉS (AVEC IDs EXPLICITES)
+    // -------------------------------------------------------------
+
+    @Test
+    void coverage_collectLogicalKeys_RootColumn_NullKey() throws Exception {
+        // CIBLE : collectLogicalColumnKeys (Branche manquante else if main.getKey() != null -> FALSE)
+        // SCENARIO : Colonne racine, sans sous-colonne, et avec une clé NULL.
+        // On utilise la réflexion (invokePrivate) car moveIssueDnD rejette les clés nulles.
+
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+        Column nullKeyCol = new Column(555L, null, "NullKey");
+        board.addColumn(nullKeyCol);
+
+        // Appel direct de la méthode privée
+        @SuppressWarnings("unchecked")
+        List<String> keys = (List<String>) invokePrivate(
+                sut,
+                "collectLogicalColumnKeys",
+                new Class<?>[]{Board.class, Column.class},
+                board,
+                nullKeyCol
+        );
+
+        // Vérif : La liste doit être vide (pas entrée dans le if, et else if faux)
+        assertTrue(keys.isEmpty(), "Une colonne sans clé et sans sous-colonnes ne doit retourner aucune clé logique");
+    }
+    @Test
+    void coverage_Ternary_SideA_RootColumn_MainIsNull() {
+        // CIBLE : Le côté "false" du ternaire (targetCol.getTitle())
+        // SCENARIO : Limite atteinte sur une colonne RACINE (donc main == null).
+
+        String key = "root-limit";
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+
+        Column root = new Column(100L, key, "TITRE_RACINE");
+        root.setWipLimit(1); // Limite stricte
+        board.addColumn(root);
+
+        Issue moveIssue = new Issue(1L, "Mover", "start");
+        Issue blocker = new Issue(2L, "Blocker", key);
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+        when(issueRepo.find(1L)).thenReturn(moveIssue);
+        when(issueRepo.findAll()).thenReturn(List.of(blocker, moveIssue)); // 2 > 1
+
+        ResponseEntity<Map<String, Object>> res = sut.moveIssueDnD(1L, key);
+
+        // Vérif : On doit voir le titre de la racine
+        assertTrue(((String) res.getBody().get("message")).contains("TITRE_RACINE"));
+    }
+
+
+    @Test
+    void coverage_WipError_MainIsNotNull_SubColumn() {
+        // CIBLE : Partie GAUCHE du ternaire (main.getTitle() ?)
+        // SCENARIO : Erreur sur une SOUS-COLONNE (donc main == Parent).
+
+        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
+
+        // 1. Structure Parent -> Enfant
+        Column parent = new Column(200L, "parent", "TITRE_PARENT");
+        Column sub = new Column(201L, "sub-key", "TITRE_SUB");
+
+        // On met la limite sur le PARENT
+        parent.setWipLimit(1);
+        parent.addSubColumn(sub);
+        board.addColumn(parent);
+
+        // 2. Mocks pour dépasser la limite (3 issues pour une limite de 1)
+        Issue moveIssue = new Issue(1L, "Mover", "start");
+        Issue blocker1 = new Issue(2L, "B1", "sub-key");
+        Issue blocker2 = new Issue(3L, "B2", "sub-key");
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+        when(issueRepo.find(1L)).thenReturn(moveIssue);
+        when(issueRepo.findAll()).thenReturn(List.of(blocker1, blocker2, moveIssue));
+
+        // 3. Action
+        ResponseEntity<Map<String, Object>> res = sut.moveIssueDnD(1L, "sub-key");
+
+        // 4. Vérif : On doit voir le titre du PARENT
+        String msg = (String) res.getBody().get("message");
+        assertTrue(msg.contains("TITRE_PARENT"), "Le message doit contenir le titre du parent (main n'est pas null)");
+    }
+
+
 }
