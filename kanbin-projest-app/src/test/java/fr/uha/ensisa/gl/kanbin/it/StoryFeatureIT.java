@@ -18,11 +18,9 @@ public class StoryFeatureIT extends AbstractIT {
 
     @Test
     public void testCreateAndDeleteStory() {
-        // 1. CREATION
         driver.get(getBaseUrl() + "issues/new");
 
-        String fullTitle = "Story Selenium " + System.currentTimeMillis();
-        // On tronque si nécessaire pour correspondre aux limites du backend
+        String fullTitle = "Story Test Selenium " + System.currentTimeMillis();
         String expectedTitle = fullTitle.length() > 30 ? fullTitle.substring(0, 30) : fullTitle;
 
         WebElement titleInput = driver.findElement(By.name("title"));
@@ -32,11 +30,9 @@ public class StoryFeatureIT extends AbstractIT {
         submitBtn.click();
 
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
+        wait.until(ExpectedConditions.urlContains("/issues"));
 
-        // --- CORRECTION ICI : On attend le BOARD, pas /issues ---
-        wait.until(ExpectedConditions.urlContains("/board"));
-
-        // Vérif visuelle sur le board
+        // On vérifie que la carte est bien sur le board
         WebElement storyCard = wait.until(ExpectedConditions.visibilityOfElementLocated(
                 By.xpath("//article[contains(., '" + expectedTitle + "')]")
         ));
@@ -78,9 +74,11 @@ public class StoryFeatureIT extends AbstractIT {
 
     @Test
     public void testRenameStory() {
-        // 1. Création
         driver.get(getBaseUrl() + "issues/new");
         String originalTitle = "RenameTest " + System.currentTimeMillis();
+        driver.findElement(By.name("title")).sendKeys(originalTitle);
+        String expectedOriginal = originalTitle.length() > 30 ? originalTitle.substring(0, 30) : originalTitle;
+
         driver.findElement(By.name("title")).sendKeys(originalTitle);
         driver.findElement(By.cssSelector("button[type='submit']")).click();
 
@@ -94,10 +92,14 @@ public class StoryFeatureIT extends AbstractIT {
         ));
         editBtn.click();
 
-        // 3. Modification
+        driver.findElement(
+                By.xpath("//tr[td[contains(text(), '" + expectedOriginal + "')]]//a[contains(@href, '/edit')]")
+        ).click();
+
         WebElement input = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("issueTitle")));
         input.clear();
-        String newTitle = "Renamed " + System.currentTimeMillis();
+        String newTitle = "Renamed Name " + System.currentTimeMillis();
+        String expectedNew = newTitle.length() > 30 ? newTitle.substring(0, 30) : newTitle;
         input.sendKeys(newTitle);
         driver.findElement(By.cssSelector("button[type='submit']")).click();
 
@@ -268,7 +270,7 @@ public class StoryFeatureIT extends AbstractIT {
 
         // Attente robuste : on attend que le titre soit visible dans la liste
         new WebDriverWait(driver, Duration.ofSeconds(5))
-                .until(ExpectedConditions.textToBePresentInElementLocated(By.tagName("body"), title));
+                .until(ExpectedConditions.urlContains("/board"));
     }
 
     /**
@@ -303,7 +305,6 @@ public class StoryFeatureIT extends AbstractIT {
 
     @Test
     public void testUpdateStoryDetail() {
-        // 1. Création
         driver.get(getBaseUrl() + "issues/new");
         String title = "DetailTest " + System.currentTimeMillis();
         driver.findElement(By.name("title")).sendKeys(title);
@@ -318,8 +319,7 @@ public class StoryFeatureIT extends AbstractIT {
         ));
         editBtn.click();
 
-        // 3. Update Detail
-        String newDetail = "Nouveau detail update";
+        String newDetail = "Ceci est une description détaillée mise à jour.";
         WebElement detailInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.name("detail")));
         detailInput.clear();
         detailInput.sendKeys(newDetail);

@@ -75,15 +75,20 @@ public class IssueControllerTest {
     }
 
     @Test
-    void createIssue_whenNew_shouldAddCreationMessage() {
+    void createIssue_whenNew_shouldAddCreationMessageAndRedirectToBoard() {
         Issue newIssue = new Issue();
         newIssue.setId(0L);
         newIssue.setTitle("Ma Nouvelle Story");
-        sut.createIssue(newIssue, redirectAttributes);
+
+        // On récupère le résultat
+        String viewName = sut.createIssue(newIssue, redirectAttributes);
+
         verify(redirectAttributes).addFlashAttribute(
                 eq("message"),
                 eq("La nouvelle story a été ajoutée.")
         );
+        // On vérifie la nouvelle destination
+        assertEquals("redirect:/board", viewName);
     }
 
     // Le test pour la limite de 30 caractères
