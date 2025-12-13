@@ -48,7 +48,7 @@ public class IssueController {
             redirectAttributes.addFlashAttribute("message", "La nouvelle story a été ajoutée.");
         }
         issueRepo.persist(issue);
-        return "redirect:/issues";
+        return "redirect:/board";
     }
 
     @PostMapping("/issues/{id}/delete")
