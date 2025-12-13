@@ -144,7 +144,7 @@ public class IssueControllerTest {
         Issue updatedData = new Issue();
         updatedData.setTitle("New Title");
         String viewName = sut.updateIssue(id, updatedData, redirectAttributes);
-        assertEquals("redirect:/issues", viewName);
+        assertEquals("redirect:/board", viewName);
         verify(issueRepo).persist(updatedData);
         assertEquals(id, updatedData.getId());
         assertEquals("todo", updatedData.getColumnKey());
@@ -176,7 +176,7 @@ public class IssueControllerTest {
 
         String view = sut.updateIssue(id, issue, redirectAttributes);
 
-        assertEquals("redirect:/issues", view);
+        assertEquals("redirect:/board", view);
         verify(issueRepo).persist(issue);
         assertEquals("new-key", issue.getColumnKey()); // La clé n'a pas été écrasée
     }
