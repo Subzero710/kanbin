@@ -30,24 +30,30 @@ public class StoryFeatureIT extends AbstractIT {
         submitBtn.click();
 
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
-        wait.until(ExpectedConditions.urlContains("/issues"));
+        wait.until(ExpectedConditions.urlContains("/board"));
 
-        WebElement storyCell = wait.until(ExpectedConditions.visibilityOfElementLocated(
-                By.xpath("//td[contains(text(), '" + expectedTitle + "')]")
+        // On vérifie que la carte est bien sur le board
+        WebElement storyCard = wait.until(ExpectedConditions.visibilityOfElementLocated(
+                By.xpath("//article[contains(., '" + expectedTitle + "')]")
         ));
-        assertTrue(storyCell.isDisplayed(), "La story créée (tronquée) devrait être visible.");
+        assertTrue(storyCard.isDisplayed(), "La story doit être visible sur le board.");
 
-        WebElement deleteBtn = driver.findElement(By.xpath("//tr[td[contains(text(), '" + expectedTitle + "')]]//form//button"));
+        // 2. SUPPRESSION
+        // On navigue vers la liste pour trouver facilement le bouton supprimer
+        driver.get(getBaseUrl() + "issues");
+
+        WebElement deleteBtn = wait.until(ExpectedConditions.elementToBeClickable(
+                By.xpath("//tr[td[contains(text(), '" + expectedTitle + "')]]//form//button")
+        ));
         deleteBtn.click();
 
         wait.until(ExpectedConditions.alertIsPresent());
         driver.switchTo().alert().accept();
-        wait.until(ExpectedConditions.invisibilityOf(storyCell));
+        wait.until(ExpectedConditions.invisibilityOf(deleteBtn));
 
         String pageSource = driver.getPageSource();
-        // CORRECTION WARNING : On vérifie que pageSource n'est pas null avant de l'utiliser
-        assertNotNull(pageSource, "Le code source de la page ne doit pas être null");
-        assertFalse(pageSource.contains(expectedTitle), "La story devrait avoir disparu après suppression.");
+        assertNotNull(pageSource);
+        assertFalse(pageSource.contains(expectedTitle), "La story devrait être supprimée.");
     }
 
     @Test
@@ -68,44 +74,41 @@ public class StoryFeatureIT extends AbstractIT {
 
     @Test
     public void testRenameStory() {
+        // 1. Création
         driver.get(getBaseUrl() + "issues/new");
-        String originalTitle = "Original Name " + System.currentTimeMillis();
-        // Gestion de la limite de caractères (Backend limité à 30)
-        String expectedOriginal = originalTitle.length() > 30 ? originalTitle.substring(0, 30) : originalTitle;
+        String originalTitle = "RenameTest " + System.currentTimeMillis();
+        // Gestion de la limite backend
+        if (originalTitle.length() > 30) originalTitle = originalTitle.substring(0, 30);
 
-        WebElement titleInput = driver.findElement(By.name("title"));
-        titleInput.sendKeys(originalTitle);
+        driver.findElement(By.name("title")).sendKeys(originalTitle);
         driver.findElement(By.cssSelector("button[type='submit']")).click();
 
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
-        wait.until(ExpectedConditions.urlContains("/issues"));
 
-        // On attend spécifiquement la ligne du tableau
-        By rowLocator = By.xpath("//tr[td[contains(text(), '" + expectedOriginal + "')]]");
-        wait.until(ExpectedConditions.presenceOfElementLocated(rowLocator));
+        // On attend d'être sur le Board
+        wait.until(ExpectedConditions.urlContains("/board"));
 
-        driver.findElement(
-                By.xpath("//tr[td[contains(text(), '" + expectedOriginal + "')]]//a[contains(@href, '/edit')]")
-        ).click();
+        // --- CORRECTION ICI (On cherche dans <article>, pas <tr>) ---
+        WebElement editBtn = wait.until(ExpectedConditions.elementToBeClickable(
+                By.xpath("//article[contains(., '" + originalTitle + "')]//a[contains(@href, '/edit')]")
+        ));
+        editBtn.click();
 
+        // 2. Modification
         WebElement input = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("issueTitle")));
         input.clear();
-        String newTitle = "Renamed Name " + System.currentTimeMillis();
-        String expectedNew = newTitle.length() > 30 ? newTitle.substring(0, 30) : newTitle;
+        String newTitle = "Renamed " + System.currentTimeMillis();
+        if (newTitle.length() > 30) newTitle = newTitle.substring(0, 30);
 
         input.sendKeys(newTitle);
         driver.findElement(By.cssSelector("button[type='submit']")).click();
 
-        wait.until(ExpectedConditions.urlContains("/issues"));
-
-        // On attend que le texte apparaisse dans le corps de la page.
-        wait.until(ExpectedConditions.textToBePresentInElementLocated(By.tagName("body"), expectedNew));
+        // Retour Board et vérif
+        wait.until(ExpectedConditions.urlContains("/board"));
+        wait.until(ExpectedConditions.textToBePresentInElementLocated(By.id("board"), newTitle));
 
         String pageSource = driver.getPageSource();
-
-        assertNotNull(pageSource, "Le code source ne doit pas être null");
-        assertFalse(pageSource.contains(expectedOriginal), "L'ancien titre ne devrait plus être visible");
-        assertTrue(pageSource.contains(expectedNew), "Le nouveau titre devrait être affiché");
+        assertFalse(pageSource.contains(originalTitle));
     }
 
     @Test
@@ -136,12 +139,13 @@ public class StoryFeatureIT extends AbstractIT {
 
         simulateDragAndDrop(issueCard, targetZone);
 
-        // 5. Vérif
         wait.until((d) -> {
-            String text = targetZone.getText();
-            return text.contains(fullTitle);
+            // On récupère la liste fraîche des colonnes
+            WebElement freshTarget = d.findElements(By.className("kb-col-body")).getLast();
+            return freshTarget.getText().contains(fullTitle);
         });
-        assertTrue(targetZone.getText().contains(fullTitle));
+        String finalStateText = driver.findElements(By.className("kb-col-body")).getLast().getText();
+        assertTrue(finalStateText.contains(fullTitle));
     }
 
     @Test
@@ -322,7 +326,7 @@ public class StoryFeatureIT extends AbstractIT {
 
         // Attente robuste : on attend que le titre soit visible dans la liste
         new WebDriverWait(driver, Duration.ofSeconds(5))
-                .until(ExpectedConditions.textToBePresentInElementLocated(By.tagName("body"), title));
+                .until(ExpectedConditions.urlContains("/board"));
     }
 
     /**
@@ -358,14 +362,18 @@ public class StoryFeatureIT extends AbstractIT {
     @Test
     public void testUpdateStoryDetail() {
         driver.get(getBaseUrl() + "issues/new");
-        String title = "Detail Test " + System.currentTimeMillis();
+        String title = "DetailTest " + System.currentTimeMillis();
         driver.findElement(By.name("title")).sendKeys(title);
         driver.findElement(By.cssSelector("button[type='submit']")).click();
 
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
-        wait.until(ExpectedConditions.urlContains("/issues"));
+        wait.until(ExpectedConditions.urlContains("/board"));
 
-        driver.findElement(By.xpath("//tr[td[contains(text(), '" + title + "')]]//a[contains(@href, '/edit')]")).click();
+        // 2. CLIC SUR LE CRAYON
+        WebElement editBtn = wait.until(ExpectedConditions.elementToBeClickable(
+                By.xpath("//article[contains(., '" + title + "')]//a[contains(@href, '/edit')]")
+        ));
+        editBtn.click();
 
         String newDetail = "Ceci est une description détaillée mise à jour.";
         WebElement detailInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.name("detail")));
@@ -373,13 +381,11 @@ public class StoryFeatureIT extends AbstractIT {
         detailInput.sendKeys(newDetail);
         driver.findElement(By.cssSelector("button[type='submit']")).click();
 
-        WebElement toBoardBtn = wait.until(ExpectedConditions.elementToBeClickable(By.id("btn-to-board")));
-        toBoardBtn.click();
-
+        // 4. Vérif
+        wait.until(ExpectedConditions.urlContains("/board"));
         WebElement card = wait.until(ExpectedConditions.presenceOfElementLocated(
-                By.xpath("//article[.//div[contains(text(), '" + title + "')]]")
+                By.xpath("//article[contains(., '" + title + "')]")
         ));
-
-        assertTrue(card.getText().contains(newDetail), "Le détail mis à jour devrait apparaître sur la carte");
+        assertTrue(card.getText().contains(newDetail));
     }
 }

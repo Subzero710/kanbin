@@ -3,6 +3,40 @@ document.addEventListener("DOMContentLoaded", function() {
     const board = document.getElementById('board');
     let draggedItem = null;
 
+    // ============================================================
+    // WIP COUNTERS (badges "X / Y" dans l'entête des colonnes)
+    // ============================================================
+    function initWipBadgeLimits() {
+        document.querySelectorAll('.kb-main-col').forEach(mainCol => {
+            const badge = mainCol.querySelector('.kb-col-header .badge');
+            if (!badge) return;
+
+            // extrait le "Y" de "X / Y" pour le garder stable
+            const m = badge.textContent.match(/(\d+)\s*\/\s*(\d+)/);
+            if (m) {
+                badge.dataset.limit = m[2];
+            }
+        });
+    }
+
+    function refreshWipCounters() {
+        document.querySelectorAll('.kb-main-col').forEach(mainCol => {
+            const badge = mainCol.querySelector('.kb-col-header .badge');
+            if (!badge) return;
+            const limitStr = badge.dataset.limit;
+            if (!limitStr) return;
+
+            const limit = parseInt(limitStr, 10);
+            const usage = mainCol.querySelectorAll('.kb-col-body .issue-draggable').length;
+            badge.textContent = usage + " / " + limit;
+        });
+    }
+
+    initWipBadgeLimits();
+    // synchronise au chargement (au cas où)
+    refreshWipCounters();
+
+
     columns.forEach(col => {
         // Restriction du drag à l'en-tête
         let isCursorInHeader = false;
@@ -191,6 +225,7 @@ document.addEventListener("DOMContentLoaded", function() {
             if (this === sourceContainer) return; // Même colonne, rien à faire
 
             this.appendChild(draggedIssue);
+            refreshWipCounters();
 
             // Sauvegarde AJAX avec gestion d'erreur et Rollback
             const issueId = draggedIssue.getAttribute('data-id');
@@ -224,7 +259,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     if (oldParent) {
                         oldParent.appendChild(element);
                     }
-
+                    refreshWipCounters();
                     // 2. Feedback visuel rouge + Message
                     element.classList.add('flash-error');
                     setTimeout(() => element.classList.remove('flash-error'), 1000);
@@ -235,7 +270,10 @@ document.addEventListener("DOMContentLoaded", function() {
             .catch(err => {
                 console.error("Network error:", err);
                 // En cas de crash réseau, on annule aussi par sécurité
-                if (oldParent) oldParent.appendChild(element);
+                if (oldParent) {
+                    oldParent.appendChild(element);
+                }
+                refreshWipCounters();
                 alert("Erreur de connexion serveur.");
             });
     }
