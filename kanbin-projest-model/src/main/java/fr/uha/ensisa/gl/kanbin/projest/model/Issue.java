@@ -1,11 +1,14 @@
 package fr.uha.ensisa.gl.kanbin.projest.model;
 
+import java.time.LocalDateTime;
+
 public class Issue {
 
     private long id;
     private String title;
     private String columnKey;
     private String detail;
+    private LocalDateTime closedAt;
 
     public Issue() {
         this.id = 0;
@@ -35,7 +38,7 @@ public class Issue {
     public String getTitle() { return this.title; }
     public long getId(){ return this.id; }
 
-    //Limitation à 30 caractères
+    // Limitation à 30 caractères
     public void setTitle(String title) {
         if (title != null && title.length() > 30) {
             this.title = title.substring(0, 30);
@@ -49,4 +52,8 @@ public class Issue {
     public void setColumnKey(String columnKey) { this.columnKey = columnKey; }
     public void setDetail(String detail) { this.detail = detail; }
     public String getDetail() { return this.detail; }
+
+    // Nouveaux Getters et Setters pour closedAt
+    public LocalDateTime getClosedAt() { return closedAt; }
+    public void setClosedAt(LocalDateTime closedAt) { this.closedAt = closedAt; }
 }

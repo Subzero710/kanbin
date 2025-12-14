@@ -12,6 +12,7 @@ import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
 import fr.uha.ensisa.gl.kanbin.projest.repo.BoardRepo;
 import fr.uha.ensisa.gl.kanbin.projest.repo.IssueRepo;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.HashMap;
@@ -92,6 +93,22 @@ public class BoardController {
                 issuesByColumn.get(key).addFirst(issue);
             }
         }
+
+        // --- NOUVEAU : TRI DE LA COLONNE CLOSED ---
+        if (issuesByColumn.containsKey("closed")) {
+            List<Issue> closedIssues = issuesByColumn.get("closed");
+            closedIssues.sort((i1, i2) -> {
+                LocalDateTime d1 = i1.getClosedAt();
+                LocalDateTime d2 = i2.getClosedAt();
+                // Si pas de date, on trie par ID inverse (le plus grand ID en premier)
+                if (d1 == null && d2 == null) return Long.compare(i2.getId(), i1.getId());
+                if (d1 == null) return 1; // les nulls à la fin
+                if (d2 == null) return -1;
+                // Ordre décroissant (le plus récent en premier)
+                return d2.compareTo(d1);
+            });
+        }
+        // ------------------------------------------
 
         mv.addObject("issuesByColumn", issuesByColumn);
 
@@ -430,6 +447,14 @@ public class BoardController {
                 // On retourne OK (200) mais avec success=false pour gestion JS
                 return ResponseEntity.ok(response);
             }
+        }
+
+        if ("closed".equals(targetColumnKey)) {
+            // Si on entre dans Closed, on met la date à maintenant
+            issue.setClosedAt(LocalDateTime.now());
+        } else {
+            // Si on sort de Closed ou qu'on bouge ailleurs, on reset la date
+            issue.setClosedAt(null);
         }
 
         // Succès

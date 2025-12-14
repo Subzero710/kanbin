@@ -228,6 +228,59 @@ public class StoryFeatureIT extends AbstractIT {
         }
     }
 
+    @Test
+    public void testClosedIssuesOrdering() {
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+        driver.get(getBaseUrl() + "board");
+
+        // 1. Créer 2 stories avec des noms distincts
+        createStory("Story A (Old)");
+        createStory("Story B (Recent)");
+
+        // 2. Aller au Board
+        driver.get(getBaseUrl() + "board");
+        wait.until(ExpectedConditions.presenceOfElementLocated(By.id("board")));
+
+        // Localiser les cartes
+        WebElement cardA = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//article[contains(., 'Story A (Old)')]")));
+        WebElement cardB = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//article[contains(., 'Story B (Recent)')]")));
+
+        // Localiser la zone "Closed" (colonne système 'closed')
+        WebElement closedZone = driver.findElement(By.xpath("//section[@data-col='closed']//div[contains(@class,'kb-col-body')]"));
+
+        // 3. Déplacer A vers Closed (devient "vieux")
+        simulateDragAndDrop(cardA, closedZone);
+
+        // Petite pause pour garantir que les timestamps soient différents (A < B)
+        try { Thread.sleep(1000); } catch (InterruptedException e) {}
+
+        // 4. Déplacer B vers Closed (devient "récent")
+        simulateDragAndDrop(cardB, closedZone);
+
+        // 5. Rafraîchir la page pour vérifier l'ordre généré par le serveur
+        driver.navigate().refresh();
+        wait.until(ExpectedConditions.presenceOfElementLocated(By.id("board")));
+
+        // 6. Vérifier l'ordre dans le DOM de la colonne Closed
+        java.util.List<WebElement> closedCards = driver.findElements(
+                By.xpath("//section[@data-col='closed']//article[contains(@class, 'kb-card')]")
+        );
+
+        assertTrue(closedCards.size() >= 2, "Il doit y avoir au moins 2 cartes dans Closed");
+
+        String firstCardText = closedCards.get(0).getText();
+        String secondCardText = closedCards.get(1).getText();
+
+        // Le plus récent (Story B) doit être en premier
+        assertTrue(firstCardText.contains("Story B"),
+                "La Story B (récente) devrait être en premier. Trouvé: " + firstCardText);
+
+        // Le plus ancien (Story A) doit être en second
+        assertTrue(secondCardText.contains("Story A"),
+                "La Story A (ancienne) devrait être ensuite.");
+    }
+
+
     // --- HELPERS ---
 
     private void ensureColumnExists(String title) {
