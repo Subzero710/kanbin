@@ -224,13 +224,20 @@ document.addEventListener("DOMContentLoaded", function() {
             // Optimistic UI : On déplace tout de suite
             if (this === sourceContainer) return; // Même colonne, rien à faire
 
-            this.appendChild(draggedIssue);
-            refreshWipCounters();
-
-            // Sauvegarde AJAX avec gestion d'erreur et Rollback
             const issueId = draggedIssue.getAttribute('data-id');
             const targetKey = targetCol.getAttribute('data-col');
 
+            // --- MODIFICATION ICI : Tri visuel immédiat ---
+            // Si on dépose dans Closed, on met en haut (le plus récent)
+            if (targetKey === 'closed') {
+                this.prepend(draggedIssue);
+            } else {
+                this.appendChild(draggedIssue);
+            }
+
+            refreshWipCounters();
+
+            // Sauvegarde AJAX avec gestion d'erreur et Rollback
             saveIssueMove(draggedIssue, issueId, targetKey, sourceContainer, this);
         });
     });
