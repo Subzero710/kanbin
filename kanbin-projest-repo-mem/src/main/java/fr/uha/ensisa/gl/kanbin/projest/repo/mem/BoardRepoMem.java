@@ -17,16 +17,18 @@ public class BoardRepoMem implements BoardRepo {
         if (store.isEmpty()) {
             Board b = new Board("Default");
 
-            // Colonne principale "Backlog" construite comme celles de /board/add-column
+            // Colonne Backlog (système)
             Column backlog = new Column("backlog", "Backlog");
-            Column backlogTodo = new Column("backlog-todo", "À Faire");
-            Column backlogWip  = new Column("backlog-wip",  "En Cours");
+            backlog.setFixed(true);
 
-            backlog.addSubColumn(backlogTodo);
-            backlog.addSubColumn(backlogWip);
+            // Colonne Closed (système)
+            Column closed = new Column("closed", "Closed");
+            closed.setFixed(true);
+
             b.addColumn(backlog);
+            b.addColumn(closed);
 
-            // On passe par save() pour avoir les mêmes règles d'IDs que partout ailleurs
+            // On passe par save() pour avoir les mêmes règles d'IDs
             save(b);
         }
     }
@@ -56,9 +58,37 @@ public class BoardRepoMem implements BoardRepo {
     @Override
     public Column addColumn(long boardId, Column column) {
         Board b = store.get(boardId);
-        if (b == null) throw new NoSuchElementException("board " + boardId + " not found");
-        if (column.getId() == 0) column.setId(colSeq.getAndIncrement());
-        b.addColumn(column);
+        if (b == null) {
+            throw new NoSuchElementException("board " + boardId + " not found");
+        }
+
+        if (column.getId() == 0) {
+            column.setId(colSeq.getAndIncrement());
+        }
+
+        List<Column> cols = b.getColumns();
+
+        // Les colonnes créées manuellement vont juste avant la colonne "closed" si elle existe
+        if (!column.isFixed()) {
+            int closedIndex = -1;
+            for (int i = 0; i < cols.size(); i++) {
+                Column c = cols.get(i);
+                if ("closed".equals(c.getKey())) {
+                    closedIndex = i;
+                    break;
+                }
+            }
+            if (closedIndex >= 0) {
+                cols.add(closedIndex, column);
+            } else {
+                // fallback si, pour une raison quelconque, il n'y a pas (encore) de colonne closed
+                cols.add(column);
+            }
+        } else {
+            // colonnes fixes : on garde un comportement simple
+            cols.add(column);
+        }
+
         this.save(b);
         return column;
     }

@@ -2,11 +2,12 @@ package fr.uha.ensisa.gl.kanbin.controller;
 
 import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
 import fr.uha.ensisa.gl.kanbin.projest.repo.IssueRepo;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -20,6 +21,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 public class IssueControllerTest {
 
     @Mock
@@ -30,11 +32,6 @@ public class IssueControllerTest {
 
     @InjectMocks
     private IssueController sut;
-
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-    }
 
     @Test
     void listIssues_shouldReturnListViewWithIssues() {
@@ -50,7 +47,6 @@ public class IssueControllerTest {
         verify(issueRepo).findAll();
     }
 
-    // 1. Test du cas critique "Sauvegarde avec perte de colonne" (Le bug qu'on a corrigé)
     @Test
     void createIssue_withExistingIdAndNullKey_shouldRestoreOldKey() {
         long id = 50L;
@@ -65,7 +61,6 @@ public class IssueControllerTest {
         verify(issueRepo).persist(newVersion);
     }
 
-    // 2. Test du cas "Sauvegarde normale avec clé existante" (Pas de restauration nécessaire)
     @Test
     void createIssue_withExistingIdAndNewKey_shouldKeepNewKey() {
         long id = 51L;
@@ -78,16 +73,37 @@ public class IssueControllerTest {
         assertEquals("col-done", newVersion.getColumnKey());
         verify(issueRepo).persist(newVersion);
     }
+
     @Test
-    void createIssue_whenNew_shouldAddCreationMessage() {
+    void createIssue_whenNew_shouldAddCreationMessageAndRedirectToBoard() {
         Issue newIssue = new Issue();
         newIssue.setId(0L);
         newIssue.setTitle("Ma Nouvelle Story");
-        sut.createIssue(newIssue, redirectAttributes);
+
+        // On récupère le résultat
+        String viewName = sut.createIssue(newIssue, redirectAttributes);
+
         verify(redirectAttributes).addFlashAttribute(
                 eq("message"),
                 eq("La nouvelle story a été ajoutée.")
         );
+        // On vérifie la nouvelle destination
+        assertEquals("redirect:/board", viewName);
+    }
+
+    // Le test pour la limite de 30 caractères
+    @Test
+    void createIssue_withLongTitle_shouldTruncateAndPersist() {
+        Issue longIssue = new Issue();
+        longIssue.setTitle("Un titre vraiment super long qui fait plus de trente caractères");
+
+        sut.createIssue(longIssue, redirectAttributes);
+
+        ArgumentCaptor<Issue> captor = ArgumentCaptor.forClass(Issue.class);
+        verify(issueRepo).persist(captor.capture());
+
+        Issue capturedIssue = captor.getValue();
+        assertEquals(30, capturedIssue.getTitle().length());
     }
 
     @Test
@@ -133,13 +149,13 @@ public class IssueControllerTest {
         Issue updatedData = new Issue();
         updatedData.setTitle("New Title");
         String viewName = sut.updateIssue(id, updatedData, redirectAttributes);
-        assertEquals("redirect:/issues", viewName);
+        assertEquals("redirect:/board", viewName);
         verify(issueRepo).persist(updatedData);
         assertEquals(id, updatedData.getId());
         assertEquals("todo", updatedData.getColumnKey());
         verify(redirectAttributes).addFlashAttribute(eq("message"), anyString());
     }
-    
+
     @Test
     void updateIssue_shouldPreserveColumnKey_whenUpdating() {
         long id = 15L;
@@ -152,5 +168,128 @@ public class IssueControllerTest {
         sut.updateIssue(id, updatedData, redirectAttributes);
         verify(issueRepo).persist(any(Issue.class));
         assertEquals("done", updatedData.getColumnKey());
+    }
+
+    @Test
+    void updateIssue_whenIssueNotFound_shouldStillPersist_butWithoutOldKeyLogic() {
+
+        long id = 999L;
+        Issue issue = new Issue(id, "Ghost Issue");
+        issue.setColumnKey("new-key");
+
+        when(issueRepo.find(id)).thenReturn(null);
+
+        String view = sut.updateIssue(id, issue, redirectAttributes);
+
+        assertEquals("redirect:/board", view);
+        verify(issueRepo).persist(issue);
+        assertEquals("new-key", issue.getColumnKey()); // La clé n'a pas été écrasée
+    }
+
+    @Test
+    void createIssue_withIdButNotFound_shouldPersistAsIs() {
+        // Cas : Création avec un ID forcé qui n'existe pas
+        long id = 888L;
+        Issue issue = new Issue(id, "New With ID");
+        issue.setColumnKey("key-A");
+
+        when(issueRepo.find(id)).thenReturn(null);
+
+        sut.createIssue(issue, redirectAttributes);
+
+        verify(issueRepo).persist(issue);
+        assertEquals("key-A", issue.getColumnKey());
+    }
+
+    @Test
+    void createIssue_withOldIssueButKeyNotNull_shouldNotOverwriteKey() {
+
+        long id = 50L;
+        Issue oldIssue = new Issue(id, "Old");
+        oldIssue.setColumnKey("old-key");
+
+        Issue newIssue = new Issue(id, "New");
+        newIssue.setColumnKey("new-user-key");
+
+        when(issueRepo.find(id)).thenReturn(oldIssue);
+
+        sut.createIssue(newIssue, redirectAttributes);
+
+        assertEquals("new-user-key", newIssue.getColumnKey());
+    }
+
+    @Test
+    void createIssue_withOldIssueAndEmptyKey_shouldRestoreOldKey() {
+        // Couvre la branche : if (... || issue.getColumnKey().isEmpty())
+        long id = 50L;
+        String oldKey = "col-old";
+        Issue oldIssue = new Issue(id, "Old");
+        oldIssue.setColumnKey(oldKey);
+
+        Issue newIssue = new Issue(id, "New");
+        newIssue.setColumnKey("");
+
+        when(issueRepo.find(id)).thenReturn(oldIssue);
+
+        sut.createIssue(newIssue, redirectAttributes);
+
+        assertEquals(oldKey, newIssue.getColumnKey());
+    }
+
+    @Test
+    void deleteIssue_whenIdDoesNotExist_shouldRedirectWithoutError() {
+
+        long ghostId = 9999L;
+
+        String view = sut.deleteIssue(ghostId, redirectAttributes);
+
+        assertEquals("redirect:/issues", view);
+        verify(issueRepo).remove(ghostId);
+
+        verify(redirectAttributes).addFlashAttribute(eq("message"), anyString());
+    }
+
+    @Test
+    void listIssues_whenRepoEmpty_shouldReturnEmptyList() {
+        when(issueRepo.findAll()).thenReturn(List.of());
+
+        ModelAndView mv = sut.listIssues();
+
+        @SuppressWarnings("unchecked")
+        Collection<Issue> issues = (Collection<Issue>) mv.getModel().get("issues");
+        assertTrue(issues.isEmpty());
+        assertEquals("list-issues", mv.getViewName());
+    }
+
+    @Test
+    void updateIssue_shouldRestoreKey_whenKeyIsEmptyString() {
+        long id = 50L;
+        Issue oldIssue = new Issue(id, "Old");
+        oldIssue.setColumnKey("old-key");
+
+        Issue newIssue = new Issue(id, "New");
+        newIssue.setColumnKey(""); // VIDE
+
+        when(issueRepo.find(id)).thenReturn(oldIssue);
+
+        sut.updateIssue(id, newIssue, redirectAttributes);
+
+        assertEquals("old-key", newIssue.getColumnKey());
+    }
+
+    @Test
+    void createIssue_withEmptyKeyString_shouldRestoreOldKey() {
+        long id = 50L;
+        Issue oldIssue = new Issue(id, "Old");
+        oldIssue.setColumnKey("safe-key");
+
+        Issue newIssue = new Issue(id, "New");
+        newIssue.setColumnKey("");
+
+        when(issueRepo.find(id)).thenReturn(oldIssue);
+
+        sut.createIssue(newIssue, redirectAttributes);
+
+        assertEquals("safe-key", newIssue.getColumnKey());
     }
 }

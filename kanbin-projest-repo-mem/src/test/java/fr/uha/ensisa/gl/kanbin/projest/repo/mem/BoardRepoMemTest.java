@@ -26,10 +26,13 @@ class BoardRepoMemTest {
         repo.seed();
         List<Board> boards = repo.findAll();
         assertEquals(1, boards.size());
-        assertEquals("Default", boards.get(0).getName());
-        assertFalse(boards.get(0).getColumns().isEmpty(), "Le seed doit créer des colonnes par défaut");
+        assertEquals("Default", boards.getFirst().getName());
+        assertFalse(boards.getFirst().getColumns().isEmpty(), "Le seed doit créer des colonnes par défaut");
 
-        // Deuxième appel ne doit rien faire
+        Column backlog = boards.getFirst().getColumns().getFirst();
+        assertEquals("backlog", backlog.getKey());
+        assertTrue(backlog.isFixed(), "La colonne Backlog générée par le seed doit être fixe");
+
         repo.seed();
         assertEquals(1, repo.findAll().size());
     }
@@ -52,24 +55,21 @@ class BoardRepoMemTest {
         Column c1 = new Column(0, "col1", "Col 1");
         b.addColumn(c1);
 
-        repo.save(b); // Sauvegarde globale
+        repo.save(b);
 
         assertTrue(c1.getId() > 0, "L'ID de la colonne doit être généré lors du save du board");
     }
 
     @Test
     void addColumn_shouldAddToExistingBoardAndGenerateId() {
-        // Setup board
         Board b = new Board("My Board");
         repo.save(b);
         long boardId = b.getId();
 
-        // Action
         Column newCol = new Column(0, "dev", "Dev");
         repo.addColumn(boardId, newCol);
 
-        // Verify
-        Board reloaded = repo.findById(boardId).get();
+        Board reloaded = repo.findById(boardId).orElseThrow();
         assertEquals(1, reloaded.getColumns().size());
         assertTrue(newCol.getId() > 0, "L'ID de la nouvelle colonne doit être généré");
     }
@@ -92,7 +92,7 @@ class BoardRepoMemTest {
         boolean result = repo.removeColumn(b.getId(), colId);
 
         assertTrue(result);
-        Board reloaded = repo.findById(b.getId()).get();
+        Board reloaded = repo.findById(b.getId()).orElseThrow();
         assertTrue(reloaded.getColumns().isEmpty());
     }
 
@@ -108,10 +108,85 @@ class BoardRepoMemTest {
     }
 
     @Test
-    public void testFindAll() {
-
+    void addNonFixedColumn_isInsertedBeforeClosedIfPresent() {
         BoardRepoMem repo = new BoardRepoMem();
+        Board board = new Board("Default");
 
+        Column backlog = new Column("backlog", "Backlog");
+        backlog.setFixed(true);
+        Column closed = new Column("closed", "Closed");
+        closed.setFixed(true);
+
+        board.addColumn(backlog);
+        board.addColumn(closed);
+
+        repo.save(board);
+
+        Column inProgress = new Column("in-progress", "In progress");
+        Column returned = repo.addColumn(board.getId(), inProgress);
+
+        assertSame(inProgress, returned);
+
+        List<Column> cols = repo.findById(board.getId())
+                .orElseThrow()
+                .getColumns();
+
+        assertEquals(3, cols.size());
+        assertEquals("backlog", cols.get(0).getKey());
+        assertEquals("in-progress", cols.get(1).getKey());
+        assertEquals("closed", cols.get(2).getKey());
+    }
+
+    @Test
+    void addNonFixedColumn_appendsWhenClosedDoesNotExist() {
+        BoardRepoMem repo = new BoardRepoMem();
+        Board board = new Board("Default");
+
+        Column backlog = new Column("backlog", "Backlog");
+        backlog.setFixed(true);
+        board.addColumn(backlog);
+
+        repo.save(board);
+
+        Column todo = new Column("todo", "Todo");
+        repo.addColumn(board.getId(), todo);
+
+        List<Column> cols = repo.findById(board.getId())
+                .orElseThrow()
+                .getColumns();
+
+        assertEquals(2, cols.size());
+        assertEquals("backlog", cols.get(0).getKey());
+        assertEquals("todo", cols.get(1).getKey());
+    }
+
+    @Test
+    void addFixedColumn_keepsSimpleAppendBehaviour() {
+        BoardRepoMem repo = new BoardRepoMem();
+        Board board = new Board("Default");
+
+        Column backlog = new Column("backlog", "Backlog");
+        backlog.setFixed(true);
+        board.addColumn(backlog);
+
+        repo.save(board);
+
+        Column closed = new Column("closed", "Closed");
+        closed.setFixed(true);
+
+        repo.addColumn(board.getId(), closed);
+
+        List<Column> cols = repo.findById(board.getId())
+                .orElseThrow()
+                .getColumns();
+        assertEquals(2, cols.size());
+        assertEquals("backlog", cols.get(0).getKey());
+        assertEquals("closed", cols.get(1).getKey());
+    }
+
+    @Test
+    public void testFindAll() {
+        BoardRepoMem repo = new BoardRepoMem();
         repo.save(new Board("Board 1"));
         repo.save(new Board("Board 2"));
 
@@ -119,5 +194,101 @@ class BoardRepoMemTest {
         assertTrue(allBoards.size() >= 2);
     }
 
+    @Test
+    void deleteById_shouldReturnFalse_whenBoardDoesNotExist() {
+        boolean result = repo.deleteById(9999L);
+        assertFalse(result, "Doit retourner false si l'ID n'existe pas");
+    }
 
+    @Test
+    void removeColumn_shouldReturnFalse_whenBoardDoesNotExist() {
+        boolean result = repo.removeColumn(9999L, 1L);
+        assertFalse(result, "Doit retourner false si le board n'existe pas");
+    }
+
+    @Test
+    void removeColumn_shouldReturnFalse_whenColumnDoesNotExistInBoard() {
+        Board b = new Board("Test");
+        repo.save(b);
+
+        boolean result = repo.removeColumn(b.getId(), 555L);
+        assertFalse(result, "Doit retourner false si la colonne n'est pas trouvée");
+    }
+
+    @Test
+    void save_existingColumn_shouldNotChangeId() {
+        Board b = new Board("Test");
+        Column c = new Column(0, "col", "Title");
+        repo.save(b);
+        long originalId = c.getId();
+
+        c.setTitle("New Title");
+        repo.save(b);
+
+        assertEquals(originalId, c.getId());
+    }
+
+    @Test
+    void save_shouldUpdateExistingColumn_withoutChangingId() {
+        // Setup
+        Board b = new Board("Test Board");
+        Column c = new Column(0, "col", "Title");
+        b.addColumn(c);
+        repo.save(b);
+        long id = c.getId();
+
+        c.setTitle("New Title");
+        repo.save(b);
+
+        assertEquals(id, c.getId());
+        assertEquals("New Title", repo.findById(b.getId()).get().getColumns().getFirst().getTitle());
+    }
+
+    @Test
+    void addColumn_shouldAddExistingColumn_withoutChangingId() {
+        Board b = new Board("Test Board");
+        repo.save(b);
+
+        Column c = new Column(123L, "key", "Title");
+        repo.addColumn(b.getId(), c);
+
+        assertEquals(123L, c.getId());
+    }
+
+    @Test
+    void addColumn_shouldThrowException_whenColumnIsNull() {
+
+        Board b = new Board("Test");
+        repo.save(b);
+        long id = b.getId();
+
+
+        assertThrows(RuntimeException.class, () -> repo.addColumn(id, null));
+    }
+
+    @Test
+    void save_shouldUpdateExistingReference() {
+
+        Board b = new Board("Original");
+        repo.save(b);
+
+        b.setName("Modified");
+
+        Board retrieved = repo.findById(b.getId()).get();
+        assertEquals("Modified", retrieved.getName());
+    }
+
+    @Test
+    void save_shouldNotChangeId_whenUpdatingExistingColumn() {
+        Board b = new Board("Test");
+        Column c = new Column(0, "col", "Title");
+        b.addColumn(c);
+        repo.save(b);
+        long originalId = c.getId();
+
+        c.setTitle("Updated");
+        repo.save(b);
+
+        assertEquals(originalId, c.getId());
+    }
 }

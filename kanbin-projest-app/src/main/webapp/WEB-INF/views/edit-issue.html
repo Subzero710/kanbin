@@ -15,8 +15,8 @@
                    id="issueTitle"
                    th:field="*{title}"
                    required
-                   maxlength="255">
-            <div class="form-text">Modifiez le titre ci-dessus.</div>
+                   maxlength="30">
+            <div class="form-text">Modifiez le titre ci-dessus (30 caractères max).</div>
         </div>
         <div class="mb-3">
             <label for="detail" class="form-label">Détail :</label>
@@ -29,7 +29,6 @@
             </textarea>
             <div class="form-text">Décrivez les exigences, les critères d'acceptation et le contexte.</div>
         </div>
-        
         <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
         <a th:href="@{/issues}" class="btn btn-secondary">Annuler</a>
     </form>
