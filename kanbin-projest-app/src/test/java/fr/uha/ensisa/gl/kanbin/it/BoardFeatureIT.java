@@ -221,5 +221,112 @@ public class BoardFeatureIT extends AbstractIT {
         assertTrue(newPresent, "Le nouveau titre de colonne devrait être affiché");
     }
 
+    /**
+     * Helper pour créer une colonne rapidement.
+     * Remplit le formulaire et attend que la colonne apparaisse.
+     */
+    private void createColumnHelper(String title) {
+        // 1. Remplir le titre
+        WebElement titleInput = driver.findElement(By.name("title"));
+        titleInput.clear();
+        titleInput.sendKeys(title);
+
+        // 2. Valider (On suppose que le type est "Simple" par défaut)
+        driver.findElement(By.cssSelector("input[type='submit'][value='Ajouter Colonne']")).click();
+
+        // 3. Attendre que la colonne soit créée pour ne pas aller trop vite
+        // Cela évite que le test enchaîne sur le Drag & Drop alors que la colonne n'est pas encore dans le DOM
+        new WebDriverWait(driver, Duration.ofSeconds(2))
+                .until(ExpectedConditions.presenceOfElementLocated(
+                        By.xpath("//span[contains(text(), '" + title + "')]")));
+    }
+    @Test
+    public void testReorderColumnFeature() {
+        driver.get(getBaseUrl() + "board");
+
+        // 1. Préparation : Création de 2 colonnes avec des noms uniques
+        long timestamp = System.currentTimeMillis();
+        String nameA = "DRAG-A-" + timestamp;
+        String nameB = "DRAG-B-" + timestamp;
+
+        createColumnHelper(nameA);
+        createColumnHelper(nameB);
+
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
+
+        // 2. Localisation des éléments
+        // On a besoin de la SECTION (pour le drag) et du HEADER (pour le unlock du clic)
+        WebElement sectionA = wait.until(ExpectedConditions.presenceOfElementLocated(
+                By.xpath("//span[contains(text(), '" + nameA + "')]/ancestor::section")));
+
+        WebElement sectionB = wait.until(ExpectedConditions.presenceOfElementLocated(
+                By.xpath("//span[contains(text(), '" + nameB + "')]/ancestor::section")));
+
+        WebElement headerB = sectionB.findElement(By.cssSelector(".kb-col-header"));
+
+        // 3. Action : Drag B sur A (B doit passer devant A)
+        // On passe headerB (pour le clic) et les sections (pour le mouvement)
+        performDragAndDropJS(headerB, sectionB, sectionA);
+
+        // 4. Vérification
+        // Petit délai de stabilisation pour le DOM
+        try { Thread.sleep(200); } catch (InterruptedException e) {}
+
+        var allTitles = driver.findElements(By.cssSelector(".kb-col-header span[id^='col-title-']"));
+
+        int indexA = -1;
+        int indexB = -1;
+
+        for (int i = 0; i < allTitles.size(); i++) {
+            String txt = allTitles.get(i).getText();
+            if (txt.contains(nameA)) indexA = i;
+            if (txt.contains(nameB)) indexB = i;
+        }
+
+        assertTrue(indexB != -1 && indexA != -1, "Les colonnes doivent être présentes dans le DOM");
+        assertTrue(indexB < indexA, "La colonne B (" + indexB + ") doit être placée avant A (" + indexA + ")");
+    }
+
+    /**
+     * Simule un Drag & Drop HTML5 complet.
+     * Contourne le bug de Selenium Actions avec HTML5 draggable.
+     * Simule d'abord un MOUSEDOWN sur le header pour valider la sécurité du project.js,
+     * puis enchaîne les événements Drag & Drop standards sur les sections.
+     */
+    private void performDragAndDropJS(WebElement srcHeader, WebElement srcSection, WebElement tgtSection) {
+        String script =
+                "var srcHeader = arguments[0]; " +
+                        "var srcSection = arguments[1]; " +
+                        "var tgtSection = arguments[2]; " +
+
+                        // 1. Scroll pour s'assurer que les éléments sont interactifs (viewport)
+                        "srcSection.scrollIntoView({block: 'center', inline: 'center'}); " +
+
+                        // 2. SIMULATION DU CLIC (MOUSEDOWN)
+                        // Indispensable pour passer le check 'if (!isCursorInHeader)' de project.js
+                        "var evtMouseDown = new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }); " +
+                        "srcHeader.dispatchEvent(evtMouseDown); " +
+
+                        // 3. PRÉPARATION DU DRAG
+                        "var dataTransfer = new DataTransfer(); " +
+
+                        // 4. DRAG START (Sur la SECTION)
+                        "var evtDragStart = new DragEvent('dragstart', { bubbles: true, cancelable: true, view: window }); " +
+                        "Object.defineProperty(evtDragStart, 'dataTransfer', { value: dataTransfer }); " +
+                        "srcSection.dispatchEvent(evtDragStart); " +
+
+                        // 5. DROP (Sur la SECTION cible)
+                        "var evtDrop = new DragEvent('drop', { bubbles: true, cancelable: true, view: window }); " +
+                        "Object.defineProperty(evtDrop, 'dataTransfer', { value: dataTransfer }); " +
+                        "tgtSection.dispatchEvent(evtDrop); " +
+
+                        // 6. DRAG END
+                        "var evtDragEnd = new DragEvent('dragend', { bubbles: true, cancelable: true, view: window }); " +
+                        "Object.defineProperty(evtDragEnd, 'dataTransfer', { value: dataTransfer }); " +
+                        "srcSection.dispatchEvent(evtDragEnd);";
+
+        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript(script, srcHeader, srcSection, tgtSection);
+    }
+
 
 }
