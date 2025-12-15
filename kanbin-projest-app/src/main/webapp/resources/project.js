@@ -1,4 +1,60 @@
 document.addEventListener("DOMContentLoaded", function() {
+    // 1. CONFIGURATION ROBUSTE (URL + CSRF (SI PRESENT))
+    const baseUrlMeta = document.querySelector('meta[name="api-base-url"]');
+    const csrfTokenMeta = document.querySelector('meta[name="_csrf"]');
+    const csrfHeaderMeta = document.querySelector('meta[name="_csrf_header"]');
+
+    // On s'assure que le chemin finit toujours par '/'
+    let rawPath = baseUrlMeta ? baseUrlMeta.getAttribute('content') : '/';
+    const CONTEXT_PATH = rawPath.endsWith('/') ? rawPath : rawPath + '/';
+
+    const CSRF_TOKEN = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : null;
+    const CSRF_HEADER = csrfHeaderMeta ? csrfHeaderMeta.getAttribute('content') : null;
+
+    /**
+     * Construit une URL API absolue et valide
+     * @param {string} endpoint - ex: "board/move-issue"
+     */
+    function getApiUrl(endpoint) {
+        // Retire le slash au début de l'endpoint pour éviter le double slash //
+        const cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+        return CONTEXT_PATH + cleanEndpoint;
+    }
+
+    /**
+     * Wrapper pour fetch qui ajoute automatiquement le token de sécurité CSRF
+     */
+    function secureFetch(endpoint, formData) {
+        const headers = {};
+        // Ajout du header CSRF si présent (obligatoire pour POST Spring Security)
+        if (CSRF_TOKEN && CSRF_HEADER) {
+            headers[CSRF_HEADER] = CSRF_TOKEN;
+        }
+
+        // Utilisation URLSearchParams qui envoie du application/x-www-form-urlencoded par défaut.
+
+        return fetch(getApiUrl(endpoint), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                ...headers // Injection du token
+            },
+            body: formData
+        }).then(response => {
+            if (!response.ok) {
+                // Si erreur 403 (Forbidden) ou 404 or 500, on lève une erreur explicite
+                throw new Error(`Erreur HTTP ${response.status} sur ${endpoint}`);
+            }
+            // On vérifie le type de contenu avant de parser JSON
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                return response.json();
+            } else {
+                return response.text(); // Pour gérer les réponses "OK" brutes
+            }
+        });
+    }
+
     const columns = document.querySelectorAll('.kb-main-col');
     const board = document.getElementById('board');
     let draggedItem = null;
@@ -133,23 +189,20 @@ document.addEventListener("DOMContentLoaded", function() {
         formData.append('columnId', columnId);
         formData.append('newIndex', newIndex);
 
-        fetch('/board/reorder-column', {
-            method: 'POST',
-            body: formData,
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-        })
-            .then(response => response.text())
+        // UTILISATION DE secureFetch
+        secureFetch('board/reorder-column', formData)
             .then(data => {
-                if (data === "OK") {
+                // data peut être "OK" (texte) ou un objet
+                if (data === "OK" || data.success) {
                     element.classList.add('flash-success');
                     setTimeout(() => element.classList.remove('flash-success'), 1500);
                 } else {
-                    console.error("Erreur:", data);
+                    console.error("Erreur logique:", data);
                     handleError(element);
                 }
             })
             .catch(err => {
-                console.error(err);
+                console.error("ERREUR CRITIQUE DND:", err);
                 handleError(element);
             });
     }
@@ -247,19 +300,14 @@ document.addEventListener("DOMContentLoaded", function() {
         formData.append('issueId', issueId);
         formData.append('targetColumnKey', targetColumnKey);
 
-        fetch('/board/move-issue-dnd', {
-            method: 'POST',
-            body: formData,
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'}
-        })
-            .then(response => response.json()) // On attend du JSON maintenant
+        secureFetch('board/move-issue-dnd', formData)
             .then(data => {
-                if (data.success) {
+                if (data && data.success) {
                     // SUCCÈS
                     element.classList.add('flash-success');
                     setTimeout(() => element.classList.remove('flash-success'), 1500);
                 } else {
-                    // ÉCHEC (Limite atteinte, etc.)
+                    // ECHEC (Limite atteinte)
                     console.warn("Move rejected:", data.message);
 
                     // 1. ROLLBACK : On remet la carte dans sa colonne d'origine
@@ -271,7 +319,10 @@ document.addEventListener("DOMContentLoaded", function() {
                     element.classList.add('flash-error');
                     setTimeout(() => element.classList.remove('flash-error'), 1000);
 
-                    alert("Erreur : " + data.message);
+                    // On met un petit timeout pour laisser le temps au navigateur d'afficher le flash rouge avant
+                    setTimeout(() => {
+                        alert("Erreur : " + (data.message || "Limite atteinte"));
+                    }, 100);
                 }
             })
             .catch(err => {
@@ -281,7 +332,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     oldParent.appendChild(element);
                 }
                 refreshWipCounters();
-                alert("Erreur de connexion serveur.");
+                alert("Erreur technique : " + err.message);
             });
     }
 });

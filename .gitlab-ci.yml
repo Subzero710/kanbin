@@ -101,6 +101,16 @@ deploy-docker:
     - kubectl config use-context default
     - APP_NAME="${CI_PROJECT_NAMESPACE}-${CI_PROJECT_NAME}"
     - NAMESPACE="gitlab-cd-${ENV}"
+
+    # --- MODIF 1 : On ajoute le calcul du tag (comme dans l'étape Docker) ---
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        DOCKER_TAG=$CI_COMMIT_TAG
+      else
+        DOCKER_TAG=$CI_COMMIT_REF_SLUG
+      fi
+    # ------------------------------------------------------------------------
+
     # Création du secret
     - kubectl -n ${NAMESPACE} create secret docker-registry $APP_NAME-registry-secret --docker-server=${CI_REGISTRY} --docker-username=${CI_DEPLOY_USER} --docker-password=${CI_DEPLOY_PASSWORD} --dry-run -o yaml | kubectl -n ${NAMESPACE} apply -f -
     # Génération du YAML Kubernetes
@@ -124,7 +134,8 @@ deploy-docker:
               app: $APP_NAME
           spec:
             containers:
-              - image: "$CI_REGISTRY_IMAGE:${CI_COMMIT_TAG:-latest}"
+              # --- MODIF 2 : On utilise la variable $DOCKER_TAG au lieu de latest ---
+              - image: "$CI_REGISTRY_IMAGE:$DOCKER_TAG"
                 imagePullPolicy: Always
                 name: $APP_NAME
                 ports:
