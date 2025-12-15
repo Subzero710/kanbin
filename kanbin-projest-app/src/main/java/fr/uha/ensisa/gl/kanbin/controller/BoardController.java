@@ -11,6 +11,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import java.util.Comparator;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -42,7 +43,7 @@ public class BoardController {
                     newBoard.addColumn(closed);
 
                     // Initialisation Row par défaut (Swimlane)
-                    Row defaultRow = new Row("default", "Tâches");
+                    Row defaultRow = new Row("default", "Non catégorisé");
                     defaultRow.setFixed(true);
                     newBoard.addRow(defaultRow);
 
@@ -114,6 +115,31 @@ public class BoardController {
             }
         }
 
+        for (Map<String, List<Issue>> colMap : issuesByRowAndCol.values()) {
+            for (Map.Entry<String, List<Issue>> entry : colMap.entrySet()) {
+                String colKey = entry.getKey();
+                List<Issue> list = entry.getValue();
+
+                if ("backlog".equals(colKey)) {
+                    // Backlog : Le plus récent en haut (ID décroissant)
+                    list.sort(Comparator.comparingLong(Issue::getId).reversed());
+                }
+                else if ("closed".equals(colKey)) {
+                    // Closed : Le fermé le plus récemment en haut
+                    list.sort((i1, i2) -> {
+                        if (i1.getClosedAt() == null) return 1;
+                        if (i2.getClosedAt() == null) return -1;
+                        return i2.getClosedAt().compareTo(i1.getClosedAt()); // Date décroissante
+                    });
+                }
+                else {
+                    // Autres colonnes : Le plus vieux en haut (ID croissant / ordre de création)
+                    list.sort(Comparator.comparingLong(Issue::getId));
+                }
+            }
+        }
+
+        // Envoi à la vue
         mv.addObject("issuesByRowAndCol", issuesByRowAndCol);
 
         // --- WIP LIMITS (Release 3) ---
@@ -130,13 +156,16 @@ public class BoardController {
     // --- GESTION COLONNES (Ajout) ---
 
     @PostMapping("/board/add-column")
-    public String addColumn(@RequestParam("title") String title,
-                            @RequestParam(value = "type", defaultValue = "simple") String type,
-                            RedirectAttributes redirectAttributes) {
+    public String addColumn(
+            @RequestParam("title") String title,
+            @RequestParam(value = "type", defaultValue = "simple") String type,
+            @RequestParam(value = "wipLimit", defaultValue = "0") int wipLimit, // 1. ON RÉCUPÈRE LA LIMITE ICI
+            RedirectAttributes redirectAttributes) {
+
         Board board = getOrCreateDefaultBoard();
         String key = title.toLowerCase().trim().replaceAll("\\s+", "-");
 
-        // Vérif doublons
+        // --- Ta logique de vérification de doublons (INCHANGÉE) ---
         List<String> newKeys = new ArrayList<>();
         newKeys.add(key);
         if ("double".equalsIgnoreCase(type)) {
@@ -156,8 +185,13 @@ public class BoardController {
             redirectAttributes.addFlashAttribute("errorMessage", "Impossible de créer la colonne : nom déjà pris.");
             return "redirect:/board";
         }
+        // -----------------------------------------------------------
 
         Column newColumn = new Column(key, title);
+
+        // 2. ON ENREGISTRE LA LIMITE DANS L'OBJET
+        newColumn.setWipLimit(wipLimit);
+
         if ("double".equalsIgnoreCase(type)) {
             newColumn.setType("double");
             Column subTodo = new Column(key + "-todo", "À Faire");
@@ -168,6 +202,15 @@ public class BoardController {
 
         boards.addColumn(board.getId(), newColumn);
         return "redirect:/board";
+    }
+
+    @PostMapping("/board/move-card")
+    @ResponseBody
+    public String moveCard(@RequestParam Long issueId,
+                           @RequestParam String rowKey,
+                           @RequestParam String colKey) {
+
+        return "OK";
     }
 
     // --- GESTION COLONNES (Suppression - Release 3) ---
@@ -341,7 +384,7 @@ public class BoardController {
             if (!alreadyInTargetColumn || changingRow) {
                 if (currentCount >= wipLimit) {
                     response.put("success", false);
-                    response.put("message", "Limite WIP atteinte !");
+                    response.put("message", "Le nombre maximum de story pour cette colonne est atteint !");
                     return ResponseEntity.badRequest().body(response);
                 }
             }

@@ -7,7 +7,7 @@ public class Column {
     private long id;
     private String key;
     private String title;
-    private int wipLimit;
+    private int wipLimit =0;
     private Integer pos;
     private String type = "simple";
 

@@ -36,7 +36,7 @@ public class IssueController {
     @GetMapping("/issues")
     public ModelAndView listIssues() {
         Collection<Issue> issues = issueRepo.findAll();
-        ModelAndView modelAndView = new ModelAndView("issues");
+        ModelAndView modelAndView = new ModelAndView("list-issues");
         modelAndView.addObject("issues", issues);
         return modelAndView;
     }
@@ -118,6 +118,16 @@ public class IssueController {
 
         issueRepo.persist(issue);
         redirectAttributes.addFlashAttribute("message", "Story mise à jour");
+        return "redirect:/board";
+    }
+
+    @PostMapping("/issues/{id}/delete") // L'URL doit correspondre à ce que le test attend
+    public String deleteIssue(@PathVariable long id, RedirectAttributes redirectAttributes) {
+        fr.uha.ensisa.gl.kanbin.projest.model.Issue issue = issueRepo.find(id);
+        if (issue != null) {
+            issueRepo.remove(id);
+            redirectAttributes.addFlashAttribute("message", "Story supprimée avec succès");
+        }
         return "redirect:/board";
     }
 }
