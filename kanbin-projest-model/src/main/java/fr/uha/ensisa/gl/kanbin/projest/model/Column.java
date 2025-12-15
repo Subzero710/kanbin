@@ -9,6 +9,7 @@ public class Column {
     private String title;
     private int wipLimit;
     private Integer pos;
+    private String type = "simple";
 
     private boolean fixed = false;
     private final List<Column> subColumns = new ArrayList<>();
@@ -45,5 +46,12 @@ public class Column {
             return List.of(this);
         }
         return this.subColumns;
+    }
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
     }
 }

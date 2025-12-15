@@ -1,26 +1,19 @@
 package fr.uha.ensisa.gl.kanbin.controller;
 
+import fr.uha.ensisa.gl.kanbin.projest.model.Board;
+import fr.uha.ensisa.gl.kanbin.projest.model.Column;
+import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
+import fr.uha.ensisa.gl.kanbin.projest.model.Row; // Import Row (Swimlane)
+import fr.uha.ensisa.gl.kanbin.projest.repo.BoardRepo;
+import fr.uha.ensisa.gl.kanbin.projest.repo.IssueRepo;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import fr.uha.ensisa.gl.kanbin.projest.model.Board;
-import fr.uha.ensisa.gl.kanbin.projest.model.Column;
-import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
-import fr.uha.ensisa.gl.kanbin.projest.repo.BoardRepo;
-import fr.uha.ensisa.gl.kanbin.projest.repo.IssueRepo;
-
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 @Controller
 public class BoardController {
@@ -35,84 +28,95 @@ public class BoardController {
 
     private Board getOrCreateDefaultBoard() {
         String boardName = "Test Board";
-
         return boards.findAll().stream()
                 .filter(b -> boardName.equals(b.getName()))
                 .findFirst()
                 .orElseGet(() -> {
                     Board newBoard = new Board(boardName);
+                    // Initialisation par défaut (Release 3)
                     Column backlog = new Column("backlog", "Backlog");
                     backlog.setFixed(true);
                     Column closed = new Column("closed", "Closed");
                     closed.setFixed(true);
                     newBoard.addColumn(backlog);
                     newBoard.addColumn(closed);
+
+                    // Initialisation Row par défaut (Swimlane)
+                    Row defaultRow = new Row("default", "Tâches");
+                    defaultRow.setFixed(true);
+                    newBoard.addRow(defaultRow);
+
                     return boards.save(newBoard);
                 });
-
     }
 
     @GetMapping("/")
-    public String homeRedirect() {
-        return "redirect:/board";
+    public ModelAndView root() {
+        return new ModelAndView("redirect:/board");
     }
 
     @GetMapping("/board")
-    public ModelAndView board() {
+    public ModelAndView showBoard() {
         Board b = getOrCreateDefaultBoard();
         ModelAndView mv = new ModelAndView("board");
         mv.addObject("board", b);
         mv.addObject("columns", b.getColumns());
+        mv.addObject("rows", b.getRows()); // Envoi des Swimlanes
 
-        // Prépare la structure issues par colonne (sub-colonnes incluses)
-        Map<String, List<Issue>> issuesByColumn = new LinkedHashMap<>();
-        String defaultKey = null;
+        // --- LOGIQUE FUSIONNÉE : Tri par Row ET par Column ---
 
-        for (Column mainCol : b.getColumns()) {
-            if (!mainCol.getSubColumns().isEmpty()) {
-                for (Column sub : mainCol.getSubColumns()) {
-                    issuesByColumn.put(sub.getKey(), new ArrayList<>());
-                    if (defaultKey == null) defaultKey = sub.getKey();
+        // Map<RowKey, Map<ColKey, List<Issue>>>
+        Map<String, Map<String, List<Issue>>> issuesByRowAndCol = new LinkedHashMap<>();
+
+        // Initialisation de la structure vide
+        for (Row row : b.getRows()) {
+            Map<String, List<Issue>> colMap = new LinkedHashMap<>();
+            for (Column col : b.getColumns()) {
+                if (col.getSubColumns().isEmpty()) {
+                    colMap.put(col.getKey(), new ArrayList<>());
+                } else {
+                    for (Column sub : col.getSubColumns()) {
+                        colMap.put(sub.getKey(), new ArrayList<>());
+                    }
                 }
-            } else {
-                issuesByColumn.put(mainCol.getKey(), new ArrayList<>());
-                if (defaultKey == null) defaultKey = mainCol.getKey();
             }
+            issuesByRowAndCol.put(row.getKey(), colMap);
         }
+
+        // Valeurs par défaut
+        String defaultRowKey = b.getRows().isEmpty() ? null : b.getRows().get(0).getKey();
+        String defaultColKey = "backlog";
 
         for (Issue issue : issues.findAll()) {
-            String key = issue.getColumnKey();
-            if (key == null || !issuesByColumn.containsKey(key)) {
-                key = defaultKey;
-                if (key != null) {
-                    issue.setColumnKey(key);
-                    issues.persist(issue);
+            boolean changed = false;
+
+            // Réparation des orphelins
+            if (issue.getRowKey() == null && defaultRowKey != null) {
+                issue.setRowKey(defaultRowKey);
+                changed = true;
+            }
+            if (issue.getColumnKey() == null) {
+                issue.setColumnKey(defaultColKey);
+                changed = true;
+            }
+
+            if (changed) issues.persist(issue);
+
+            // Remplissage de la Map
+            if (issue.getRowKey() != null && issue.getColumnKey() != null) {
+                Map<String, List<Issue>> rowMap = issuesByRowAndCol.get(issue.getRowKey());
+                if (rowMap != null) {
+                    List<Issue> list = rowMap.get(issue.getColumnKey());
+                    if (list != null) {
+                        list.add(issue);
+                    }
                 }
             }
-            if (key != null) {
-                issuesByColumn.get(key).addFirst(issue);
-            }
         }
 
-        // --- NOUVEAU : TRI DE LA COLONNE CLOSED ---
-        if (issuesByColumn.containsKey("closed")) {
-            List<Issue> closedIssues = issuesByColumn.get("closed");
-            closedIssues.sort((i1, i2) -> {
-                LocalDateTime d1 = i1.getClosedAt();
-                LocalDateTime d2 = i2.getClosedAt();
-                // Si pas de date, on trie par ID inverse (le plus grand ID en premier)
-                if (d1 == null && d2 == null) return Long.compare(i2.getId(), i1.getId());
-                if (d1 == null) return 1; // les nulls à la fin
-                if (d2 == null) return -1;
-                // Ordre décroissant (le plus récent en premier)
-                return d2.compareTo(d1);
-            });
-        }
-        // ------------------------------------------
+        mv.addObject("issuesByRowAndCol", issuesByRowAndCol);
 
-        mv.addObject("issuesByColumn", issuesByColumn);
-
-        // Prépare les informations WIP pour chaque colonne principale
+        // --- WIP LIMITS (Release 3) ---
         Map<Long, Long> wipUsageByColumnId = new HashMap<>();
         for (Column mainCol : b.getColumns()) {
             long count = countIssuesInColumn(b, mainCol);
@@ -123,6 +127,8 @@ public class BoardController {
         return mv;
     }
 
+    // --- GESTION COLONNES (Ajout) ---
+
     @PostMapping("/board/add-column")
     public String addColumn(@RequestParam("title") String title,
                             @RequestParam(value = "type", defaultValue = "simple") String type,
@@ -130,7 +136,7 @@ public class BoardController {
         Board board = getOrCreateDefaultBoard();
         String key = title.toLowerCase().trim().replaceAll("\\s+", "-");
 
-        // Clés qui seraient utilisées par cette nouvelle colonne
+        // Vérif doublons
         List<String> newKeys = new ArrayList<>();
         newKeys.add(key);
         if ("double".equalsIgnoreCase(type)) {
@@ -138,33 +144,24 @@ public class BoardController {
             newKeys.add(key + "-wip");
         }
 
-        // Clés déjà existantes (colonnes principales + sous-colonnes)
         Set<String> existingKeys = new HashSet<>();
         for (Column col : board.getColumns()) {
-            if (col.getKey() != null) {
-                existingKeys.add(col.getKey());
-            }
+            if (col.getKey() != null) existingKeys.add(col.getKey());
             for (Column sub : col.getSubColumns()) {
-                if (sub.getKey() != null) {
-                    existingKeys.add(sub.getKey());
-                }
+                if (sub.getKey() != null) existingKeys.add(sub.getKey());
             }
         }
 
-        boolean conflict = newKeys.stream().anyMatch(existingKeys::contains);
-        if (conflict) {
-            redirectAttributes.addFlashAttribute(
-                    "errorMessage",
-                    "Impossible de créer la colonne : une colonne portant déjà ce nom existe."
-            );
+        if (newKeys.stream().anyMatch(existingKeys::contains)) {
+            redirectAttributes.addFlashAttribute("errorMessage", "Impossible de créer la colonne : nom déjà pris.");
             return "redirect:/board";
         }
 
         Column newColumn = new Column(key, title);
-
         if ("double".equalsIgnoreCase(type)) {
+            newColumn.setType("double");
             Column subTodo = new Column(key + "-todo", "À Faire");
-            Column subWip  = new Column(key + "-wip",  "En Cours");
+            Column subWip = new Column(key + "-wip", "En Cours");
             newColumn.addSubColumn(subTodo);
             newColumn.addSubColumn(subWip);
         }
@@ -173,49 +170,37 @@ public class BoardController {
         return "redirect:/board";
     }
 
+    // --- GESTION COLONNES (Suppression - Release 3) ---
+
     @PostMapping("/board/remove-column")
     public String removeColumn(@RequestParam("columnId") long columnId,
                                RedirectAttributes redirectAttributes) {
         Board board = getOrCreateDefaultBoard();
-
         Optional<Column> colOpt = board.getColumns().stream()
                 .filter(c -> c.getId() == columnId)
                 .findFirst();
 
-        if (colOpt.isEmpty()) {
-            return "redirect:/board";
-        }
-
+        if (colOpt.isEmpty()) return "redirect:/board";
         Column column = colOpt.get();
 
-        // SECURITÉ : COLONNE FIXE
+        // Sécurité : colonne fixe
         if (column.isFixed()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    "Action interdite : Cette colonne système ne peut pas être supprimée.");
+            redirectAttributes.addFlashAttribute("errorMessage", "Action interdite : Cette colonne système ne peut pas être supprimée.");
             return "redirect:/board";
         }
 
-        // SECURITÉ : COLONNE NON VIDE
-        List<String> keys = new ArrayList<>();
-        if (column.getKey() != null) keys.add(column.getKey());
-        for (Column sub : column.getSubColumns()) {
-            if (sub.getKey() != null) keys.add(sub.getKey());
-        }
-
-        boolean hasIssues = issues.findAll().stream()
-                .anyMatch(i -> i.getColumnKey() != null && keys.contains(i.getColumnKey()));
-
-        if (hasIssues) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    "Impossible de supprimer une colonne non vide");
+        // Sécurité : colonne non vide
+        long count = countIssuesInColumn(board, column);
+        if (count > 0) {
+            redirectAttributes.addFlashAttribute("errorMessage", "Impossible de supprimer : la colonne contient des tâches.");
             return "redirect:/board";
         }
 
-        board.removeColumn(columnId);
-        boards.save(board);
+        boards.removeColumn(board.getId(), columnId);
         return "redirect:/board";
     }
 
+    // --- GESTION COLONNES (Edition - Release 3) ---
 
     @GetMapping("/board/columns/{id}/edit")
     public ModelAndView editColumnForm(@PathVariable long id) {
@@ -223,9 +208,7 @@ public class BoardController {
         Optional<Column> colOpt = board.getColumns().stream()
                 .filter(c -> c.getId() == id).findFirst();
 
-        if (colOpt.isEmpty()) return new ModelAndView("redirect:/board");
-
-        if (colOpt.get().isFixed()) {
+        if (colOpt.isEmpty() || colOpt.get().isFixed()) {
             return new ModelAndView("redirect:/board");
         }
 
@@ -241,45 +224,34 @@ public class BoardController {
                                RedirectAttributes redirectAttributes) {
         Board board = getOrCreateDefaultBoard();
         Optional<Column> colOpt = board.getColumns().stream()
-                .filter(c -> c.getId() == id)
-                .findFirst();
+                .filter(c -> c.getId() == id).findFirst();
 
-        // Colonne introuvable → on ne fait rien
-        if (colOpt.isEmpty()) {
+        if (colOpt.isEmpty() || colOpt.get().isFixed()) {
             return "redirect:/board";
         }
 
         Column column = colOpt.get();
-
-        // Colonne fixe (Backlog, etc.) → on ne la modifie pas
-        if (column.isFixed()) {
-            return "redirect:/board";
-        }
-
-        // Empêche d'avoir deux colonnes principales avec le même titre (hors colonne courante)
         String normalizedTitle = title.trim();
+
+        // Vérification doublon de titre
         boolean titleAlreadyUsed = board.getColumns().stream()
                 .filter(c -> c.getId() != id)
                 .anyMatch(c -> c.getTitle() != null && c.getTitle().equalsIgnoreCase(normalizedTitle));
 
         if (titleAlreadyUsed) {
-            redirectAttributes.addFlashAttribute(
-                    "errorMessage",
-                    "Impossible de renommer la colonne : une autre colonne porte déjà ce nom."
-            );
+            redirectAttributes.addFlashAttribute("errorMessage", "Impossible de renommer : ce nom est déjà utilisé.");
             return "redirect:/board";
         }
 
-        // On met à jour le titre
         column.setTitle(normalizedTitle);
-
-        // wipLimit nul ou <= 0 => pas de limite (stocké comme 0)
         int finalLimit = (wipLimit != null && wipLimit > 0) ? wipLimit : 0;
         column.setWipLimit(finalLimit);
 
         boards.save(board);
         return "redirect:/board";
     }
+
+    // --- GESTION COLONNES (Réorganisation - Release 3) ---
 
     @PostMapping("/board/reorder-column")
     @ResponseBody
@@ -310,8 +282,8 @@ public class BoardController {
             }
         }
 
-        if (columnToMove == null) return false;
-        if (columnToMove.isFixed()) return false;
+        if (columnToMove == null || columnToMove.isFixed()) return false;
+
         columns.remove(oldIndex);
         if (newIndex >= columns.size()) {
             columns.add(columnToMove);
@@ -321,55 +293,118 @@ public class BoardController {
         return true;
     }
 
-    /**
-     * Colonne principale logique pour une colonne donnée (elle-même ou son parent).
-     */
-    private Column findMainColumn(Board board, Column column) {
-        for (Column main : board.getColumns()) {
-            if (main == column) {
-                return main;
+    // --- GESTION LIGNES (Ajout du Pote) ---
+
+    @PostMapping("/board/add-row")
+    public String addRow(@RequestParam("title") String title) {
+        Board board = getOrCreateDefaultBoard();
+        String key = title.toLowerCase().trim().replaceAll("\\s+", "-") + "-" + System.currentTimeMillis();
+        Row newRow = new Row(key, title);
+        board.addRow(newRow);
+        boards.save(board);
+        return "redirect:/board";
+    }
+
+    // --- DRAG & DROP + LOGIQUE MÉTIER (Release 3) ---
+
+    @PostMapping("/board/move-issue-dnd")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> moveIssueDnD(
+            @RequestParam("issueId") long issueId,
+            @RequestParam("targetColumnKey") String targetColumnKey,
+            @RequestParam(value = "targetRowKey", required = false) String targetRowKey) {
+
+        Map<String, Object> response = new HashMap<>();
+        Board board = getOrCreateDefaultBoard();
+        Issue issue = issues.find(issueId);
+
+        if (issue == null) {
+            response.put("success", false);
+            response.put("message", "Issue introuvable");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        Column targetCol = findColumnByKey(board, targetColumnKey);
+        if (targetCol == null) {
+            response.put("success", false);
+            response.put("message", "Colonne cible introuvable");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        // Vérification WIP Limit
+        int wipLimit = resolveWipLimit(board, targetCol);
+        if (wipLimit > 0) {
+            long currentCount = countIssuesInColumn(board, targetCol);
+            boolean alreadyInTargetColumn = isIssueAlreadyInLogicalColumn(board, targetCol, issue);
+            boolean changingRow = targetRowKey != null && !targetRowKey.equals(issue.getRowKey());
+
+            if (!alreadyInTargetColumn || changingRow) {
+                if (currentCount >= wipLimit) {
+                    response.put("success", false);
+                    response.put("message", "Limite WIP atteinte !");
+                    return ResponseEntity.badRequest().body(response);
+                }
             }
-            if (main.getSubColumns().contains(column)) {
-                return main;
+        }
+
+        // ClosedAt
+        if ("closed".equals(targetColumnKey)) {
+            issue.setClosedAt(LocalDateTime.now());
+        } else {
+            issue.setClosedAt(null);
+        }
+
+        issue.setColumnKey(targetColumnKey);
+        if (targetRowKey != null) {
+            issue.setRowKey(targetRowKey);
+        }
+
+        issues.persist(issue);
+
+        response.put("success", true);
+        return ResponseEntity.ok(response);
+    }
+
+    // --- UTILITAIRES ---
+
+    private Column findColumnByKey(Board board, String key) {
+        for (Column col : board.getColumns()) {
+            if (key.equals(col.getKey())) return col;
+            for (Column sub : col.getSubColumns()) {
+                if (key.equals(sub.getKey())) return sub;
             }
         }
         return null;
     }
 
-    /**
-     * Clés de colonnes (sub-colonnes) qui appartiennent à la même colonne logique.
-     */
+    private Column findMainColumn(Board board, Column column) {
+        for (Column main : board.getColumns()) {
+            if (main == column) return main;
+            if (main.getSubColumns().contains(column)) return main;
+        }
+        return null;
+    }
+
     private List<String> collectLogicalColumnKeys(Board board, Column column) {
         List<String> keys = new ArrayList<>();
-
         Column main = findMainColumn(board, column);
         if (main != null) {
             if (!main.getSubColumns().isEmpty()) {
                 for (Column sub : main.getSubColumns()) {
-                    if (sub.getKey() != null) {
-                        keys.add(sub.getKey());
-                    }
+                    if (sub.getKey() != null) keys.add(sub.getKey());
                 }
             } else if (main.getKey() != null) {
                 keys.add(main.getKey());
             }
         } else if (column.getKey() != null) {
-            // Colonne orpheline (ancien board)
             keys.add(column.getKey());
         }
-
         return keys;
     }
 
-    /**
-     * Nombre de stories présentes dans une colonne logique (principale + sous-colonnes).
-     */
     private long countIssuesInColumn(Board board, Column anyColumn) {
         List<String> keys = collectLogicalColumnKeys(board, anyColumn);
-        if (keys.isEmpty()) {
-            return 0L;
-        }
-
+        if (keys.isEmpty()) return 0L;
         long count = 0L;
         for (Issue i : issues.findAll()) {
             String key = i.getColumnKey();
@@ -380,88 +415,15 @@ public class BoardController {
         return count;
     }
 
-    /**
-     * Limite WIP associée à la colonne logique.
-     * Elle est stockée sur la colonne principale du board.
-     */
-    private Integer resolveWipLimit(Board board, Column targetCol) {
+    private int resolveWipLimit(Board board, Column targetCol) {
         Column main = findMainColumn(board, targetCol);
-        if (main != null) {
-            return main.getWipLimit();
-        }
+        if (main != null) return main.getWipLimit();
         return targetCol.getWipLimit();
     }
 
-    /**
-     * Indique si l'issue est déjà dans cette colonne logique (pour ne pas la compter deux fois).
-     */
     private boolean isIssueAlreadyInLogicalColumn(Board board, Column targetCol, Issue issue) {
         List<String> keys = collectLogicalColumnKeys(board, targetCol);
         String currentKey = issue.getColumnKey();
         return currentKey != null && keys.contains(currentKey);
-    }
-
-    @PostMapping("/board/move-issue-dnd")
-    @ResponseBody
-    public ResponseEntity<Map<String, Object>> moveIssueDnD(@RequestParam("issueId") long issueId,
-                                                            @RequestParam("targetColumnKey") String targetColumnKey) {
-
-        Map<String, Object> response = new HashMap<>();
-        Board board = getOrCreateDefaultBoard();
-        Issue issue = issues.find(issueId);
-
-        if (issue == null) {
-            response.put("success", false);
-            response.put("message", "Story introuvable.");
-            return ResponseEntity.badRequest().body(response);
-        }
-
-        // Trouver la colonne cible (parcours du board pour la trouver par sa clé)
-        Column targetCol = null;
-        for (Column col : board.getColumns()) {
-            if (targetColumnKey.equals(col.getKey())) { targetCol = col; break; }
-            for (Column sub : col.getSubColumns()) {
-                if (targetColumnKey.equals(sub.getKey())) { targetCol = sub; break; }
-            }
-        }
-
-        if (targetCol == null) {
-            response.put("success", false);
-            response.put("message", "Colonne cible introuvable.");
-            return ResponseEntity.badRequest().body(response);
-        }
-
-        int wipLimit = resolveWipLimit(board, targetCol);
-        if (wipLimit > 0) {
-            long currentCount = countIssuesInColumn(board, targetCol);
-            boolean alreadyInTargetColumn = isIssueAlreadyInLogicalColumn(board, targetCol, issue);
-
-            long afterMove = currentCount + (alreadyInTargetColumn ? 0L : 1L);
-
-            if (afterMove > wipLimit) {
-                Column main = findMainColumn(board, targetCol);
-                String colTitle = (main != null ? main.getTitle() : targetCol.getTitle());
-
-                response.put("success", false);
-                response.put("message", "Limite atteinte (" + wipLimit + ") pour la colonne \"" + colTitle + "\".");
-                // On retourne OK (200) mais avec success=false pour gestion JS
-                return ResponseEntity.ok(response);
-            }
-        }
-
-        if ("closed".equals(targetColumnKey)) {
-            // Si on entre dans Closed, on met la date à maintenant
-            issue.setClosedAt(LocalDateTime.now());
-        } else {
-            // Si on sort de Closed ou qu'on bouge ailleurs, on reset la date
-            issue.setClosedAt(null);
-        }
-
-        // Succès
-        issue.setColumnKey(targetColumnKey);
-        issues.persist(issue);
-
-        response.put("success", true);
-        return ResponseEntity.ok(response);
     }
 }
