@@ -2,6 +2,11 @@
 <html>
 	<head th:fragment="head(title)">
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <meta name="api-base-url" th:content="@{/}" />
+
+        <meta th:if="${_csrf}" name="_csrf" th:content="${_csrf.token}" />
+        <meta th:if="${_csrf}" name="_csrf_header" th:content="${_csrf.headerName}" />
+
         <title th:replace="${title}"></title>
     	<link rel="stylesheet" type="text/css" media="all" th:href="@{/libs/bootstrap.min.css}"/>
 		<link rel="stylesheet" type="text/css" media="all" th:href="@{/resources/style.css}"/>
