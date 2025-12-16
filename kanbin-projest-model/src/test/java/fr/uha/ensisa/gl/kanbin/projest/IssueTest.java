@@ -137,4 +137,12 @@ public class IssueTest {
 
         assertEquals(now, issue.getClosedAt(), "Le getter doit retourner la date définie");
     }
+
+    @Test
+    void testIssueConstructorWithColumnKey() {
+        Issue issue = new Issue(123L, "Ma Tache", "todo_column");
+
+        assertEquals(123L, issue.getId());
+        assertEquals("Ma Tache", issue.getTitle());
+    }
 }
