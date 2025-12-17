@@ -36,9 +36,8 @@
         <div class="column-headers-container" style="display:flex;">
             <section th:each="col : ${columns}"
                      class="col-header-item"
-                     th:classappend="${col.subColumns.isEmpty()} ? 'col-width-simple' : 'col-width-double'"
-                     th:attr="data-column-id=${col.id}, data-col=${col.key}"
-                     draggable="true">
+                     th:classappend="(${col.subColumns.isEmpty()} ? 'col-width-simple' : 'col-width-double') + (${col.fixed} ? ' fixed-col' : '')"
+                     th:attr="data-column-id=${col.id}, data-col=${col.key}, draggable=${!col.fixed}">
 
                 <div class="col-header-top kb-col-header">
                     <header>
@@ -77,7 +76,18 @@
     </div>
 
     <div th:each="row : ${rows}" class="kb-swimlane">
-        <div class="swimlane-title-sidebar" th:text="${row.title}">Urgent</div>
+        <div class="swimlane-title-sidebar">
+            <div class="swimlane-title-text" th:text="${row.title}">Urgent</div>
+
+            <form th:if="${!row.fixed}" th:action="@{/board/remove-row}" method="post"
+                  onsubmit="return confirm('Supprimer la swimlane ?');" style="margin:0;">
+                <input type="hidden" name="rowKey" th:value="${row.key}"/>
+                <button type="submit" class="btn btn-danger" title="Supprimer" style="padding: 2px 6px;">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </form>
+        </div>
+
         <div class="swimlane-columns-container">
             <section th:each="col : ${columns}"
                      th:classappend="${col.subColumns.isEmpty()} ? 'col-width-simple' : 'col-width-double'"

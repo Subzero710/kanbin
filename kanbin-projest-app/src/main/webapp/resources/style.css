@@ -176,6 +176,8 @@ body {
     padding: 10px;
     color: #42526e;
     font-size: 1.1em;
+    flex-direction: column;
+    gap: 8px;
 }
 
 /* Couleur alternée pour les lignes (Zebra striping léger) pour lisibilité */
@@ -222,3 +224,4 @@ body {
 .col-header-item[draggable="true"]:active {
     cursor: grabbing;
 }
+.swimlane-title-text { line-height: 1.2; }

@@ -1,5 +1,6 @@
 package fr.uha.ensisa.gl.kanbin.controller;
-
+import fr.uha.ensisa.gl.kanbin.projest.model.Column;
+import fr.uha.ensisa.gl.kanbin.projest.model.Row;
 import fr.uha.ensisa.gl.kanbin.projest.model.Board;
 import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
 import fr.uha.ensisa.gl.kanbin.projest.repo.BoardRepo;
@@ -28,9 +29,44 @@ public class IssueController {
 
     // Helper pour récupérer le board (comme dans BoardController)
     private Board getOrCreateDefaultBoard() {
-        return boardRepo.findAll().stream()
-                .findFirst()
-                .orElse(null); // On suppose qu'il est déjà créé par BoardController
+        final String preferredName = "Default";
+
+        Collection<Board> all = boardRepo.findAll();
+        Board board = null;
+
+        if (all != null && !all.isEmpty()) {
+            board = all.stream()
+                    .filter(b -> preferredName.equals(b.getName()))
+                    .findFirst()
+                    .orElse(all.iterator().next());
+        }
+
+        if (board == null) {
+            Board newBoard = new Board(preferredName);
+
+            Column backlog = new Column("backlog", "Backlog");
+            backlog.setFixed(true);
+            Column closed = new Column("closed", "Closed");
+            closed.setFixed(true);
+            newBoard.addColumn(backlog);
+            newBoard.addColumn(closed);
+
+            Row defaultRow = new Row("default", "Non catégorisé");
+            defaultRow.setFixed(true);
+            newBoard.addRow(defaultRow);
+
+            Board saved = boardRepo.save(newBoard);
+            board = (saved != null ? saved : newBoard);
+        }
+
+        if (board.getRows() == null || board.getRows().isEmpty()) {
+            Row defaultRow = new Row("default", "Non catégorisé");
+            defaultRow.setFixed(true);
+            board.addRow(defaultRow);
+            boardRepo.save(board);
+        }
+
+        return board;
     }
 
     @GetMapping("/issues")
@@ -58,29 +94,29 @@ public class IssueController {
     public String createIssue(Issue issue, RedirectAttributes redirectAttributes) {
         Board board = getOrCreateDefaultBoard();
 
-        if (board != null && (issue.getRowKey() == null || issue.getRowKey().isEmpty())) {
-            if (!board.getRows().isEmpty()) {
-                issue.setRowKey(board.getRows().get(0).getKey());
-            }
-        }
-
+        // 1) Si on édite une issue existante, restaurer d'abord ses clés
         if (issue.getId() > 0) {
             Issue oldIssue = issueRepo.find(issue.getId());
             if (oldIssue != null) {
-                // On garde la colonne existante si non fournie
                 if (issue.getColumnKey() == null || issue.getColumnKey().isEmpty()) {
                     issue.setColumnKey(oldIssue.getColumnKey());
                 }
-
                 if (issue.getRowKey() == null || issue.getRowKey().isEmpty()) {
                     issue.setRowKey(oldIssue.getRowKey());
                 }
             }
         }
 
+        // 2) Ensuite seulement appliquer la row par défaut si toujours vide
+        if (board != null && (issue.getRowKey() == null || issue.getRowKey().isEmpty())) {
+            if (board.getRows() != null && !board.getRows().isEmpty()) {
+                issue.setRowKey(board.getRows().get(0).getKey());
+            }
+        }
+
         issueRepo.persist(issue);
         redirectAttributes.addFlashAttribute("message", "Story créée avec succès");
-        return "redirect:/board"; // Ta redirection Release 3
+        return "redirect:/board";
     }
 
     @GetMapping("/issues/{id}/edit")

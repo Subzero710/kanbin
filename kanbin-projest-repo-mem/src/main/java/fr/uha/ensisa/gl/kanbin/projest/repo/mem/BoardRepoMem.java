@@ -27,7 +27,9 @@ public class BoardRepoMem implements BoardRepo {
 
             b.addColumn(backlog);
             b.addColumn(closed);
-
+            Row defaultRow = new Row("default", "Non catégorisé");
+            defaultRow.setFixed(true);
+            b.addRow(defaultRow);
             // On passe par save() pour avoir les mêmes règles d'IDs
             save(b);
         }

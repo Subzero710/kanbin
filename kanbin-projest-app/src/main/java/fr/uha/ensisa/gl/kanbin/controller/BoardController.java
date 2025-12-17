@@ -28,28 +28,42 @@ public class BoardController {
     }
 
     private Board getOrCreateDefaultBoard() {
-        String boardName = "Test Board";
-        return boards.findAll().stream()
-                .filter(b -> boardName.equals(b.getName()))
-                .findFirst()
-                .orElseGet(() -> {
-                    Board newBoard = new Board(boardName);
-                    // Initialisation par défaut (Release 3)
-                    Column backlog = new Column("backlog", "Backlog");
-                    backlog.setFixed(true);
-                    Column closed = new Column("closed", "Closed");
-                    closed.setFixed(true);
-                    newBoard.addColumn(backlog);
-                    newBoard.addColumn(closed);
+        final String preferredName = "Default";
 
-                    // Initialisation Row par défaut (Swimlane)
-                    Row defaultRow = new Row("default", "Non catégorisé");
-                    defaultRow.setFixed(true);
-                    newBoard.addRow(defaultRow);
+        Collection<Board> all = boards.findAll();
+        Board board = null;
 
-                    return boards.save(newBoard);
-                });
+        // Si le repo contient déjà un board, on prend celui qui s'appelle "Default" si présent,
+        // sinon on prend simplement le premier (ça évite de recréer un board en tests).
+        if (all != null && !all.isEmpty()) {
+            board = all.stream()
+                    .filter(b -> preferredName.equals(b.getName()))
+                    .findFirst()
+                    .orElse(all.iterator().next());
+        }
+
+        // Repo vide : on crée un board minimal "Default"
+        if (board == null) {
+            Board newBoard = new Board(preferredName);
+
+            Column backlog = new Column("backlog", "Backlog");
+            backlog.setFixed(true);
+            Column closed = new Column("closed", "Closed");
+            closed.setFixed(true);
+            newBoard.addColumn(backlog);
+            newBoard.addColumn(closed);
+
+            Row defaultRow = new Row("default", "Non catégorisé");
+            defaultRow.setFixed(true);
+            newBoard.addRow(defaultRow);
+
+            Board saved = boards.save(newBoard);
+            board = (saved != null ? saved : newBoard); // important: un mock peut renvoyer null
+        }
+
+        return board;
     }
+
 
     @GetMapping("/")
     public ModelAndView root() {
@@ -347,6 +361,44 @@ public class BoardController {
         boards.save(board);
         return "redirect:/board";
     }
+    @PostMapping("/board/remove-row")
+    public String removeRow(@RequestParam("rowKey") String rowKey,
+                            RedirectAttributes redirectAttributes) {
+        Board board = getOrCreateDefaultBoard();
+
+        Optional<Row> rowOpt = board.getRows().stream()
+                .filter(r -> rowKey != null && rowKey.equals(r.getKey()))
+                .findFirst();
+
+        if (rowOpt.isEmpty()) return "redirect:/board";
+        Row row = rowOpt.get();
+
+        if (row.isFixed()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Action interdite : cette swimlane système ne peut pas être supprimée.");
+            return "redirect:/board";
+        }
+
+        if (board.getRows().size() <= 1) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Impossible de supprimer : il doit rester au moins une swimlane.");
+            return "redirect:/board";
+        }
+
+        long count = issues.findAll().stream()
+                .filter(i -> rowKey.equals(i.getRowKey()))
+                .count();
+        if (count > 0) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Impossible de supprimer : la swimlane contient des tâches.");
+            return "redirect:/board";
+        }
+
+        if (board.removeRowByKey(rowKey)) {
+            boards.save(board);
+        }
+        return "redirect:/board";
+    }
 
     // --- DRAG & DROP + LOGIQUE MÉTIER (Release 3) ---
 
@@ -379,14 +431,12 @@ public class BoardController {
         if (wipLimit > 0) {
             long currentCount = countIssuesInColumn(board, targetCol);
             boolean alreadyInTargetColumn = isIssueAlreadyInLogicalColumn(board, targetCol, issue);
-            boolean changingRow = targetRowKey != null && !targetRowKey.equals(issue.getRowKey());
 
-            if (!alreadyInTargetColumn || changingRow) {
-                if (currentCount >= wipLimit) {
-                    response.put("success", false);
-                    response.put("message", "Le nombre maximum de story pour cette colonne est atteint !");
-                    return ResponseEntity.badRequest().body(response);
-                }
+            long afterMove = currentCount + (alreadyInTargetColumn ? 0L : 1L);
+            if (afterMove > wipLimit) {
+                response.put("success", false);
+                response.put("message", "Le nombre maximum de story pour cette colonne est atteint !");
+                return ResponseEntity.badRequest().body(response);
             }
         }
 
