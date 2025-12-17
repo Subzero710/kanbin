@@ -17,7 +17,12 @@ public class IssueRepoMemTest {
         i.setTitle("an issue title");
         IssueRepoMem sut = new IssueRepoMem();
         long initialCount = sut.count();
+
         sut.persist(i);
+
+        // On vérifie que l'ID a bien été généré (qu'il n'est plus 0)
+        assertNotEquals(0, i.getId(), "L'ID doit être généré lors du persist");
+
         long newId = i.getId();
         Issue retreive = sut.find(newId);
         assertNotNull(retreive);
@@ -25,6 +30,16 @@ public class IssueRepoMemTest {
         assertEquals(i.getTitle(), retreive.getTitle());
         assertEquals(initialCount + 1, sut.count());
     }
+
+    @Test
+    public void persist_shouldNotChangeId_whenIdIsAlreadySet() {
+        IssueRepoMem sut = new IssueRepoMem();
+        Issue i = new Issue(100L, "Existing ID");
+        sut.persist(i);
+        assertEquals(100L, i.getId());
+        assertNotNull(sut.find(100L));
+    }
+
     @Test
     public void testRemoveIssue() {
         IssueRepoMem sut = new IssueRepoMem();
