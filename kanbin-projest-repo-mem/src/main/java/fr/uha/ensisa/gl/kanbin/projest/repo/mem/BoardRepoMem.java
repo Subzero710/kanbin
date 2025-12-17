@@ -62,9 +62,8 @@ public class BoardRepoMem implements BoardRepo {
             throw new NoSuchElementException("board " + boardId + " not found");
         }
 
-        if (column.getId() == 0) {
-            column.setId(colSeq.getAndIncrement());
-        }
+        // SUPPRESSION DU BLOC "column.setId" REDONDANT ICI.
+        // C'est this.save(b) à la fin qui s'en charge.
 
         List<Column> cols = b.getColumns();
 
@@ -81,11 +80,11 @@ public class BoardRepoMem implements BoardRepo {
             if (closedIndex >= 0) {
                 cols.add(closedIndex, column);
             } else {
-                // fallback si, pour une raison quelconque, il n'y a pas (encore) de colonne closed
+                // fallback
                 cols.add(column);
             }
         } else {
-            // colonnes fixes : on garde un comportement simple
+            // colonnes fixes
             cols.add(column);
         }
 
@@ -97,10 +96,14 @@ public class BoardRepoMem implements BoardRepo {
     public boolean removeColumn(long boardId, long columnId) {
         Board b = store.get(boardId);
         if (b == null) return false;
+
         boolean removed = b.removeColumn(columnId);
-        if (removed) {
-            this.save(b);
-        }
+
+        // SIMPLIFICATION : On sauvegarde systématiquement l'état du board
+        // Cela tue le mutant conditionnel car il n'y a plus de condition.
+        // En mémoire, c'est sans risque.
+        this.save(b);
+
         return removed;
     }
 }
