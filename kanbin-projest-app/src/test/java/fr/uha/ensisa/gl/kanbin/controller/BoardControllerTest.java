@@ -16,6 +16,7 @@ import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import static org.mockito.ArgumentMatchers.*;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -160,25 +161,20 @@ class BoardControllerTest {
 
     @Test
     void getOrCreateDefaultBoard_ShouldInitializeDefaults_WhenNoBoardExists() {
-        // Arrange : Le repo est vide
         when(boardRepo.findAll()).thenReturn(List.of());
-        // On intercepte la sauvegarde pour vérifier ce qui a été créé
         when(boardRepo.save(any(Board.class))).thenAnswer(i -> i.getArguments()[0]);
 
-        // Act
-        // On appelle showBoard qui appelle indirectement getOrCreateDefaultBoard
         sut.showBoard();
 
-        // Assert
         org.mockito.ArgumentCaptor<Board> captor = org.mockito.ArgumentCaptor.forClass(Board.class);
         verify(boardRepo).save(captor.capture());
 
         Board savedBoard = captor.getValue();
-        // Vérifie les lignes rouges : Colonnes fixes et Row par défaut
         assertTrue(savedBoard.getColumns().stream().anyMatch(c -> c.getKey().equals("backlog") && c.isFixed()));
         assertTrue(savedBoard.getColumns().stream().anyMatch(c -> c.getKey().equals("closed") && c.isFixed()));
         assertFalse(savedBoard.getRows().isEmpty());
         assertEquals("default", savedBoard.getRows().get(0).getKey());
+        assertTrue(savedBoard.getRows().get(0).isFixed(), "La ligne par défaut doit être fixe");
     }
 
     @Test
@@ -1354,6 +1350,44 @@ class BoardControllerTest {
     }
 
     @Test
+    void addColumn_shouldVerifyWipLimitSet_AndHandleDoubleTypeNegation() {
+        Board b = new Board("WipBoard");
+        b.setId(42L);
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        sut.addColumn("Limited", "double", 5, redirectAttributes);
+
+        org.mockito.ArgumentCaptor<Column> captor = org.mockito.ArgumentCaptor.forClass(Column.class);
+        verify(boardRepo).addColumn(eq(42L), captor.capture());
+        assertEquals(5, captor.getValue().getWipLimit());
+        assertEquals("double", captor.getValue().getType());
+    }
+
+    @Test
+    void boundaryTests_Reorder_And_Wip() {
+        Board b = new Board("Boundary");
+        b.addColumn(new Column(1L, "backlog", "B"));
+        b.addColumn(new Column(2L, "todo", "T"));
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        assertEquals("ERROR: Invalid move", sut.reorderColumn(2L, 0));
+        sut.updateColumn(2L, "New", 0, redirectAttributes);
+        verify(boardRepo).save(b);
+        assertEquals(0, b.getColumns().get(1).getWipLimit());
+    }
+
+    @Test
+    void findColumnByKey_ShouldSearchSubColumns() {
+        Board b = new Board("SubSearch");
+        Column parent = new Column("p", "P");
+        Column sub = new Column("s", "S");
+        parent.addSubColumn(sub);
+        b.addColumn(parent);
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        when(issueRepo.find(1L)).thenReturn(new Issue(1L, "T"));
+        sut.moveIssueDnD(1L, "s", null);
+        verify(issueRepo).persist(any());
+    }
+
+    @Test
     void addColumn_shouldIgnoreExistingSubColumnsWithNullKeys() {
         Board board = new Board("Default");
         board.setId(1L);
@@ -1367,5 +1401,162 @@ class BoardControllerTest {
         assertEquals("redirect:/board", view);
         verify(boardRepo).addColumn(eq(1L), any(Column.class));
         verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+    }
+
+    @Test
+    void showBoard_ShouldSortIssuesCorrectly_IncludingNullsAndOtherCols() {
+        Board b = new Board("SortBoard");
+        b.addRow(new Row("def", "Def"));
+        b.addColumn(new Column("todo", "Todo")); // Colonne standard
+        b.addColumn(new Column("closed", "Closed"));
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        Issue t1 = new Issue(100L, "Old"); t1.setColumnKey("todo"); t1.setRowKey("def");
+        Issue t2 = new Issue(50L, "New"); t2.setColumnKey("todo"); t2.setRowKey("def");
+        Issue c1 = new Issue(200L, "No Date"); c1.setColumnKey("closed"); c1.setRowKey("def");
+        c1.setClosedAt(null);
+        Issue c2 = new Issue(201L, "With Date"); c2.setColumnKey("closed"); c2.setRowKey("def");
+        c2.setClosedAt(java.time.LocalDateTime.now());
+
+        when(issueRepo.findAll()).thenReturn(List.of(t1, t2, c1, c2));
+
+        ModelAndView mv = sut.showBoard();
+        Map<String, Map<String, List<Issue>>> data = (Map) mv.getModel().get("issuesByRowAndCol");
+        assertEquals(50L, data.get("def").get("todo").get(0).getId());
+        assertEquals(201L, data.get("def").get("closed").get(0).getId());
+    }
+
+    @Test
+    void showBoard_ShouldSortClosedIssuesWithNullDates() {
+        Board b = new Board("Test");
+        b.addRow(new Row("def", "Def"));
+        b.addColumn(new Column("closed", "Closed"));
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+
+        Issue i1 = new Issue(1L, "Null Date");
+        i1.setColumnKey("closed"); i1.setRowKey("def"); i1.setClosedAt(null);
+
+        Issue i2 = new Issue(2L, "With Date");
+        i2.setColumnKey("closed"); i2.setRowKey("def");
+        i2.setClosedAt(LocalDateTime.now());
+
+        when(issueRepo.findAll()).thenReturn(List.of(i1, i2));
+
+        ModelAndView mv = sut.showBoard();
+        var data = (Map<String, Map<String, List<Issue>>>) mv.getModel().get("issuesByRowAndCol");
+        List<Issue> closed = data.get("def").get("closed");
+        assertEquals(2L, closed.get(0).getId());
+        assertEquals(1L, closed.get(1).getId());
+    }
+
+    @Test
+    void updateColumn_WipLimitBoundary() {
+        Board b = new Board("Test");
+        Column col = new Column("todo", "Todo");
+        col.setId(1L);
+        b.addColumn(col);
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        sut.updateColumn(1L, "Todo", 0, redirectAttributes);
+        assertEquals(0, col.getWipLimit());
+        sut.updateColumn(1L, "Todo", 1, redirectAttributes);
+        assertEquals(1, col.getWipLimit());
+    }
+
+    @Test
+    void moveColumnInternal_ExactSizeBoundary() {
+        Board b = new Board("Test");
+        Column c1 = new Column(1L, "c1", "C1"); c1.setFixed(true);
+        Column c2 = new Column(2L, "c2", "C2");
+        Column c3 = new Column(3L, "c3", "C3");
+        b.addColumn(c1); b.addColumn(c2); b.addColumn(c3);
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        sut.reorderColumn(2L, 2);
+
+        assertEquals("c3", b.getColumns().get(1).getKey());
+        assertEquals("c2", b.getColumns().get(2).getKey()); // Doit être à la fin
+    }
+
+
+    @Test
+    void editColumnForm_ShouldNotFindFixedColumn_EvenIfIdMatches() {
+        Board b = new Board("Test");
+        Column c = new Column(1L, "fixed", "Fixed");
+        c.setFixed(true);
+        b.addColumn(c);
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        ModelAndView mv = sut.editColumnForm(999L);
+        assertEquals("redirect:/board", mv.getViewName());
+    }
+
+    @Test
+    void removeRow_LambdaCheck() {
+        Board b = new Board("Test");
+        b.addRow(new Row("r1", "R1"));
+        b.addRow(new Row("r2", "R2"));
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+
+        sut.removeRow("wrong-key", redirectAttributes);
+        assertEquals(2, b.getRows().size());
+    }
+
+    @Test
+    void editColumnForm_ShouldFindExactColumn_AndKillLambdaMutant() {
+        Board b = new Board("Test");
+        Column c1 = new Column(1L, "c1", "C1");
+        Column c2 = new Column(2L, "c2", "C2");
+        b.addColumn(c1);
+        b.addColumn(c2);
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+
+        ModelAndView mv = sut.editColumnForm(2L);
+        Column result = (Column) mv.getModel().get("column");
+        assertEquals(2L, result.getId(), "On doit trouver la colonne avec l'ID exact 2");
+    }
+
+    @Test
+    void removeRow_ShouldCountOnlyIssuesOfTargetRow() {
+        Board b = new Board("Test");
+        b.addRow(new Row("target", "Target"));
+        b.addRow(new Row("other", "Other"));
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        Issue issue = new Issue(1L, "Task");
+        issue.setRowKey("other");
+        when(issueRepo.findAll()).thenReturn(List.of(issue));
+        sut.removeRow("target", redirectAttributes);
+        verify(boardRepo).save(b);
+    }
+
+    @Test
+    void showBoard_SortClosed_KillAllComparatorMutants() {
+        Board b = new Board("Test");
+        b.addRow(new Row("def", "Def"));
+        b.addColumn(new Column("closed", "Closed"));
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+
+        Issue i1 = new Issue(1L, "Null1"); i1.setColumnKey("closed"); i1.setRowKey("def"); i1.setClosedAt(null);
+        Issue i2 = new Issue(2L, "Date"); i2.setColumnKey("closed"); i2.setRowKey("def");
+        i2.setClosedAt(LocalDateTime.now());
+        Issue i3 = new Issue(3L, "Null2"); i3.setColumnKey("closed"); i3.setRowKey("def"); i3.setClosedAt(null);
+
+        when(issueRepo.findAll()).thenReturn(List.of(i1, i2, i3));
+
+        ModelAndView mv = sut.showBoard();
+        var data = (Map<String, Map<String, List<Issue>>>) mv.getModel().get("issuesByRowAndCol");
+        List<Issue> closed = data.get("def").get("closed");
+        assertEquals(2L, closed.get(0).getId());
+
+        assertTrue(closed.get(1).getClosedAt() == null);
+    }
+
+    @Test
+    void updateColumn_ShouldNotConflictWithItself() {
+        Board b = new Board("Test");
+        Column c1 = new Column(1L, "todo", "Todo");
+        b.addColumn(c1);
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        String view = sut.updateColumn(1L, "Todo", 0, redirectAttributes);
+
+        assertEquals("redirect:/board", view);
+        verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+        verify(boardRepo).save(b);
     }
 }
