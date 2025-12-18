@@ -48,7 +48,7 @@
                                   th:id="'counter-span-' + ${col.id}"
                                   th:attr="data-limit=${col.wipLimit}"
                                   th:text="' ' + ${wipUsageByColumnId[col.id]} + ' / ' + ${col.wipLimit}"
-                                  style="font-weight:normal; color:#666; font-size: 0.9em;">
+                                  class="badge bg-secondary ms-2">
                             </span>
                         </div>
 

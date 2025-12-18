@@ -6,7 +6,8 @@
     /* Largeur de base : 1 colonne simple = 280px */
     --col-base: 280px;
     --sidebar-width: 150px; /* Largeur de la colonne violette/grise à gauche */
-
+    /* Hauteur d’une ligne (case) : ajustable */
+    --swimlane-height: clamp(170px, 35vh, 420px);
     /* Couleurs */
     --bg-color: #ffffff;
     --text-color: #333;
@@ -95,8 +96,9 @@ body {
 .kanban-board {
     display: flex;
     flex-direction: column;
-    overflow-x: auto;
+    overflow: auto;
     flex: 1;
+    min-height: 0;
     border: 1px solid var(--border-color);
     margin-top: 15px;
 }
@@ -118,6 +120,7 @@ body {
     padding: 5px;
     display: flex;
     flex-direction: column;
+    min-height: 0;
 }
 .sub-col-item:last-child { border-right: none; }
 
@@ -160,7 +163,8 @@ body {
     border-bottom: 1px solid var(--border-color);
     width: max-content;
     background: #fff;
-    min-height: 150px; /* Hauteur min d'une ligne */
+    height: var(--swimlane-height);
+    min-height: var(--swimlane-height);
 }
 
 .swimlane-title-sidebar {
@@ -184,12 +188,17 @@ body {
 .kb-swimlane:nth-child(even) .swimlane-title-sidebar { background-color: #f9f9f9; }
 
 .swimlane-columns-container { display: flex; }
+.swimlane-columns-container { min-height: 0; }
 
 .kb-col-body {
     border-right: 1px solid #eee;
     padding: 8px;
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;  /* le scroll des issues */
+    scrollbar-gutter: stable;
 }
 .kb-col-body.drag-over { background-color: #e3f2fd; }
 
@@ -225,3 +234,36 @@ body {
     cursor: grabbing;
 }
 .swimlane-title-text { line-height: 1.2; }
+/* Fallback Bootstrap-like badge (si Bootstrap n'est pas inclus) */
+.badge{
+    display: inline-block;
+    padding: .35em .65em;
+    font-size: .75em;
+    font-weight: 600;
+    line-height: 1;
+    border-radius: .375rem;
+    vertical-align: middle;
+}
+
+.bg-secondary{
+    background-color: #6c757d !important;
+    color: #fff !important;
+}
+
+.ms-2{ margin-left: .5rem !important; }
+
+.kb-col-header{
+    padding: .6rem .8rem;
+    border-bottom: 1px solid var(--border-color);
+    font-weight: 600;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    hyphens: auto;
+}
+
+/* évite que .col-header-top impose sa typo/couleur au badge */
+.col-header-top{
+    font-weight: inherit;
+    color: inherit;
+}
+
