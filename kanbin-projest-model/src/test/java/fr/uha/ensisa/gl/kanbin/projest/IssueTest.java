@@ -1,13 +1,10 @@
 package fr.uha.ensisa.gl.kanbin.projest;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-
 import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
 import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 public class IssueTest {
 
@@ -22,12 +19,11 @@ public class IssueTest {
 
     @Test
     public void anIssueHasAStableId(){
-        Issue sut = new Issue(42, "no title");
+        String title = "no title";
+        Issue sut = new Issue(42, title);
         long id = sut.getId();
-
         assertEquals(id, sut.getId());
-        assertEquals(id, sut.getId());
-        assertEquals(id, sut.getId());
+        assertEquals(title, sut.getTitle(), "Le constructeur doit définir le titre via setTitle");
     }
 
     @Test
@@ -145,4 +141,38 @@ public class IssueTest {
         assertEquals(123L, issue.getId());
         assertEquals("Ma Tache", issue.getTitle());
     }
+
+    @Test
+    void testIdSetter() {
+        Issue issue = new Issue();
+        issue.setId(500L);
+        assertEquals(500L, issue.getId());
+    }
+
+    @Test
+    void testRowKeyManagement() {
+        Issue issue = new Issue();
+        // Tue le mutant NO_COVERAGE sur getRowKey
+        assertNull(issue.getRowKey());
+
+        issue.setRowKey("row-123");
+        assertEquals("row-123", issue.getRowKey());
+    }
+
+    @Test
+    public void titleBoundaryTests() {
+        Issue sut = new Issue();
+        String thirtyChars = "1234567890" + "1234567890" + "1234567890";
+        sut.setTitle(thirtyChars);
+        assertEquals(30, sut.getTitle().length());
+        assertEquals(thirtyChars, sut.getTitle());
+        assertSame(thirtyChars, sut.getTitle(), "À 30, on ne doit pas avoir fait de substring");
+        String thirtyOneChars = thirtyChars + "A";
+        sut.setTitle(thirtyOneChars);
+        assertEquals(30, sut.getTitle().length());
+        assertEquals(thirtyChars, sut.getTitle());
+        assertNotSame(thirtyOneChars, sut.getTitle(), "À 31, un nouvel objet String doit être créé");
+    }
+
+
 }

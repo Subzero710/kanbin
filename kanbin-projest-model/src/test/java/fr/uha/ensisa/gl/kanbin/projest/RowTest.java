@@ -36,4 +36,14 @@ public class RowTest {
         assertEquals(subRow, row.getSubRows().get(0));
         assertEquals(1, row.getSubRowsOrSelf().size()); // Retourne la liste des enfants
     }
+
+    @Test
+    void testFixedState() {
+        Row row = new Row();
+        assertFalse(row.isFixed(), "Par défaut, une Row ne doit pas être fixe");
+        row.setFixed(true);
+        assertTrue(row.isFixed());
+        row.setFixed(false);
+        assertFalse(row.isFixed());
+    }
 }
