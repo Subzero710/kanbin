@@ -120,4 +120,11 @@ public class ColumnTest {
         assertFalse(result.contains(parentColumn), "Ne doit pas contenir le parent");
 
     }
+    @Test
+    void testColumnType() {
+        Column column = new Column("todo", "A Faire");
+
+        column.setType("swimlane");
+        assertEquals("swimlane", column.getType());
+    }
 }

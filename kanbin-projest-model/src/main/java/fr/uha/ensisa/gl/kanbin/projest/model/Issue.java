@@ -7,6 +7,9 @@ public class Issue {
     private long id;
     private String title;
     private String columnKey;
+
+    private String rowKey;
+
     private String detail;
     private LocalDateTime closedAt;
 
@@ -14,6 +17,7 @@ public class Issue {
         this.id = 0;
         this.title = null;
         this.columnKey = null;
+        this.rowKey = null;
     }
 
     public Issue(long id, String title) {
@@ -35,10 +39,13 @@ public class Issue {
         this.detail = detail;
     }
 
-    public String getTitle() { return this.title; }
-    public long getId(){ return this.id; }
+    // --- GETTERS & SETTERS ---
 
-    // Limitation à 30 caractères
+    public long getId(){ return this.id; }
+    public void setId(long id) { this.id = id; }
+
+    public String getTitle() { return this.title; }
+
     public void setTitle(String title) {
         if (title != null && title.length() > 30) {
             this.title = title.substring(0, 30);
@@ -47,13 +54,15 @@ public class Issue {
         }
     }
 
-    public void setId(long id) { this.id = id; }
     public String getColumnKey() { return columnKey; }
     public void setColumnKey(String columnKey) { this.columnKey = columnKey; }
+
     public void setDetail(String detail) { this.detail = detail; }
     public String getDetail() { return this.detail; }
 
-    // Nouveaux Getters et Setters pour closedAt
     public LocalDateTime getClosedAt() { return closedAt; }
     public void setClosedAt(LocalDateTime closedAt) { this.closedAt = closedAt; }
+
+    public String getRowKey() { return rowKey; }
+    public void setRowKey(String rowKey) { this.rowKey = rowKey; }
 }

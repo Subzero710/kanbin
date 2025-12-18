@@ -3,1950 +3,1369 @@ package fr.uha.ensisa.gl.kanbin.controller;
 import fr.uha.ensisa.gl.kanbin.projest.model.Board;
 import fr.uha.ensisa.gl.kanbin.projest.model.Column;
 import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
+import fr.uha.ensisa.gl.kanbin.projest.model.Row;
 import fr.uha.ensisa.gl.kanbin.projest.repo.BoardRepo;
 import fr.uha.ensisa.gl.kanbin.projest.repo.IssueRepo;
-import fr.uha.ensisa.gl.kanbin.projest.repo.mem.IssueRepoMem;
-import fr.uha.ensisa.gl.kanbin.projest.repo.mem.BoardRepoMem;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
+import static org.mockito.ArgumentMatchers.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.lang.reflect.Method;
-import java.time.LocalDateTime; // AJOUTÉ : Nécessaire pour les tests de date
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class BoardControllerTest {
+class BoardControllerTest {
 
     @Mock
     private BoardRepo boardRepo;
-
     @Mock
     private IssueRepo issueRepo;
+    @Mock
+    private RedirectAttributes redirectAttributes;
 
-    @InjectMocks
     private BoardController sut;
-
-    private final long TEST_BOARD_ID = 1L;
-    private final String BOARD_NAME = "Test Board";
-
-    private Board testBoard;
 
     @BeforeEach
     void setUp() {
-        testBoard = new Board(TEST_BOARD_ID, BOARD_NAME);
-        testBoard.addColumn(new Column(100L, "initial", "Initial Column"));
+        sut = new BoardController(boardRepo, issueRepo);
     }
 
     @Test
-    void board_shouldReturnBoardView() {
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+    void root_shouldRedirectToBoard() {
+        // Correction nom méthode : homeRedirect -> root
+        ModelAndView mv = sut.root();
+        assertEquals("redirect:/board", mv.getViewName());
+    }
+
+    @Test
+    void showBoard_shouldDisplayBoardWithRowsAndCols() {
+        Board b = new Board("Test Board");
+        b.addColumn(new Column("todo", "Todo"));
+        b.addRow(new Row("urgent", "Urgent"));
+
+        when(boardRepo.findAll()).thenReturn(List.of(b));
         when(issueRepo.findAll()).thenReturn(List.of());
-        ModelAndView mv = sut.board();
+
+        // Correction nom méthode : board -> showBoard
+        ModelAndView mv = sut.showBoard();
+
         assertEquals("board", mv.getViewName());
-    }
-
-    // --- TESTS AJOUT COLONNE (Add Column) ---
-
-    @Test
-    void addColumn_whenBoardExists_shouldAddColumnToIt() {
-        String newColumnTitle = "Test Column #29";
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        sut.addColumn(newColumnTitle, "simple", redirectAttributes);
-        verify(boardRepo, times(1)).addColumn(eq(TEST_BOARD_ID), any(Column.class));
+        assertSame(b, mv.getModel().get("board"));
+        assertNotNull(mv.getModel().get("rows")); // Vérifie que les rows sont passées
+        assertNotNull(mv.getModel().get("issuesByRowAndCol"));
     }
 
     @Test
-    void addColumn_whenRepoIsEmpty_shouldCreateDefaultBoard() {
-        when(boardRepo.findAll()).thenReturn(List.of());
-        when(boardRepo.save(any(Board.class))).thenAnswer(invocation -> {
-            Board b = invocation.getArgument(0);
-            b.setId(TEST_BOARD_ID);
-            return b;
-        });
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        sut.addColumn("Ma Colonne", "simple", redirectAttributes);
-        verify(boardRepo).save(any(Board.class));
-        verify(boardRepo).addColumn(eq(TEST_BOARD_ID), any(Column.class));
-    }
-
-    @Test
-    void addColumn_duplicateName_shouldNotCallRepoAndSetErrorMessage() {
-        // Board existant avec une colonne "Dev"
-        Column existing = new Column("dev", "Dev");
-        testBoard.addColumn(existing);
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String view = sut.addColumn("Dev", "simple", redirectAttributes);
-
-        assertEquals("redirect:/board", view);
-        assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorMessage"));
-        verify(boardRepo, never()).addColumn(anyLong(), any(Column.class));
-    }
-
-    @Test
-    void addColumn_duplicateKeyOnExistingSubColumn_shouldNotCallRepoAndSetErrorMessage() {
-        // Board existant avec une colonne "Parent" qui a déjà une sous-colonne foo-todo
-        Column parent = new Column("parent", "Parent");
-        parent.addSubColumn(new Column("foo-todo", "À Faire"));
-        parent.addSubColumn(new Column("foo-wip", "En Cours"));
-        testBoard.addColumn(parent);
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String view = sut.addColumn("Foo", "double", redirectAttributes);
-
-        assertEquals("redirect:/board", view);
-        assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorMessage"));
-        verify(boardRepo, never()).addColumn(anyLong(), any(Column.class));
-    }
-
-    @Test
-    void homeRedirect_shouldRedirectToBoard() {
-        String viewName = sut.homeRedirect();
-        assertEquals("redirect:/board", viewName);
-    }
-
-    @Test
-    void postRemoveColumn_shouldSaveBoardWithoutThatColumn() {
-        long columnToRemoveId = 100L;
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        when(issueRepo.findAll()).thenReturn(List.of());
-        assertTrue(testBoard.getColumns().stream().anyMatch(c -> c.getId() == columnToRemoveId));
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String viewName = sut.removeColumn(columnToRemoveId, redirectAttributes );
-        assertEquals("redirect:/board", viewName);
-
-        ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
-        verify(boardRepo, times(1)).save(captor.capture());
-        Board saved = captor.getValue();
-        assertTrue(saved.getColumns().stream().noneMatch(c -> c.getId() == columnToRemoveId));
-    }
-
-    @Test
-    void removeColumn_fixedColumn_shouldFail_andSetErrorMessage() {
-        long fixedColId = 999L;
-        Column fixedCol = new Column(fixedColId, "backlog", "Backlog");
-        fixedCol.setFixed(true);
-        testBoard.addColumn(fixedCol);
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String viewName = sut.removeColumn(fixedColId, redirectAttributes);
-
-        assertEquals("redirect:/board", viewName);
-        verify(boardRepo, never()).save(any());
-        assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorMessage"));
-    }
-
-    @Test
-    void removeColumn_columnNotFound_shouldRedirectWithoutSavingAndWithoutErrorMessage() {
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String viewName = sut.removeColumn(999_999L, redirectAttributes);
-
-        assertEquals("redirect:/board", viewName);
-        verify(boardRepo, never()).save(any());
-        assertTrue(redirectAttributes.getFlashAttributes().isEmpty());
-    }
-
-    @Test
-    void removeColumn_withSubColumnsAndNoIssues_shouldRemoveColumn() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column parent = new Column(200L, "parent", "Parent");
-        parent.addSubColumn(new Column("parent-todo", "Todo"));
-        parent.addSubColumn(new Column("parent-wip", "Wip"));
-        board.addColumn(parent);
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.findAll()).thenReturn(List.of());
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String viewName = sut.removeColumn(200L, redirectAttributes);
-
-        assertEquals("redirect:/board", viewName);
-        verify(boardRepo).save(board);
-        assertTrue(board.getColumns().isEmpty(), "La colonne principale (avec ses sous-colonnes) doit être supprimée");
-    }
-
-    @Test
-    void removeColumn_withSubColumnsButIssueInside_shouldFailAndSetErrorMessage() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column parent = new Column(201L, "parent", "Parent");
-        parent.addSubColumn(new Column("sub-1", "Sub 1"));
-        parent.addSubColumn(new Column("sub-2", "Sub 2"));
-        board.addColumn(parent);
-
-        Issue issueInSub2 = new Issue(1L, "Issue", "sub-2");
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.findAll()).thenReturn(List.of(issueInSub2));
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String viewName = sut.removeColumn(201L, redirectAttributes);
-
-        assertEquals("redirect:/board", viewName);
-        verify(boardRepo, never()).save(any());
-        assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorMessage"));
-    }
-
-    // --- TESTS ÉDITION (Edit/Update) ---
-    @Test
-    void editColumnForm_shouldShowEditView_whenColumnExists() {
-        long colId = 100L;
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        ModelAndView mv = sut.editColumnForm(colId);
-        assertEquals("edit-column", mv.getViewName());
-        assertEquals(colId, ((Column) mv.getModel().get("column")).getId());
-    }
-
-    @Test
-    void editColumnForm_shouldRedirect_whenColumnDoesNotExist() {
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        ModelAndView mv = sut.editColumnForm(999L);
-        assertEquals("redirect:/board", mv.getViewName());
-    }
-
-    @Test
-    void editColumnForm_fixedColumn_shouldRedirect() {
-        long fixedColId = 888L;
-        Column fixedCol = new Column(fixedColId, "fix", "Fixed");
-        fixedCol.setFixed(true);
-        testBoard.addColumn(fixedCol);
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-
-        ModelAndView mv = sut.editColumnForm(fixedColId);
-        assertEquals("redirect:/board", mv.getViewName());
-    }
-
-    @Test
-    void updateColumn_shouldChangeTitleAndSaveBoard() {
-        long colId = 100L;
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        String newTitle = "Renamed Column";
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String view = sut.updateColumn(colId, newTitle, null, redirectAttributes);
-        assertEquals("redirect:/board", view);
-
-        ArgumentCaptor<Board> boardCaptor = ArgumentCaptor.forClass(Board.class);
-        verify(boardRepo).save(boardCaptor.capture());
-        Column updatedCol = boardCaptor.getValue().getColumns().stream()
-                .filter(c -> c.getId() == colId).findFirst().orElseThrow();
-        assertEquals(newTitle, updatedCol.getTitle());
-    }
-
-    @Test
-    void updateColumn_whenColumnDoesNotExist_shouldRedirectAndNotSave() {
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String view = sut.updateColumn(999_999L, "Does not matter", 3, redirectAttributes);
-
-        assertEquals("redirect:/board", view);
-        verify(boardRepo, never()).save(any());
-        assertTrue(redirectAttributes.getFlashAttributes().isEmpty());
-    }
-
-    @Test
-    void updateColumn_duplicateTitle_shouldNotSaveAndSetErrorMessage() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column colA = new Column(100L, "a", "Col A");
-        Column colB = new Column(101L, "b", "Col B");
-        board.addColumn(colA);
-        board.addColumn(colB);
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String view = sut.updateColumn(101L, "Col A", null, redirectAttributes);
-
-        assertEquals("redirect:/board", view);
-        verify(boardRepo, never()).save(any());
-        assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorMessage"));
-
-        assertEquals("Col B", board.getColumns().stream()
-                .filter(c -> c.getId() == 101L)
-                .findFirst().orElseThrow()
-                .getTitle());
-    }
-
-    @Test
-    void updateColumn_shouldTrimTitleAndApplyWipLimitRules() {
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        sut.updateColumn(100L, "   New Title   ", -5, redirectAttributes);
-
-        ArgumentCaptor<Board> boardCaptor = ArgumentCaptor.forClass(Board.class);
-        verify(boardRepo).save(boardCaptor.capture());
-
-        Column updated = boardCaptor.getValue().getColumns().stream()
-                .filter(c -> c.getId() == 100L)
-                .findFirst().orElseThrow();
-
-        assertEquals("New Title", updated.getTitle());
-        assertEquals(0, updated.getWipLimit());
-        reset(boardRepo);
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-
-        RedirectAttributes redirectAttributes2 = new RedirectAttributesModelMap();
-        sut.updateColumn(100L, "Title", 7, redirectAttributes2);
-
-        ArgumentCaptor<Board> boardCaptor2 = ArgumentCaptor.forClass(Board.class);
-        verify(boardRepo).save(boardCaptor2.capture());
-        Column updated2 = boardCaptor2.getValue().getColumns().stream()
-                .filter(c -> c.getId() == 100L)
-                .findFirst().orElseThrow();
-
-        assertEquals(7, updated2.getWipLimit());
-    }
-
-    @Test
-    void collectLogicalColumnKeys_orphanColumn_shouldReturnItsOwnKey() throws Exception {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column orphan = new Column("orphan-key", "Orphan");
-
-        @SuppressWarnings("unchecked")
-        List<String> keys = (List<String>) invokePrivate(
-                sut,
-                "collectLogicalColumnKeys",
-                new Class<?>[]{Board.class, Column.class},
-                board,
-                orphan
-        );
-
-        assertEquals(List.of("orphan-key"), keys);
-    }
-
-    @Test
-    void resolveWipLimit_orphanColumn_shouldReturnItsOwnLimit() throws Exception {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column orphan = new Column("orphan", "Orphan");
-        orphan.setWipLimit(3);
-
-        Integer limit = (Integer) invokePrivate(
-                sut,
-                "resolveWipLimit",
-                new Class<?>[]{Board.class, Column.class},
-                board,
-                orphan
-        );
-
-        assertEquals(3, limit);
-    }
-
-    private static Object invokePrivate(Object target,
-                                        String methodName,
-                                        Class<?>[] paramTypes,
-                                        Object... args) throws Exception {
-        Method m = target.getClass().getDeclaredMethod(methodName, paramTypes);
-        m.setAccessible(true);
-        return m.invoke(target, args);
-    }
-
-    @Test
-    void updateColumn_fixedColumn_shouldNotChangeTitle() {
-        long fixedColId = 777L;
-        Column fixedCol = new Column(fixedColId, "fix", "Original Title");
-        fixedCol.setFixed(true);
-        testBoard.addColumn(fixedCol);
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String view = sut.updateColumn(fixedColId, "Hacked Title", null, redirectAttributes);
-        assertEquals("redirect:/board", view);
-        verify(boardRepo, never()).save(any());
-    }
-
-    @Test
-    void board_shouldAssignOrphanIssuesToDefaultColumn() {
-        Board b = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column defaultCol = new Column(10L, "todo", "To Do");
-        b.addColumn(defaultCol);
-
+    void addColumn_shouldAddColumnAndRedirect() {
+        Board b = new Board("Test Board");
         when(boardRepo.findAll()).thenReturn(List.of(b));
 
-        Issue orphanIssue = new Issue(99L, "Orphan Issue", "lost-column");
-        when(issueRepo.findAll()).thenReturn(List.of(orphanIssue));
+        String view = sut.addColumn("New Col", "simple", 0, redirectAttributes);
 
-        sut.board();
-
-        ArgumentCaptor<Issue> issueCaptor = ArgumentCaptor.forClass(Issue.class);
-        verify(issueRepo).persist(issueCaptor.capture());
-
-        assertEquals("todo", issueCaptor.getValue().getColumnKey());
+        assertEquals("redirect:/board", view);
+        verify(boardRepo).addColumn(eq(b.getId()), any(Column.class));
     }
 
     @Test
-    void coverage_updateColumn_ignoreColumnsWithNullTitles() {
-        // SETUP : Un tableau avec une colonne "corrompue" qui a un titre NULL
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column corruptCol = new Column(100L, "key1", null); // Titre NULL
-        board.addColumn(corruptCol);
+    void addRow_shouldAddRowAndRedirect() {
+        Board b = new Board("Test Board");
+        when(boardRepo.findAll()).thenReturn(List.of(b));
 
-        // Une autre colonne normale qu'on veut renommer
-        Column normalCol = new Column(101L, "key2", "OldName");
-        board.addColumn(normalCol);
+        String view = sut.addRow("New Swimlane");
 
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-
-        sut.updateColumn(101L, "NewName", 0, redirectAttributes);
-
-        verify(boardRepo).save(board);
-    }
-
-
-    // --- TESTS POUR LES SOUS-COLONNES ---
-
-    @Test
-    void addColumn_shouldCreateParentWithTwoSubColumns() {
-        when(boardRepo.findAll()).thenReturn(List.of());
-        when(boardRepo.save(any(Board.class))).thenAnswer(i -> {
-            Board b = i.getArgument(0); b.setId(1L); return b;
-        });
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        sut.addColumn("ColonnePrincipale", "double", redirectAttributes);
-
-        ArgumentCaptor<Column> columnCaptor = ArgumentCaptor.forClass(Column.class);
-        verify(boardRepo).addColumn(eq(1L), columnCaptor.capture());
-
-        Column createdCol = columnCaptor.getValue();
-
-        assertEquals("ColonnePrincipale", createdCol.getTitle());
-        assertEquals(2, createdCol.getSubColumns().size());
-        assertEquals("À Faire", createdCol.getSubColumns().get(0).getTitle());
-        assertEquals("En Cours", createdCol.getSubColumns().get(1).getTitle());
+        assertEquals("redirect:/board", view);
+        // Vérifie qu'on a bien ajouté la row
+        assertFalse(b.getRows().isEmpty());
+        verify(boardRepo).save(b);
     }
 
     @Test
-    void board_withMixedColumns_shouldMapAllKeys() {
-        Board b = new Board(1L, BOARD_NAME);
+    void moveIssueDnD_shouldUpdateColumnAndRow() {
+        Board b = new Board("Test Board");
+        Column todo = new Column("todo", "Todo");
+        b.addColumn(todo);
 
-        // Cas  : Colonne AVEC sous-colonnes
-        Column parent = new Column("parent", "Parent");
-        parent.addSubColumn(new Column("sub1", "Sub 1"));
-        parent.addSubColumn(new Column("sub2", "Sub 2"));
-        b.addColumn(parent);
-
-        // Cas  : Colonne SANS sous-colonnes
-        Column simple = new Column("simple", "Simple");
-        b.addColumn(simple);
+        long issueId = 1L;
+        Issue issue = new Issue(issueId, "Task");
+        issue.setColumnKey("old");
+        issue.setRowKey("oldRow");
 
         when(boardRepo.findAll()).thenReturn(List.of(b));
-        when(issueRepo.findAll()).thenReturn(List.of());
-
-        sut.board();
-    }
-
-    // TESTS POUR LE REORDERING (DRAG & DROP)
-    @Test
-    void reorderColumn_validMove_shouldUpdateOrderAndSave() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column fixed = new Column(100L, "fixed", "Backlog (Fixed)");
-        Column colA = new Column(101L, "col-a", "Col A");
-        Column colB = new Column(102L, "col-b", "Col B");
-        board.addColumn(fixed); board.addColumn(colA); board.addColumn(colB);
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-
-        String response = sut.reorderColumn(102L, 1);
-
-        assertEquals("OK", response);
-
-        // L'ordre doit avoir changé : [Fixed, B, A]
-        assertEquals(fixed, board.getColumns().get(0));
-        assertEquals(colB, board.getColumns().get(1));
-        assertEquals(colA, board.getColumns().get(2));
-
-        // La sauvegarde doit avoir été appelée
-        verify(boardRepo).save(board);
-    }
-
-    @Test
-    void reorderColumn_moveToIndexZero_shouldFail() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        board.addColumn(new Column(100L, "fixed", "Fixed"));
-        board.addColumn(new Column(101L, "col-a", "Col A"));
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-
-        String response = sut.reorderColumn(101L, 0);
-
-        assertEquals("ERROR: Invalid move", response);
-        verify(boardRepo, never()).save(any());
-    }
-
-    @Test
-    void reorderColumn_moveFixedColumn_shouldFail() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column fixed = new Column(100L, "fixed", "Fixed");
-        fixed.setFixed(true);
-        board.addColumn(fixed); board.addColumn(new Column(101L, "col-a", "Col A"));
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-
-        // Action : Essayer de déplacer la colonne fixe (ID 100) vers la fin (index 1)
-        String response = sut.reorderColumn(100L, 1);
-        assertEquals("ERROR: Invalid move", response);
-
-        // L'ordre ne doit pas changer
-        assertEquals(fixed, board.getColumns().getFirst());
-        verify(boardRepo, never()).save(any());
-    }
-
-    @Test
-    void reorderColumn_moveToIndexGreaterThanSize_shouldAppendToEnd() {
-        // 1. SETUP : Board [Fixed, A, B]
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column fixed = new Column(100L, "fixed", "Fixed");
-        Column colA = new Column(101L, "col-a", "Col A");
-        Column colB = new Column(102L, "col-b", "Col B");
-        board.addColumn(fixed); board.addColumn(colA); board.addColumn(colB);
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-
-        String response = sut.reorderColumn(101L, 10);
-
-        assertEquals("OK", response);
-
-        List<Column> result = board.getColumns();
-        assertEquals(3, result.size());
-
-        // L'ordre doit être : [Fixed, B, A]
-        assertEquals(fixed, result.get(0));
-        assertEquals(colB, result.get(1));
-        assertEquals(colA, result.get(2));
-        verify(boardRepo).save(board);
-    }
-
-    @Test
-    public void removeColumn_shouldRemoveEmptyColumn() {
-        BoardRepoMem boardRepo = new BoardRepoMem();
-        IssueRepoMem issueRepo = new IssueRepoMem();
-        BoardController controller = new BoardController(boardRepo, issueRepo);
-
-        Board board = new Board(BOARD_NAME);
-        boardRepo.save(board);
-        Column col = boardRepo.addColumn(board.getId(), new Column("TODO", "A faire"));
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String view = controller.removeColumn(col.getId(), redirectAttributes);
-
-        assertEquals("redirect:/board", view);
-        assertTrue(boardRepo.findById(board.getId()).orElseThrow().getColumns().isEmpty());
-    }
-
-    @Test
-    public void removeColumn_shouldNotRemoveNonEmptyColumn_andSetErrorMessage() {
-        BoardRepoMem boardRepo = new BoardRepoMem();
-        IssueRepoMem issueRepo = new IssueRepoMem();
-        BoardController controller = new BoardController(boardRepo, issueRepo);
-
-        Board board = new Board(BOARD_NAME);
-        boardRepo.save(board);
-
-        Column col = new Column("IN_PROGRESS", "En cours");
-        col = boardRepo.addColumn(board.getId(), col);
-        long columnId = col.getId();
-
-        Issue issue = new Issue();
-        issue.setTitle("Une story");
-        issue.setColumnKey(col.getKey());
-
-        issueRepo.persist(issue);
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String view = controller.removeColumn(columnId, redirectAttributes);
-
-        assertEquals("redirect:/board", view);
-
-        Board reloaded = boardRepo.findById(board.getId()).orElseThrow();
-        assertFalse(reloaded.getColumns().isEmpty(),
-                "La colonne ne doit pas être supprimée si elle contient des issues");
-
-        assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorMessage"),
-                "Un message d'erreur doit être ajouté en flash");
-        assertEquals("Impossible de supprimer une colonne non vide",
-                redirectAttributes.getFlashAttributes().get("errorMessage"));
-    }
-
-    @Test
-    void board_whenRepoEmpty_shouldCreateBoardWithSimpleBacklog() {
-        when(boardRepo.findAll()).thenReturn(List.of());
-        when(boardRepo.save(any(Board.class))).thenAnswer(i -> i.getArgument(0));
-
-        sut.board();
-
-        ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
-        verify(boardRepo).save(captor.capture());
-
-        Board createdBoard = captor.getValue();
-        assertEquals(BOARD_NAME, createdBoard.getName());
-        assertEquals("Backlog", createdBoard.getColumns().getFirst().getTitle());
-    }
-
-
-// --- TESTS DRAG & DROP STORIES ---
-
-    @Test
-    void moveIssueDnD_shouldReturn400_whenIssueNotFound() {
-        // Cas : ID inexistant
-        when(issueRepo.find(999L)).thenReturn(null);
-
-        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(999L, "any-col");
-
-        assertEquals(400, response.getStatusCodeValue());
-        assertNotNull(response.getBody());
-        assertFalse((Boolean) response.getBody().get("success"));
-        assertEquals("Story introuvable.", response.getBody().get("message"));
-        verify(issueRepo, never()).persist(any());
-    }
-
-    @Test
-    void moveIssueDnD_shouldReturn400_whenTargetColumnNotFound() {
-        // Cas : Colonne cible inexistante
-        long issueId = 1L;
-        Issue issue = new Issue(issueId, "Story");
         when(issueRepo.find(issueId)).thenReturn(issue);
 
-        // Board vide ou sans cette colonne
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        when(boardRepo.findAll()).thenReturn(List.of(board));
+        // Appel avec 3 arguments (ID, Col, Row)
+        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(issueId, "todo", "newRow");
 
-        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(issueId, "unknown-key");
-
-        assertEquals(400, response.getStatusCodeValue());
-        assertNotNull(response.getBody());
-        assertEquals("Colonne cible introuvable.", response.getBody().get("message"));
-        verify(issueRepo, never()).persist(any());
-    }
-
-    @Test
-    void moveIssueDnD_shouldMove_whenNoWipLimit() {
-        // Cas nominal : Pas de limite
-        long issueId = 1L;
-        String targetKey = "col-free";
-        Issue issue = new Issue(issueId, "Story", "old-col");
-
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        board.addColumn(new Column(targetKey, "Free Column")); // WipLimit null par défaut
-
-        when(issueRepo.find(issueId)).thenReturn(issue);
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-
-        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(issueId, targetKey);
-
-        assertNotNull(response.getBody());
         assertTrue((Boolean) response.getBody().get("success"));
-        assertEquals(targetKey, issue.getColumnKey());
+        assertEquals("todo", issue.getColumnKey());
+        assertEquals("newRow", issue.getRowKey());
         verify(issueRepo).persist(issue);
     }
 
     @Test
-    void moveIssueDnD_shouldFail_whenWipLimitReached_inSimpleColumn() {
-        // Cas : Limite atteinte dans une colonne simple
-        long issueId = 1L;
-        String targetKey = "col-limited";
-
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column col = new Column(targetKey, "Limited");
-        col.setWipLimit(1); // Limite = 1
-        board.addColumn(col);
-
-        Issue issueToMove = new Issue(issueId, "Mover", "old-col");
-        Issue existingIssue = new Issue(2L, "Blocker", targetKey);
-
-        when(issueRepo.find(issueId)).thenReturn(issueToMove);
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-
-        when(issueRepo.findAll()).thenReturn(List.of(existingIssue, issueToMove));
-
-        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(issueId, targetKey);
-
-        assertEquals(200, response.getStatusCodeValue());
-        assertNotNull(response.getBody());
-        assertFalse((Boolean) response.getBody().get("success"));
-        assertTrue(((String)response.getBody().get("message")).contains("Limite atteinte"));
-
-
-        assertEquals("old-col", issueToMove.getColumnKey());
-        verify(issueRepo, never()).persist(issueToMove);
-    }
-
-    @Test
-    void moveIssueDnD_shouldFail_whenWipLimitReached_inParentColumn() {
+    void moveIssueDnD_shouldKeepRowIfNull() {
+        Board b = new Board("Test Board");
+        b.addColumn(new Column("done", "Done"));
 
         long issueId = 1L;
+        Issue issue = new Issue(issueId, "Task");
+        issue.setRowKey("urgent"); // Ligne existante
 
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column parent = new Column("parent", "Parent");
-        parent.setWipLimit(1); // Le parent limite à 1
-
-        Column sub1 = new Column("sub-1", "Sub 1");
-        Column sub2 = new Column("sub-2", "Sub 2");
-        parent.addSubColumn(sub1);
-        parent.addSubColumn(sub2);
-        board.addColumn(parent);
-
-        Issue issueToMove = new Issue(issueId, "Mover", "outside");
-        Issue existingInSub2 = new Issue(2L, "Blocker", "sub-2");
-
-        when(issueRepo.find(issueId)).thenReturn(issueToMove);
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.findAll()).thenReturn(List.of(existingInSub2, issueToMove));
-
-        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(issueId, "sub-1");
-
-        assertNotNull(response.getBody());
-        assertFalse((Boolean) response.getBody().get("success"), "Devrait échouer car la limite du parent est atteinte");
-        assertTrue(((String)response.getBody().get("message")).contains("Parent"));
-    }
-
-    @Test
-    void moveIssueDnD_shouldAllowMove_ifAlreadyInLogicalColumn() {
-
-        long issueId = 1L;
-
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column parent = new Column("parent", "Parent");
-        parent.setWipLimit(1); // Limite stricte à 1
-
-        Column subTodo = new Column("todo", "Todo");
-        Column subWip = new Column("wip", "Wip");
-        parent.addSubColumn(subTodo);
-        parent.addSubColumn(subWip);
-        board.addColumn(parent);
-
-        Issue issue = new Issue(issueId, "Mover", "todo");
-
+        when(boardRepo.findAll()).thenReturn(List.of(b));
         when(issueRepo.find(issueId)).thenReturn(issue);
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.findAll()).thenReturn(List.of(issue)); // Seule issue présente
 
-        // Action : Déplacer de Todo vers Wip
-        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(issueId, "wip");
+        // Appel avec Row = null (ne doit pas changer la ligne)
+        sut.moveIssueDnD(issueId, "done", null);
 
-        assertNotNull(response.getBody());
-        assertTrue((Boolean) response.getBody().get("success"), "Devrait réussir car l'issue est déjà comptée dans la limite du parent");
-        assertEquals("wip", issue.getColumnKey());
+        assertEquals("done", issue.getColumnKey());
+        assertEquals("urgent", issue.getRowKey()); // N'a pas changé
+    }
+
+    // Test WIP Limit
+    @Test
+    void moveIssueDnD_shouldFailIfWipLimitReached() {
+        Board b = new Board("Test Board");
+        Column wipCol = new Column("wip", "WIP");
+        wipCol.setWipLimit(1);
+        b.addColumn(wipCol);
+
+        // Déjà une issue dedans
+        Issue blocker = new Issue(2L, "Blocker");
+        blocker.setColumnKey("wip");
+        blocker.setRowKey("default"); // Important pour le comptage
+
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        when(issueRepo.findAll()).thenReturn(List.of(blocker));
+
+        Issue newIssue = new Issue(1L, "Mover");
+        newIssue.setRowKey("default");
+        when(issueRepo.find(1L)).thenReturn(newIssue);
+
+        // Tentative de déplacer dans une colonne pleine
+        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(1L, "wip", "default");
+
+        assertFalse((Boolean) response.getBody().get("success"));
+        assertTrue(response.getBody().get("message").toString().contains("maximum"));
     }
 
     @Test
-    void updateColumn_nonExistingColumn_shouldNotSaveBoard() {
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+    void getOrCreateDefaultBoard_ShouldInitializeDefaults_WhenNoBoardExists() {
+        // Arrange : Le repo est vide
+        when(boardRepo.findAll()).thenReturn(List.of());
+        // On intercepte la sauvegarde pour vérifier ce qui a été créé
+        when(boardRepo.save(any(Board.class))).thenAnswer(i -> i.getArguments()[0]);
 
-        String view = sut.updateColumn(999L, "New Title", null, mock(RedirectAttributes.class));
+        // Act
+        // On appelle showBoard qui appelle indirectement getOrCreateDefaultBoard
+        sut.showBoard();
 
+        // Assert
+        org.mockito.ArgumentCaptor<Board> captor = org.mockito.ArgumentCaptor.forClass(Board.class);
+        verify(boardRepo).save(captor.capture());
+
+        Board savedBoard = captor.getValue();
+        // Vérifie les lignes rouges : Colonnes fixes et Row par défaut
+        assertTrue(savedBoard.getColumns().stream().anyMatch(c -> c.getKey().equals("backlog") && c.isFixed()));
+        assertTrue(savedBoard.getColumns().stream().anyMatch(c -> c.getKey().equals("closed") && c.isFixed()));
+        assertFalse(savedBoard.getRows().isEmpty());
+        assertEquals("default", savedBoard.getRows().get(0).getKey());
+    }
+
+    @Test
+    void showBoard_ShouldSortBacklogAndClosedColumns() {
+        // Arrange
+        Board board = new Board("Test Board");
+        board.addRow(new fr.uha.ensisa.gl.kanbin.projest.model.Row("def", "Def"));
+
+        fr.uha.ensisa.gl.kanbin.projest.model.Column backlog = new fr.uha.ensisa.gl.kanbin.projest.model.Column("backlog", "Backlog");
+        fr.uha.ensisa.gl.kanbin.projest.model.Column closed = new fr.uha.ensisa.gl.kanbin.projest.model.Column("closed", "Closed");
+        board.addColumn(backlog);
+        board.addColumn(closed);
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        // Issues pour le Backlog (Tri ID décroissant)
+        Issue i1 = new Issue(1L, "Old"); i1.setColumnKey("backlog"); i1.setRowKey("def");
+        Issue i2 = new Issue(2L, "New"); i2.setColumnKey("backlog"); i2.setRowKey("def");
+
+        // Issues pour Closed (Tri Date décroissante)
+        Issue c1 = new Issue(10L, "Closed Yesterday");
+        c1.setColumnKey("closed"); c1.setRowKey("def");
+        c1.setClosedAt(java.time.LocalDateTime.now().minusDays(1));
+
+        Issue c2 = new Issue(11L, "Closed Today");
+        c2.setColumnKey("closed"); c2.setRowKey("def");
+        c2.setClosedAt(java.time.LocalDateTime.now());
+
+        when(issueRepo.findAll()).thenReturn(List.of(i1, i2, c1, c2));
+
+        // Act
+        ModelAndView mv = sut.showBoard();
+        Map<String, Map<String, List<Issue>>> data = (Map) mv.getModel().get("issuesByRowAndCol");
+
+        // Assert
+        List<Issue> backlogList = data.get("def").get("backlog");
+        assertEquals(2L, backlogList.get(0).getId()); // Le plus récent (ID 2) en premier
+
+        List<Issue> closedList = data.get("def").get("closed");
+        assertEquals(11L, closedList.get(0).getId()); // Le fermé aujourd'hui en premier
+    }
+
+    @Test
+    void removeColumn_ShouldFail_IfNotEmpty() {
+        // Arrange
+        Board board = new Board("Test Board");
+        fr.uha.ensisa.gl.kanbin.projest.model.Column col = new fr.uha.ensisa.gl.kanbin.projest.model.Column("wip", "WIP");
+        col.setId(5L);
+        board.addColumn(col);
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        // On simule une issue dans cette colonne via countIssuesInColumn -> findAll
+        Issue issue = new Issue(1L, "Task");
+        issue.setColumnKey("wip");
+        when(issueRepo.findAll()).thenReturn(List.of(issue));
+
+        // Act
+        String view = sut.removeColumn(5L, redirectAttributes);
+
+        // Assert
+        verify(boardRepo, never()).removeColumn(anyLong(), anyLong());
+        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), contains("contient des tâches"));
+    }
+
+    @Test
+    void removeColumn_ShouldFail_IfNotFound() {
+        // Arrange
+        Board board = new Board("Test Board");
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        // Act : ID inconnu 999
+        String view = sut.removeColumn(999L, redirectAttributes);
+
+        // Assert
+        assertEquals("redirect:/board", view);
+    }
+
+    @Test
+    void reorderColumn_ShouldFail_InvalidIndex() {
+        Board board = new Board("Test Board");
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        // Act : Index négatif
+        String res = sut.reorderColumn(1L, -1);
+
+        // Assert
+        assertEquals("ERROR: Invalid move", res);
+    }
+
+    @Test
+    void reorderColumn_ShouldFail_FixedColumn() {
+        Board board = new Board("Test Board");
+        fr.uha.ensisa.gl.kanbin.projest.model.Column backlog = new fr.uha.ensisa.gl.kanbin.projest.model.Column("backlog", "Backlog");
+        backlog.setFixed(true);
+        backlog.setId(10L);
+        board.addColumn(backlog);
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        // Act : Essayer de bouger le backlog
+        String res = sut.reorderColumn(10L, 2);
+
+        // Assert
+        assertEquals("ERROR: Invalid move", res);
+    }
+
+    @Test
+    void addColumn_ShouldFail_WhenNameAlreadyExists() {
+        // --- ARRANGE (Préparation) ---
+        // 1. On crée un board fictif
+        Board board = new Board("Test Board");
+        board.setId(1L);
+
+        // 2. On lui ajoute DÉJÀ une colonne nommée "Dev"
+        // (Attention à la casse : ton code semble sensible aux majuscules/minuscules selon le screenshot)
+        fr.uha.ensisa.gl.kanbin.projest.model.Column existingCol = new fr.uha.ensisa.gl.kanbin.projest.model.Column("dev", "Dev");
+        board.addColumn(existingCol);
+
+        // 3. On dit au Mock de renvoyer ce board
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        // --- ACT (Action) ---
+        // On essaie d'ajouter une colonne avec le MÊME titre "Dev"
+        String viewName = sut.addColumn("Dev", "simple", 0, redirectAttributes);
+
+        // --- ASSERT (Vérification) ---
+        // 1. Vérifie qu'on est redirigé vers le board
+        assertEquals("redirect:/board", viewName);
+
+        // 2. Vérifie qu'un message d'erreur est bien ajouté (Cible la zone rouge de ton screenshot)
+        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), contains("déjà pris"));
+
+        // 3. CRUCIAL : Vérifie que boardRepo.addColumn(...) N'A JAMAIS ÉTÉ APPELÉ
+        verify(boardRepo, never()).addColumn(anyLong(), any());
+    }
+
+    @Test
+    void addColumn_ShouldCreateSubColumns_WhenTypeIsDouble() {
+        // --- ARRANGE ---
+        Board board = new Board("Test Board");
+        board.setId(10L); // On donne un ID pour le verify plus tard
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        // --- ACT ---
+        // On ajoute une colonne "Feature" de type "double"
+        String viewName = sut.addColumn("Feature", "double", 5, redirectAttributes);
+
+        // --- ASSERT ---
+        // 1. On vérifie la redirection
+        assertEquals("redirect:/board", viewName);
+
+        // 2. On CAPTURE la colonne qui a été envoyée au repo pour l'inspecter
+        org.mockito.ArgumentCaptor<fr.uha.ensisa.gl.kanbin.projest.model.Column> columnCaptor =
+                org.mockito.ArgumentCaptor.forClass(fr.uha.ensisa.gl.kanbin.projest.model.Column.class);
+
+        // On vérifie que la méthode a été appelée sur le bon Board (ID 10) avec notre colonne
+        verify(boardRepo).addColumn(eq(10L), columnCaptor.capture());
+
+        // 3. Analyse de la colonne capturée (Cible le bloc "if double" de ton code)
+        fr.uha.ensisa.gl.kanbin.projest.model.Column createdCol = columnCaptor.getValue();
+
+        assertEquals("double", createdCol.getType()); // Vérifie le type
+        assertEquals(2, createdCol.getSubColumns().size()); // Vérifie qu'il y a 2 enfants
+
+        String subCol1Key = createdCol.getSubColumns().get(0).getKey();
+        String subCol2Key = createdCol.getSubColumns().get(1).getKey();
+
+        assertTrue(subCol1Key.endsWith("-todo"));
+        assertTrue(subCol2Key.endsWith("-wip"));
+    }
+
+    @Test
+    void removeColumn_ShouldCountIssuesInSubColumns() {
+        // --- ARRANGE ---
+        Board realBoard = new Board("Test Board");
+        realBoard.setId(1L);
+
+        // 1. Création d'une colonne "Double" (Parent)
+        fr.uha.ensisa.gl.kanbin.projest.model.Column parentCol = new fr.uha.ensisa.gl.kanbin.projest.model.Column("dev", "Dev");
+        parentCol.setId(10L);
+        parentCol.setType("double"); // Important pour la logique
+
+        // 2. Ajout des sous-colonnes (simulation de ce que fait addColumn)
+        fr.uha.ensisa.gl.kanbin.projest.model.Column subTodo = new fr.uha.ensisa.gl.kanbin.projest.model.Column("dev-todo", "Dev Todo");
+        fr.uha.ensisa.gl.kanbin.projest.model.Column subWip = new fr.uha.ensisa.gl.kanbin.projest.model.Column("dev-wip", "Dev Wip");
+        parentCol.addSubColumn(subTodo);
+        parentCol.addSubColumn(subWip);
+
+        realBoard.addColumn(parentCol);
+
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+
+        // 3. On place une Issue dans la sous-colonne "dev-wip"
+        Issue hiddenIssue = new Issue(100L, "Hidden Task");
+        hiddenIssue.setColumnKey("dev-wip"); // C'est une clé enfant !
+
+        // countIssuesInColumn appelle findAll()
+        when(issueRepo.findAll()).thenReturn(List.of(hiddenIssue));
+
+        // --- ACT ---
+        // On essaie de supprimer le PARENT (ID 10)
+        String view = sut.removeColumn(10L, redirectAttributes);
+
+        // --- ASSERT ---
+        // Ça doit échouer car il y a une tâche dans un enfant
+        assertEquals("redirect:/board", view);
+        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), contains("contient des tâches"));
+
+    }
+
+    @Test
+    void showBoard_ShouldSortIssuesCorrectly() {
+        // --- ARRANGE ---
+        // 1. Vrai Board avec les colonnes nécessaires
+        Board realBoard = new Board("Test Board");
+        realBoard.addRow(new fr.uha.ensisa.gl.kanbin.projest.model.Row("def", "Def"));
+        realBoard.addColumn(new fr.uha.ensisa.gl.kanbin.projest.model.Column("backlog", "Backlog"));
+        realBoard.addColumn(new fr.uha.ensisa.gl.kanbin.projest.model.Column("closed", "Closed"));
+
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+
+        // 2. Issues pour le Backlog (ID 10 et ID 20) -> On veut 20 avant 10
+        Issue i1 = new Issue(10L, "Vieux");
+        i1.setColumnKey("backlog"); i1.setRowKey("def");
+
+        Issue i2 = new Issue(20L, "Recent");
+        i2.setColumnKey("backlog"); i2.setRowKey("def");
+
+        // 3. Issues pour Closed -> On veut la date la plus récente en premier
+        Issue c1 = new Issue(100L, "Fermé Hier");
+        c1.setColumnKey("closed"); c1.setRowKey("def");
+        c1.setClosedAt(java.time.LocalDateTime.now().minusDays(1)); // Hier
+
+        Issue c2 = new Issue(200L, "Fermé Auj");
+        c2.setColumnKey("closed"); c2.setRowKey("def");
+        c2.setClosedAt(java.time.LocalDateTime.now()); // Aujourd'hui
+
+        when(issueRepo.findAll()).thenReturn(List.of(i1, i2, c1, c2));
+
+        // --- ACT ---
+        ModelAndView mv = sut.showBoard();
+
+        // --- ASSERT ---
+        // On récupère la grosse Map compliquée du modèle
+        java.util.Map<String, java.util.Map<String, List<Issue>>> data =
+                (java.util.Map) mv.getModel().get("issuesByRowAndCol");
+
+        // Vérif Backlog : ID 20 doit être avant ID 10
+        List<Issue> backlogList = data.get("def").get("backlog");
+        assertEquals(20L, backlogList.get(0).getId());
+        assertEquals(10L, backlogList.get(1).getId());
+
+        // Vérif Closed : Date récente (c2) avant Date ancienne (c1)
+        List<Issue> closedList = data.get("def").get("closed");
+        assertEquals(200L, closedList.get(0).getId());
+    }
+
+    @Test
+    void showBoard_ShouldFixOrphanIssues() {
+        // --- ARRANGE ---
+        Board realBoard = new Board("Test Board");
+        // Ligne par défaut et Colonne par défaut (backlog)
+        realBoard.addRow(new fr.uha.ensisa.gl.kanbin.projest.model.Row("def-row", "Default"));
+        realBoard.addColumn(new fr.uha.ensisa.gl.kanbin.projest.model.Column("backlog", "Backlog"));
+
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+
+        // Une issue cassée (null / null)
+        Issue orphan = new Issue(99L, "Lost Issue");
+        orphan.setRowKey(null);
+        orphan.setColumnKey(null);
+
+        when(issueRepo.findAll()).thenReturn(List.of(orphan));
+
+        // --- ACT ---
+        sut.showBoard();
+
+        // --- ASSERT ---
+        // 1. Vérifie qu'on a réparé l'objet en mémoire
+        assertEquals("def-row", orphan.getRowKey());
+        assertEquals("backlog", orphan.getColumnKey());
+
+        // 2. Vérifie qu'on a sauvegardé la correction en base
+        verify(issueRepo).persist(orphan);
+    }
+
+    @Test
+    void updateColumn_ShouldFail_IfNameAlreadyExists() {
+        // --- ARRANGE ---
+        Board realBoard = new Board("Test Board");
+        realBoard.setId(1L);
+
+        // Colonne 1 : Celle qu'on veut modifier (ID 10)
+        fr.uha.ensisa.gl.kanbin.projest.model.Column colToEdit = new fr.uha.ensisa.gl.kanbin.projest.model.Column("todo", "Todo");
+        colToEdit.setId(10L);
+        realBoard.addColumn(colToEdit);
+
+        // Colonne 2 : Celle qui porte le nom conflictuel (ID 20)
+        fr.uha.ensisa.gl.kanbin.projest.model.Column otherCol = new fr.uha.ensisa.gl.kanbin.projest.model.Column("done", "Done");
+        otherCol.setId(20L);
+        realBoard.addColumn(otherCol);
+
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+
+        // --- ACT ---
+        // On essaie de renommer la colonne 10 en "Done" (nom de la 20)
+        String view = sut.updateColumn(10L, "Done", 5, redirectAttributes);
+
+        // --- ASSERT ---
+        // Redirection vers board
+        assertEquals("redirect:/board", view);
+
+        // Message d'erreur présent
+        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), contains("déjà utilisé"));
+
+        // Pas de sauvegarde
+        verify(boardRepo, never()).save(any());
+    }
+
+    @Test
+    void showBoard_ShouldDisplaySubColumns_WhenTypeIsDouble() {
+        // ARRANGE
+        Board realBoard = new Board("Test Board");
+        realBoard.setId(1L);
+        realBoard.addRow(new fr.uha.ensisa.gl.kanbin.projest.model.Row("def", "Default"));
+
+        // Création d'une colonne "Double"
+        fr.uha.ensisa.gl.kanbin.projest.model.Column dev = new fr.uha.ensisa.gl.kanbin.projest.model.Column("dev", "Dev");
+        dev.setType("double");
+
+        // Ajout des sous-colonnes (C'est ça qui va déclencher la boucle rouge)
+        fr.uha.ensisa.gl.kanbin.projest.model.Column subTodo = new fr.uha.ensisa.gl.kanbin.projest.model.Column("dev-todo", "Dev Todo");
+        dev.addSubColumn(subTodo);
+        realBoard.addColumn(dev);
+
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+        when(issueRepo.findAll()).thenReturn(List.of()); // Pas besoin d'issues pour ce test
+
+        // ACT
+        ModelAndView mv = sut.showBoard();
+
+        // ASSERT
+        // On vérifie juste que ça n'a pas planté et que la map est construite
+        java.util.Map<String, Object> data = (java.util.Map) mv.getModel().get("issuesByRowAndCol");
+        assertNotNull(data);
+        // Le code est passé dans le "else { for (Column sub : ...)}"
+    }
+
+    @Test
+    void removeColumn_ShouldFail_IfFixedOrNotEmpty() {
+        // ARRANGE
+        Board realBoard = new Board("Test Board");
+        realBoard.setId(1L);
+
+        // Cas 1 : Colonne Fixe (ex: Backlog)
+        fr.uha.ensisa.gl.kanbin.projest.model.Column fixedCol = new fr.uha.ensisa.gl.kanbin.projest.model.Column("backlog", "Backlog");
+        fixedCol.setId(10L);
+        fixedCol.setFixed(true);
+        realBoard.addColumn(fixedCol);
+
+        // Cas 2 : Colonne Non Vide
+        fr.uha.ensisa.gl.kanbin.projest.model.Column busyCol = new fr.uha.ensisa.gl.kanbin.projest.model.Column("todo", "Todo");
+        busyCol.setId(20L);
+        realBoard.addColumn(busyCol);
+
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+
+        // Pour le Cas 2, on simule une tâche dedans
+        Issue task = new Issue(1L, "Tache");
+        task.setColumnKey("todo");
+        // Attention : countIssuesInColumn utilise findAll
+        when(issueRepo.findAll()).thenReturn(List.of(task));
+
+        // ACT & ASSERT 1 : Suppression Fixe
+        String view1 = sut.removeColumn(10L, redirectAttributes);
+        assertEquals("redirect:/board", view1);
+        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), contains("interdite"));
+
+        // ACT & ASSERT 2 : Suppression Non Vide
+        String view2 = sut.removeColumn(20L, redirectAttributes);
+        assertEquals("redirect:/board", view2);
+        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), contains("contient des tâches"));
+
+        // Vérifie qu'aucune suppression n'a été faite
+        verify(boardRepo, never()).removeColumn(anyLong(), anyLong());
+    }
+
+    @Test
+    void updateColumn_ShouldFail_IfNameConflict() {
+        // ARRANGE
+        Board realBoard = new Board("Test Board");
+        realBoard.setId(1L);
+
+        // Col A (ID 10)
+        fr.uha.ensisa.gl.kanbin.projest.model.Column colA = new fr.uha.ensisa.gl.kanbin.projest.model.Column("cola", "Col A");
+        colA.setId(10L);
+        realBoard.addColumn(colA);
+
+        // Col B (ID 20)
+        fr.uha.ensisa.gl.kanbin.projest.model.Column colB = new fr.uha.ensisa.gl.kanbin.projest.model.Column("colb", "Col B");
+        colB.setId(20L);
+        realBoard.addColumn(colB);
+
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+
+        // ACT : On essaie de renommer A (10) avec le nom de B ("Col B")
+        String view = sut.updateColumn(10L, "Col B", 0, redirectAttributes);
+
+        // ASSERT
+        assertEquals("redirect:/board", view);
+        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), contains("déjà utilisé"));
+    }
+
+    @Test
+    void moveCard_ShouldReturnOK() {
+        // C'est un test tout bête pour couvrir la ligne "return OK"
+        String result = sut.moveCard(1L, "row", "col");
+        assertEquals("OK", result);
+    }
+
+    @Test
+    void reorderColumn_ShouldFail_IfInvalid() {
+        Board realBoard = new Board("Test Board");
+        realBoard.setId(1L);
+        // Une colonne fixe (ne peut pas bouger)
+        fr.uha.ensisa.gl.kanbin.projest.model.Column fixed = new fr.uha.ensisa.gl.kanbin.projest.model.Column("fix", "Fix");
+        fixed.setId(99L);
+        fixed.setFixed(true);
+        realBoard.addColumn(fixed);
+
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+
+        // Cas 1 : Index négatif
+        String res1 = sut.reorderColumn(99L, -1);
+        assertEquals("ERROR: Invalid move", res1);
+
+        // Cas 2 : Colonne fixe
+        String res2 = sut.reorderColumn(99L, 2);
+        assertEquals("ERROR: Invalid move", res2);
+    }
+
+    @Test
+    void editColumnForm_ShouldReturnView_WhenColumnExistsAndNotFixed() {
+        // --- ARRANGE ---
+        Board realBoard = new Board("Test Board");
+        realBoard.setId(1L);
+
+        // Création d'une colonne normale (non fixe)
+        fr.uha.ensisa.gl.kanbin.projest.model.Column col = new fr.uha.ensisa.gl.kanbin.projest.model.Column("edit-me", "To Edit");
+        col.setId(50L);
+        col.setFixed(false); // Elle peut être éditée
+        realBoard.addColumn(col);
+
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+
+        // --- ACT ---
+        ModelAndView mv = sut.editColumnForm(50L);
+
+        // --- ASSERT ---
+        // Vérifie qu'on va sur la page d'édition
+        assertEquals("edit-column", mv.getViewName());
+
+        // Vérifie qu'on a bien passé la bonne colonne à la vue
+        fr.uha.ensisa.gl.kanbin.projest.model.Column modelCol = (fr.uha.ensisa.gl.kanbin.projest.model.Column) mv.getModel().get("column");
+        assertEquals(50L, modelCol.getId());
+    }
+
+    @Test
+    void editColumnForm_ShouldRedirect_WhenColumnIsFixed() {
+        // --- ARRANGE ---
+        Board realBoard = new Board("Test Board");
+
+        // Création d'une colonne fixe (ex: Backlog)
+        fr.uha.ensisa.gl.kanbin.projest.model.Column fixedCol = new fr.uha.ensisa.gl.kanbin.projest.model.Column("fixed", "Fixed");
+        fixedCol.setId(60L);
+        fixedCol.setFixed(true); // INTERDIT d'éditer
+        realBoard.addColumn(fixedCol);
+
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+
+        // --- ACT ---
+        ModelAndView mv = sut.editColumnForm(60L);
+
+        // --- ASSERT ---
+        // Doit rediriger vers le board
+        assertEquals("redirect:/board", mv.getViewName()); // Attention : ton code renvoie un ModelAndView avec cette string, pas un String direct
+    }
+    @Test
+    void editColumnForm_ShouldRedirect_WhenColumnNotFound() {
+        // --- ARRANGE ---
+        Board realBoard = new Board("Test Board");
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+
+        // --- ACT ---
+        // On demande l'ID 999 qui n'est pas dans le board
+        ModelAndView mv = sut.editColumnForm(999L);
+
+        // --- ASSERT ---
+        assertEquals("redirect:/board", mv.getViewName());
+    }
+
+    @Test
+    void addColumn_ShouldFail_IfNameMatchesExistingSubColumn() {
+        // ARRANGE
+        Board realBoard = new Board("Test Board");
+        realBoard.setId(1L);
+
+        // 1. On crée une structure existante : Parent -> Enfant
+        fr.uha.ensisa.gl.kanbin.projest.model.Column parent = new fr.uha.ensisa.gl.kanbin.projest.model.Column("parent", "Parent");
+        // L'enfant s'appelle "hidden-target"
+        fr.uha.ensisa.gl.kanbin.projest.model.Column sub = new fr.uha.ensisa.gl.kanbin.projest.model.Column("hidden-target", "Hidden Target");
+        parent.addSubColumn(sub);
+
+        realBoard.addColumn(parent);
+
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+
+        // ACT
+        // 2. On essaie d'ajouter une nouvelle colonne principale qui s'appelle "Hidden Target"
+        // Le système doit voir que ce nom est déjà pris par la sous-colonne !
+        String view = sut.addColumn("Hidden Target", "simple", 0, redirectAttributes);
+
+        // ASSERT
+        assertEquals("redirect:/board", view);
+        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), contains("déjà pris"));
+        verify(boardRepo, never()).addColumn(anyLong(), any());
+    }
+
+    @Test
+    void addColumn_ShouldIgnoreExistingColumnsWithNullKeys() {
+        // ARRANGE
+        Board realBoard = new Board("Test Board");
+        realBoard.setId(1L);
+        fr.uha.ensisa.gl.kanbin.projest.model.Column corruptedCol = new fr.uha.ensisa.gl.kanbin.projest.model.Column(null, "No Key Column");
+        realBoard.addColumn(corruptedCol);
+
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+        String view = sut.addColumn("New Normal", "simple", 0, redirectAttributes);
+
+        // ASSERT
+        // Ça doit passer (redirect sans erreur)
+        assertEquals("redirect:/board", view);
+        // Et l'ajout doit bien se faire
+        verify(boardRepo).addColumn(eq(1L), any());
+    }
+
+    @Test
+    void removeColumn_ShouldSucceed_WhenColumnIsValidAndEmpty() {
+        Board realBoard = new Board("Test Board");
+        realBoard.setId(1L);
+        fr.uha.ensisa.gl.kanbin.projest.model.Column colToRemove = new fr.uha.ensisa.gl.kanbin.projest.model.Column("toremove", "To Remove");
+        colToRemove.setId(50L);
+        colToRemove.setFixed(false); // Important
+        realBoard.addColumn(colToRemove);
+
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+        when(issueRepo.findAll()).thenReturn(List.of());
+        String view = sut.removeColumn(50L, redirectAttributes);
+
+        // --- ASSERT ---
+        // 1. Vérifie la redirection standard (sans erreur)
+        assertEquals("redirect:/board", view);
+        verify(boardRepo).removeColumn(eq(1L), eq(50L));
+        verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+    }
+
+    @Test
+    void removeColumn_ShouldCoverYellowChecks_WithSubColumnsAndOrphanIssues() {
+        // --- ARRANGE ---
+        Board realBoard = new Board("Test Board");
+        realBoard.setId(1L);
+        fr.uha.ensisa.gl.kanbin.projest.model.Column parent = new fr.uha.ensisa.gl.kanbin.projest.model.Column("parent", "Parent");
+        parent.setId(10L);
+        parent.setType("double");
+
+        fr.uha.ensisa.gl.kanbin.projest.model.Column sub = new fr.uha.ensisa.gl.kanbin.projest.model.Column("sub", "Sub-Col");
+        parent.addSubColumn(sub);
+        realBoard.addColumn(parent);
+
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+        Issue orphan = new Issue(1L, "Orphan");
+        orphan.setColumnKey(null);
+        Issue other = new Issue(2L, "Other");
+        other.setColumnKey("somewhere-else");
+        when(issueRepo.findAll()).thenReturn(List.of(orphan, other));
+        sut.removeColumn(10L, redirectAttributes);
+        verify(boardRepo).removeColumn(1L, 10L);
+    }
+
+    @Test
+    void updateColumn_ShouldRedirect_WhenColumnNotFound() {
+        Board realBoard = new Board("Test Board");
+        realBoard.setId(1L);
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+        String view = sut.updateColumn(999L, "New Title", 0, redirectAttributes);
+        assertEquals("redirect:/board", view);
+    }
+    @Test
+    void updateColumn_ShouldRedirect_WhenColumnIsFixed() {
+        Board realBoard = new Board("Test Board");
+        realBoard.setId(1L);
+        fr.uha.ensisa.gl.kanbin.projest.model.Column fixedCol = new fr.uha.ensisa.gl.kanbin.projest.model.Column("backlog", "Backlog");
+        fixedCol.setId(50L);
+        fixedCol.setFixed(true);
+        realBoard.addColumn(fixedCol);
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+        String view = sut.updateColumn(50L, "New Name", 0, redirectAttributes);
         assertEquals("redirect:/board", view);
         verify(boardRepo, never()).save(any());
     }
-
     @Test
-    void reorderColumn_nonExistingColumn_shouldFail() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column colA = new Column(101L, "col-a", "Col A");
-        Column colB = new Column(102L, "col-b", "Col B");
-        board.addColumn(colA);
-        board.addColumn(colB);
+    void removeRow_shouldRedirect_whenRowKeyNotFoundOrNull() {
+        Board board = new Board("Default");
+        board.addRow(new Row("r1", "Row 1"));
+        board.addRow(new Row("r2", "Row 2"));
         when(boardRepo.findAll()).thenReturn(List.of(board));
 
-        String response = sut.reorderColumn(999L, 1);
+        // rowKey inexistant
+        String view1 = sut.removeRow("missing", redirectAttributes);
+        assertEquals("redirect:/board", view1);
 
-        assertEquals("ERROR: Invalid move", response);
+        // rowKey null (couvre le prédicat rowKey != null)
+        String view2 = sut.removeRow(null, redirectAttributes);
+        assertEquals("redirect:/board", view2);
+
+        verify(boardRepo, never()).save(any());
+        verify(issueRepo, never()).findAll();
+        verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+    }
+
+    @Test
+    void removeRow_shouldBlockFixedRow() {
+        Board board = new Board("Default");
+        Row fixed = new Row("sys", "System");
+        fixed.setFixed(true);
+        board.addRow(fixed);
+        board.addRow(new Row("r2", "Row 2"));
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        String view = sut.removeRow("sys", redirectAttributes);
+
+        assertEquals("redirect:/board", view);
+        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), contains("ne peut pas être supprimée"));
+        verify(boardRepo, never()).save(any());
+        verify(issueRepo, never()).findAll();
+    }
+
+    @Test
+    void removeRow_shouldBlockIfItWouldLeaveNoRows() {
+        Board board = new Board("Default");
+        board.addRow(new Row("r1", "Only Row")); // non fixed
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        String view = sut.removeRow("r1", redirectAttributes);
+
+        assertEquals("redirect:/board", view);
+        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), contains("au moins une swimlane"));
+        verify(boardRepo, never()).save(any());
+        verify(issueRepo, never()).findAll();
+    }
+
+    @Test
+    void removeRow_shouldBlockIfRowContainsIssues() {
+        Board board = new Board("Default");
+        board.addRow(new Row("r1", "Row 1"));
+        board.addRow(new Row("r2", "Row 2"));
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        Issue issue = new Issue(1L, "Task");
+        issue.setRowKey("r1");
+        when(issueRepo.findAll()).thenReturn(List.of(issue));
+
+        String view = sut.removeRow("r1", redirectAttributes);
+
+        assertEquals("redirect:/board", view);
+        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), contains("contient des tâches"));
         verify(boardRepo, never()).save(any());
     }
 
     @Test
-    void reorderColumn_moveColumnIntoFixedSlot_shouldFail_CORRECTED() {
+    void removeRow_shouldRemoveAndSave_whenAllowed() {
+        Board board = new Board("Default");
+        Row r1 = new Row("r1", "Row 1");
+        Row r2 = new Row("r2", "Row 2");
+        board.addRow(r1);
+        board.addRow(r2);
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+        when(issueRepo.findAll()).thenReturn(List.of()); // aucune issue dans la row
 
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column movable = new Column(101L, "col-a", "Col A");
-        Column fixedSlot = new Column(100L, "fixed", "Fixed");
-        fixedSlot.setFixed(true);
+        String view = sut.removeRow("r1", redirectAttributes);
 
-        board.addColumn(movable);
-        board.addColumn(fixedSlot);
+        assertEquals("redirect:/board", view);
+        assertEquals(1, board.getRows().size());
+        assertSame(r2, board.getRows().get(0));
+        verify(boardRepo).save(board);
+    }
+
+    @Test
+    void reorderColumn_shouldMoveColumnAndSave_whenValid() {
+        Board board = new Board("Default");
+        Column backlog = new Column("backlog", "Backlog");
+        backlog.setId(1L);
+        backlog.setFixed(true);
+
+        Column a = new Column("a", "A");
+        a.setId(2L);
+
+        Column b = new Column("b", "B");
+        b.setId(3L);
+
+        Column c = new Column("c", "C");
+        c.setId(4L);
+
+        Column closed = new Column("closed", "Closed");
+        closed.setId(5L);
+        closed.setFixed(true);
+
+        board.addColumn(backlog);
+        board.addColumn(a);
+        board.addColumn(b);
+        board.addColumn(c);
+        board.addColumn(closed);
+
         when(boardRepo.findAll()).thenReturn(List.of(board));
 
-        String response = sut.reorderColumn(101L, 1);
+        // Déplacer C juste après backlog (branche newIndex < size)
+        String res = sut.reorderColumn(4L, 1);
 
-
-        assertEquals("OK", response);
-        verify(boardRepo).save(any());
+        assertEquals("OK", res);
+        assertEquals(List.of("backlog", "c", "a", "b", "closed"),
+                board.getColumns().stream().map(Column::getKey).collect(java.util.stream.Collectors.toList()));
+        verify(boardRepo).save(board);
     }
 
     @Test
-    void collectLogicalColumnKeys_orphanColumn_shouldUseItsOwnKey() throws Exception {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column orphan = new Column("orphan", "Orphan");
+    void reorderColumn_shouldMoveColumnToEnd_whenNewIndexBeyondSize() {
+        Board board = new Board("Default");
+        Column backlog = new Column("backlog", "Backlog");
+        backlog.setId(1L);
+        backlog.setFixed(true);
 
-        java.lang.reflect.Method m = BoardController.class
-                .getDeclaredMethod("collectLogicalColumnKeys", Board.class, Column.class);
-        m.setAccessible(true);
+        Column a = new Column("a", "A");
+        a.setId(2L);
 
-        @SuppressWarnings("unchecked")
-        List<String> keys = (List<String>) m.invoke(sut, board, orphan);
+        Column b = new Column("b", "B");
+        b.setId(3L);
 
-        assertEquals(List.of("orphan"), keys);
+        Column closed = new Column("closed", "Closed");
+        closed.setId(4L);
+        closed.setFixed(true);
+
+        board.addColumn(backlog);
+        board.addColumn(a);
+        board.addColumn(b);
+        board.addColumn(closed);
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        // Déplacer A à la fin (branche newIndex >= size)
+        String res = sut.reorderColumn(2L, 99);
+
+        assertEquals("OK", res);
+        assertEquals(List.of("backlog", "b", "closed", "a"),
+                board.getColumns().stream().map(Column::getKey).collect(java.util.stream.Collectors.toList()));
+        verify(boardRepo).save(board);
     }
 
     @Test
-    void countIssuesInColumn_whenNoLogicalKeys_shouldReturnZero() throws Exception {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column column = new Column(null, "NoKey");
+    void moveIssueDnD_shouldAllowMoveBetweenSubColumnsWithoutBreakingWipLimit() {
+        Board board = new Board("Default");
+        board.addRow(new Row("default", "Default"));
 
-        java.lang.reflect.Method m = BoardController.class
-                .getDeclaredMethod("countIssuesInColumn", Board.class, Column.class);
-        m.setAccessible(true);
+        Column dev = new Column("dev", "Dev");
+        dev.setType("double");
+        dev.setWipLimit(1); // limite à 1 story sur tout le groupe dev
 
-        long count = (long) m.invoke(sut, board, column);
-        assertEquals(0L, count);
+        Column subTodo = new Column("dev-todo", "Dev Todo");
+        Column subDone = new Column("dev-done", "Dev Done");
+        Column subNull = new Column(null, "Corrupted Sub"); // couvre (sub.getKey() != null)
+
+        dev.addSubColumn(subTodo);
+        dev.addSubColumn(subDone);
+        dev.addSubColumn(subNull);
+        board.addColumn(dev);
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        long issueId = 42L;
+        Issue issue = new Issue(issueId, "Task");
+        issue.setColumnKey("dev-todo");
+        issue.setRowKey("default");
+
+        when(issueRepo.find(issueId)).thenReturn(issue);
+        when(issueRepo.findAll()).thenReturn(List.of(issue)); // currentCount = 1
+        ResponseEntity<Map<String, Object>> res = sut.moveIssueDnD(issueId, "dev-done", null);
+
+        assertTrue((Boolean) res.getBody().get("success"));
+        assertEquals("dev-done", issue.getColumnKey());
+        assertEquals("default", issue.getRowKey()); // n'a pas change
+        verify(issueRepo).persist(issue);
+    }
+    @Test
+    void moveIssueDnD_shouldReturnBadRequest_whenIssueNotFound() {
+        Board b = new Board("Test Board");
+        b.addColumn(new Column("todo", "Todo"));
+
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        when(issueRepo.find(123L)).thenReturn(null);
+
+        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(123L, "todo", null);
+
+        assertEquals(400, response.getStatusCodeValue());
+        assertFalse((Boolean) response.getBody().get("success"));
+        assertTrue(response.getBody().get("message").toString().contains("introuvable"));
+        verify(issueRepo, never()).persist(any());
+    }
+
+    @Test
+    void moveIssueDnD_shouldReturnBadRequest_whenTargetColumnNotFound() {
+        Board b = new Board("Test Board");
+        b.addColumn(new Column("todo", "Todo"));
+
+        Issue issue = new Issue(1L, "Task");
+
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        when(issueRepo.find(1L)).thenReturn(issue);
+
+        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(1L, "missing", null);
+
+        assertEquals(400, response.getStatusCodeValue());
+        assertFalse((Boolean) response.getBody().get("success"));
+        assertTrue(response.getBody().get("message").toString().contains("Colonne cible"));
+        verify(issueRepo, never()).persist(any());
+    }
+
+    @Test
+    void moveIssueDnD_shouldSetClosedAt_whenMovingToClosed() {
+        Board b = new Board("Test Board");
+        b.addColumn(new Column("closed", "Closed"));
+
+        Issue issue = new Issue(1L, "Task");
+        issue.setClosedAt(null);
+
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        when(issueRepo.find(1L)).thenReturn(issue);
+
+        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(1L, "closed", null);
+
+        assertTrue((Boolean) response.getBody().get("success"));
+        assertNotNull(issue.getClosedAt());
+        assertEquals("closed", issue.getColumnKey());
+        verify(issueRepo).persist(issue);
+    }
+
+    @Test
+    void moveIssueDnD_shouldClearClosedAt_whenMovingOutOfClosed() {
+        Board b = new Board("Test Board");
+        b.addColumn(new Column("backlog", "Backlog"));
+
+        Issue issue = new Issue(1L, "Task");
+        issue.setColumnKey("closed");
+        issue.setClosedAt(java.time.LocalDateTime.now());
+
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        when(issueRepo.find(1L)).thenReturn(issue);
+
+        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(1L, "backlog", null);
+
+        assertTrue((Boolean) response.getBody().get("success"));
+        assertNull(issue.getClosedAt());
+        assertEquals("backlog", issue.getColumnKey());
+        verify(issueRepo).persist(issue);
+    }
+
+    @Test
+    void moveIssueDnD_shouldPassWipLimit_whenSpaceAvailable_andIssueNotAlreadyInLogicalColumn() {
+        Board b = new Board("Test Board");
+        b.addRow(new Row("default", "Default"));
+
+        Column dev = new Column("dev", "Dev");
+        dev.setType("double");
+        dev.setWipLimit(2);
+
+        Column subTodo = new Column("dev-todo", "Todo");
+        Column subWip = new Column("dev-wip", "Wip");
+        dev.addSubColumn(subTodo);
+        dev.addSubColumn(subWip);
+        b.addColumn(dev);
+
+        Issue alreadyThere = new Issue(10L, "Existing");
+        alreadyThere.setRowKey("default");
+        alreadyThere.setColumnKey("dev-todo");
+
+        Issue moving = new Issue(11L, "Moving");
+        moving.setRowKey("default");
+        moving.setColumnKey("backlog"); // pas dans dev-* => alreadyInTargetColumn=false
+
+        when(boardRepo.findAll()).thenReturn(List.of(b));
+        when(issueRepo.find(11L)).thenReturn(moving);
+        when(issueRepo.findAll()).thenReturn(List.of(alreadyThere, moving));
+
+        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(11L, "dev-wip", null);
+
+        assertTrue((Boolean) response.getBody().get("success"));
+        assertEquals("dev-wip", moving.getColumnKey());
+        verify(issueRepo).persist(moving);
+    }
+
+    @Test
+    void showBoard_ShouldSortClosedAndPlaceNullClosedAtLast() {
+        Board board = new Board("Test Board");
+        board.addRow(new Row("def", "Def"));
+        board.addColumn(new Column("closed", "Closed"));
+
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+
+        Issue nullClosedAt = new Issue(1L, "Null");
+        nullClosedAt.setRowKey("def");
+        nullClosedAt.setColumnKey("closed");
+        nullClosedAt.setClosedAt(null);
+
+        Issue old = new Issue(2L, "Old");
+        old.setRowKey("def");
+        old.setColumnKey("closed");
+        old.setClosedAt(java.time.LocalDateTime.now().minusDays(2));
+
+        Issue recent = new Issue(3L, "Recent");
+        recent.setRowKey("def");
+        recent.setColumnKey("closed");
+        recent.setClosedAt(java.time.LocalDateTime.now().minusHours(1));
+
+        // ordre volontairement "mauvais" pour forcer les branches null/non-null du comparator
+        when(issueRepo.findAll()).thenReturn(List.of(nullClosedAt, old, recent));
+
+        ModelAndView mv = sut.showBoard();
+        Map<String, Map<String, List<Issue>>> data = (Map) mv.getModel().get("issuesByRowAndCol");
+        List<Issue> closedList = data.get("def").get("closed");
+
+        assertEquals(3L, closedList.get(0).getId());
+        assertEquals(2L, closedList.get(1).getId());
+        assertEquals(1L, closedList.get(2).getId()); // null en dernier
+    }
+
+    @Test
+    void updateColumn_ShouldSave_WhenValidAndTrimTitle_AndSetPositiveWipLimit() {
+        Board realBoard = new Board("Test Board");
+        realBoard.setId(1L);
+
+        Column colToEdit = new Column("todo", "Todo");
+        colToEdit.setId(10L);
+        realBoard.addColumn(colToEdit);
+
+        Column other = new Column("done", "Done");
+        other.setId(20L);
+        realBoard.addColumn(other);
+
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+
+        String view = sut.updateColumn(10L, "  New Title  ", 3, redirectAttributes);
+
+        assertEquals("redirect:/board", view);
+        assertEquals("New Title", colToEdit.getTitle());
+        assertEquals(3, colToEdit.getWipLimit());
+        verify(boardRepo).save(realBoard);
+        verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+    }
+
+    @Test
+    void updateColumn_ShouldSave_WhenValidAndSetWipLimitToZero_WhenNullOrNonPositive() {
+        Board realBoard = new Board("Test Board");
+        realBoard.setId(1L);
+
+        Column colToEdit = new Column("todo", "Todo");
+        colToEdit.setId(10L);
+        colToEdit.setWipLimit(5);
+        realBoard.addColumn(colToEdit);
+
+        when(boardRepo.findAll()).thenReturn(List.of(realBoard));
+
+        String view1 = sut.updateColumn(10L, "X", null, redirectAttributes);
+        assertEquals("redirect:/board", view1);
+        assertEquals(0, colToEdit.getWipLimit());
+
+        String view2 = sut.updateColumn(10L, "Y", 0, redirectAttributes);
+        assertEquals("redirect:/board", view2);
+        assertEquals(0, colToEdit.getWipLimit());
+
+        verify(boardRepo, atLeastOnce()).save(realBoard);
     }
 
     @Test
     void resolveWipLimit_shouldReturnTargetLimit_whenColumnNotInBoard() throws Exception {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column orphan = new Column("wip-orphan", "Orphan WIP");
-        orphan.setWipLimit(5);
+        Board b = new Board("B");
+        Column in = new Column("in", "In");
+        in.setWipLimit(7);
+        b.addColumn(in);
 
-        java.lang.reflect.Method m = BoardController.class
-                .getDeclaredMethod("resolveWipLimit", Board.class, Column.class);
+        Column external = new Column("ext", "Ext");
+        external.setWipLimit(13);
+
+        java.lang.reflect.Method m = BoardController.class.getDeclaredMethod(
+                "resolveWipLimit", Board.class, Column.class);
         m.setAccessible(true);
 
-        Integer limit = (Integer) m.invoke(sut, board, orphan);
-        assertEquals(5, limit);
+        int limit = (int) m.invoke(sut, b, external);
+        assertEquals(13, limit);
     }
 
     @Test
-    void board_withSubColumnWithoutKey_shouldIgnoreNullKeysInWipComputation() {
-        Board b = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column parent = new Column("parent2", "Parent 2");
-        Column subWithKey = new Column("p2-todo", "Todo");
-        Column subWithoutKey = new Column(null, "No Key");
+    void collectLogicalColumnKeys_shouldCoverMainNullAndNullKeys() throws Exception {
+        Board b = new Board("B");
 
-        parent.addSubColumn(subWithKey);
-        parent.addSubColumn(subWithoutKey);
-        b.addColumn(parent);
+        Column corruptedInBoard = new Column(null, "Corrupted");
+        b.addColumn(corruptedInBoard);
 
-        when(boardRepo.findAll()).thenReturn(List.of(b));
-        when(issueRepo.findAll()).thenReturn(List.of());
+        Column external = new Column("ext", "Ext");
+        Column externalNullKey = new Column(null, "NoKey");
 
-        sut.board();
-    }
-
-    @Test
-    void board_shouldHandleIssuesWithUnknownColumnKeys() {
-        Board b = new Board(TEST_BOARD_ID, BOARD_NAME);
-        b.addColumn(new Column("default", "Default"));
-
-        Issue ghostIssue = new Issue(1L, "Ghost", "ghost-key");
-
-        when(boardRepo.findAll()).thenReturn(List.of(b));
-        when(issueRepo.findAll()).thenReturn(List.of(ghostIssue));
-
-        sut.board();
-
-        ArgumentCaptor<Issue> captor = ArgumentCaptor.forClass(Issue.class);
-        verify(issueRepo).persist(captor.capture());
-        assertEquals("default", captor.getValue().getColumnKey());
-    }
-
-    @Test
-    void moveIssueDnD_shouldReturnFailure_whenWipLimitReached() {
-        long issueId = 60L;
-        String targetKey = "col-limited";
-        Issue issue = new Issue(issueId, "Story", "col-origin");
-
-        Board b = new Board(1L, BOARD_NAME);
-        Column limitedCol = new Column(targetKey, "Limited");
-        limitedCol.setWipLimit(1);
-        b.addColumn(limitedCol);
-        when(boardRepo.findAll()).thenReturn(List.of(b));
-        when(issueRepo.find(issueId)).thenReturn(issue);
-
-        Issue existing = new Issue(99L, "Blocker", targetKey);
-        when(issueRepo.findAll()).thenReturn(List.of(existing, issue));
-
-        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(issueId, targetKey);
-
-        assertEquals(200, response.getStatusCodeValue());
-        assertNotNull(response.getBody());
-        assertFalse((Boolean) response.getBody().get("success"));
-        assertTrue(((String)response.getBody().get("message")).contains("Limite atteinte"));
-
-        verify(issueRepo, never()).persist(issue);
-    }
-
-    @Test
-    void moveIssueDnD_shouldAllowMove_whenWipLimitNotReached() {
-        long issueId = 61L;
-        String targetKey = "col-limited-open";
-        Issue issue = new Issue(issueId, "Story", "col-origin");
-
-        Board b = new Board(1L, BOARD_NAME);
-        Column limitedCol = new Column(targetKey, "Limited But Empty");
-        limitedCol.setWipLimit(5);
-        b.addColumn(limitedCol);
-        when(boardRepo.findAll()).thenReturn(List.of(b));
-        when(issueRepo.find(issueId)).thenReturn(issue);
-
-        when(issueRepo.findAll()).thenReturn(List.of(issue));
-
-        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(issueId, targetKey);
-
-        assertEquals(200, response.getStatusCodeValue());
-        assertNotNull(response.getBody());
-        assertTrue((Boolean) response.getBody().get("success"));
-        verify(issueRepo).persist(issue);
-    }
-
-    @Test
-    void reorderColumn_shouldFail_whenMovingFixedColumn() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column fixed = new Column(100L, "fixed", "Fixed");
-        fixed.setFixed(true);
-        board.addColumn(fixed);
-        board.addColumn(new Column(101L, "col-a", "A"));
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-
-        String result = sut.reorderColumn(100L, 1); // Essai de bouger la fixe
-        assertEquals("ERROR: Invalid move", result);
-    }
-
-    @Test
-    void reorderColumn_shouldFail_whenTargetIndexInvalid() {
-        String result = sut.reorderColumn(101L, -5);
-        assertEquals("ERROR: Invalid move", result);
-    }
-
-    @Test
-    void updateColumn_shouldRedirect_whenColumnNotFound() {
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-
-        String result = sut.updateColumn(9999L, "New Title", 0, mock(RedirectAttributes.class));
-
-        assertEquals("redirect:/board", result);
-        verify(boardRepo, never()).save(any());
-    }
-
-    @Test
-    void removeColumn_shouldRedirect_whenColumnNotFound() {
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String result = sut.removeColumn(9999L, redirectAttributes);
-
-        assertEquals("redirect:/board", result);
-        verify(boardRepo, never()).save(any());
-    }
-
-    @Test
-    void removeColumn_whenColumnNotFound_shouldRedirect() {
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-
-        String view = sut.removeColumn(9999L, redirectAttributes);
-
-        assertEquals("redirect:/board", view);
-        verify(boardRepo, never()).save(any());
-    }
-
-    @Test
-    void removeColumn_shouldIgnoreSubColumnsWithNullKeys() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column parent = new Column(100L, "parent", "Parent");
-        Column corruptSub = new Column();
-        corruptSub.setTitle("Corrupt");
-        parent.addSubColumn(corruptSub);
-
-        board.addColumn(parent);
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String view = sut.removeColumn(100L, redirectAttributes);
-
-        assertEquals("redirect:/board", view);
-        verify(boardRepo).save(board);
-    }
-
-    @Test
-    void removeColumn_shouldRemoveParentColumn_andCheckSubKeys() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column parent = new Column(200L, "parent", "Parent");
-        parent.addSubColumn(new Column("sub1", "Sub 1"));
-        parent.addSubColumn(new Column("sub2", "Sub 2"));
-        board.addColumn(parent);
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.findAll()).thenReturn(List.of());
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String view = sut.removeColumn(200L, redirectAttributes);
-
-        assertEquals("redirect:/board", view);
-        verify(boardRepo).save(board);
-        assertTrue(board.getColumns().isEmpty());
-    }
-
-    @Test
-    void removeColumn_shouldNotRemoveParentColumn_whenSubColumnNotEmpty() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column parent = new Column(200L, "parent", "Parent");
-        Column sub = new Column("sub-1", "Sub 1");
-        parent.addSubColumn(sub);
-        board.addColumn(parent);
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        Issue issue = new Issue(1L, "Story", "sub-1");
-        when(issueRepo.findAll()).thenReturn(List.of(issue));
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String view = sut.removeColumn(200L, redirectAttributes);
-
-        assertEquals("redirect:/board", view);
-        verify(boardRepo, never()).save(any());
-        assertTrue(redirectAttributes.getFlashAttributes().containsKey("errorMessage"));
-    }
-
-    @Test
-    void removeColumn_shouldRemoveParentColumn_whenEmpty() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column parent = new Column(200L, "parent", "Parent");
-        parent.addSubColumn(new Column("sub-1", "Sub 1"));
-        board.addColumn(parent);
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.findAll()).thenReturn(List.of());
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String view = sut.removeColumn(200L, redirectAttributes);
-
-        assertEquals("redirect:/board", view);
-        verify(boardRepo).save(board);
-    }
-
-    @Test
-    void removeColumn_shouldHandleParentColumnWithSubColumns() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column parent = new Column(200L, "parent", "Parent");
-        Column sub1 = new Column("sub-1", "Sub 1");
-        parent.addSubColumn(sub1);
-        board.addColumn(parent);
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.findAll()).thenReturn(List.of());
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String view = sut.removeColumn(200L, redirectAttributes);
-
-        assertEquals("redirect:/board", view);
-        verify(boardRepo).save(board);
-    }
-
-    @Test
-    void removeColumn_shouldIgnoreNullKeys_SafetyCheck() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column corruptCol = new Column();
-        corruptCol.setId(300L);
-        corruptCol.setTitle("Corrupt");
-        Column corruptSub = new Column();
-        corruptSub.setTitle("Sub Corrupt");
-        corruptCol.addSubColumn(corruptSub);
-        board.addColumn(corruptCol);
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.findAll()).thenReturn(List.of());
-
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String view = sut.removeColumn(300L, redirectAttributes);
-
-        assertEquals("redirect:/board", view);
-        verify(boardRepo).save(board);
-    }
-
-    @Test
-    void moveIssueDnD_shouldIgnoreWipLimit_whenLimitIsZero() {
-        long issueId = 10L;
-        String targetKey = "col-unlimited";
-        Board b = new Board(1L, BOARD_NAME);
-        Column unlimitedCol = new Column(targetKey, "Unlimited");
-        unlimitedCol.setWipLimit(0);
-        b.addColumn(unlimitedCol);
-
-        Issue issue = new Issue(issueId, "Story", "old");
-        when(boardRepo.findAll()).thenReturn(List.of(b));
-        when(issueRepo.find(issueId)).thenReturn(issue);
-
-        sut.moveIssueDnD(issueId, targetKey);
-        verify(issueRepo).persist(issue);
-    }
-
-    @Test
-    void board_shouldHandleIssuesWithNullOrUnknownKeys() {
-        Board b = new Board(TEST_BOARD_ID, BOARD_NAME);
-        b.addColumn(new Column("default", "Default"));
-        Issue validIssue = new Issue(1L, "Valid", "default");
-        Issue nullKeyIssue = new Issue(2L, "Null Key", null);
-        Issue unknownKeyIssue = new Issue(3L, "Unknown", "ghost-key");
-
-        when(boardRepo.findAll()).thenReturn(List.of(b));
-        when(issueRepo.findAll()).thenReturn(List.of(validIssue, nullKeyIssue, unknownKeyIssue));
-
-        ModelAndView mv = sut.board();
-        @SuppressWarnings("unchecked")
-        Map<String, List<Issue>> map = (Map<String, List<Issue>>) mv.getModel().get("issuesByColumn");
-        assertEquals(3, map.get("default").size());
-    }
-
-    @Test
-    void updateColumn_shouldResetWipLimit_whenValueIsZeroOrNegative() {
-        long colId = 100L;
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-
-        // Test 0
-        sut.updateColumn(colId, "Title", 0, mock(RedirectAttributes.class));
-        ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
-        verify(boardRepo).save(captor.capture());
-        assertEquals(0, captor.getValue().getColumns().getFirst().getWipLimit());
-
-        // Test Négatif
-        sut.updateColumn(colId, "Title", -5, mock(RedirectAttributes.class));
-        // (Mockito note: on capture la 2ème invocation)
-        verify(boardRepo, times(2)).save(captor.capture());
-        assertEquals(0, captor.getValue().getColumns().getFirst().getWipLimit());
-    }
-
-    @Test
-    void homeRedirect_shouldReturnRedirectToBoard() {
-        String view = sut.homeRedirect();
-        assertEquals("redirect:/board", view);
-    }
-
-    @Test
-    void addColumn_doubleType_shouldCreateCorrectHierarchy() {
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        sut.addColumn("Dev", "double", mock(RedirectAttributes.class));
-
-        ArgumentCaptor<Column> captor = ArgumentCaptor.forClass(Column.class);
-        verify(boardRepo).addColumn(eq(TEST_BOARD_ID), captor.capture());
-        Column parent = captor.getValue();
-        assertEquals(2, parent.getSubColumns().size());
-    }
-
-    @Test
-    void updateColumn_withPositiveWipLimit_shouldSaveThatLimit() {
-        long colId = 100L;
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        sut.updateColumn(colId, "Title", 5, mock(RedirectAttributes.class));
-
-        ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
-        verify(boardRepo).save(captor.capture());
-        assertEquals(5, captor.getValue().getColumns().getFirst().getWipLimit());
-    }
-
-    @Test
-    void updateColumn_withNegativeWipLimit_shouldSaveZero() {
-        long colId = 100L;
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        sut.updateColumn(colId, "Title", -1, mock(RedirectAttributes.class));
-
-        ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
-        verify(boardRepo).save(captor.capture());
-        assertEquals(0, captor.getValue().getColumns().getFirst().getWipLimit());
-    }
-
-    @Test
-    void updateColumn_withZeroWipLimit_shouldSaveZero() {
-        long colId = 100L;
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
-        sut.updateColumn(colId, "Title", 0, mock(RedirectAttributes.class));
-
-        ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
-        verify(boardRepo).save(captor.capture());
-        assertEquals(0, captor.getValue().getColumns().getFirst().getWipLimit());
-    }
-
-    @Test
-    void moveIssueDnD_shouldTraverseEmptySubColumnsWithoutError() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column simpleCol = new Column("simple", "Simple");
-        Column targetCol = new Column("target", "Target");
-        board.addColumn(simpleCol);
-        board.addColumn(targetCol);
-
-        long issueId = 1L;
-        Issue issue = new Issue(issueId, "Mover", "simple");
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.find(issueId)).thenReturn(issue);
-
-        sut.moveIssueDnD(issueId, "target");
-        verify(issueRepo).persist(issue);
-        assertEquals("target", issue.getColumnKey());
-    }
-
-    @Test
-    void collectLogicalKeys_shouldHandleNullMainColumnKey() throws Exception {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column corruptMain = new Column();
-        corruptMain.setId(999L);
-
-        java.lang.reflect.Method m = BoardController.class
-                .getDeclaredMethod("collectLogicalColumnKeys", Board.class, Column.class);
+        java.lang.reflect.Method m = BoardController.class.getDeclaredMethod(
+                "collectLogicalColumnKeys", Board.class, Column.class);
         m.setAccessible(true);
 
-        @SuppressWarnings("unchecked")
-        List<String> keys = (List<String>) m.invoke(sut, board, corruptMain);
-        assertTrue(keys.isEmpty());
+        List<String> keys1 = (List<String>) m.invoke(sut, b, corruptedInBoard);
+        assertTrue(keys1.isEmpty());
+
+        List<String> keys2 = (List<String>) m.invoke(sut, b, external);
+        assertEquals(List.of("ext"), keys2);
+
+        List<String> keys3 = (List<String>) m.invoke(sut, b, externalNullKey);
+        assertTrue(keys3.isEmpty());
+    }
+    @Test
+    void getOrCreateDefaultBoard_shouldCreateDefaults_whenFindAllReturnsNull_andSaveReturnsNull() {
+        when(boardRepo.findAll()).thenReturn(null);
+        when(boardRepo.save(any(Board.class))).thenReturn(null);
+
+        ModelAndView mv = sut.showBoard();
+
+        assertEquals("board", mv.getViewName());
+        Board created = (Board) mv.getModel().get("board");
+        assertNotNull(created);
+        assertEquals("Default", created.getName());
+        assertTrue(created.getColumns().stream().anyMatch(c -> "backlog".equals(c.getKey()) && c.isFixed()));
+        assertTrue(created.getColumns().stream().anyMatch(c -> "closed".equals(c.getKey()) && c.isFixed()));
+        assertFalse(created.getRows().isEmpty());
+        assertEquals("default", created.getRows().get(0).getKey());
+
+        verify(boardRepo).save(any(Board.class));
     }
 
     @Test
-    void removeColumn_shouldIgnoreIssuesWithNullOrDifferentKeys() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column colToRemove = new Column(100L, "remove-me", "Remove Me");
-        board.addColumn(colToRemove);
+    void getOrCreateDefaultBoard_shouldPreferBoardNamedDefault_whenPresent() {
+        Board other = new Board("Other");
+        other.addRow(new Row("rOther", "Other Row"));
+        other.addColumn(new Column("backlog", "Backlog"));
 
+        Board def = new Board("Default");
+        def.addRow(new Row("rDef", "Default Row"));
+        def.addColumn(new Column("backlog", "Backlog"));
+
+        when(boardRepo.findAll()).thenReturn(List.of(other, def));
+        when(issueRepo.findAll()).thenReturn(List.of());
+
+        ModelAndView mv = sut.showBoard();
+        assertSame(def, mv.getModel().get("board"));
+    }
+
+    @Test
+    void reorderColumn_shouldReturnError_whenColumnIdNotFound() {
+        Board board = new Board("Default");
+        Column backlog = new Column("backlog", "Backlog");
+        backlog.setFixed(true);
+        backlog.setId(1L);
+        board.addColumn(backlog);
+        board.addColumn(new Column("a", "A"));
         when(boardRepo.findAll()).thenReturn(List.of(board));
-        Issue issueNull = new Issue(1L, "Null Key", null);
-        Issue issueOther = new Issue(2L, "Other Key", "safe-col");
-        when(issueRepo.findAll()).thenReturn(List.of(issueNull, issueOther));
 
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String view = sut.removeColumn(100L, redirectAttributes);
-
-        assertEquals("redirect:/board", view);
-        verify(boardRepo).save(board);
+        String res = sut.reorderColumn(999L, 1);
+        assertEquals("ERROR: Invalid move", res);
+        verify(boardRepo, never()).save(any());
     }
 
     @Test
-    void moveIssueDnD_shouldIterateOverNonMatchingSubColumns() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column parent = new Column("parent", "Parent");
-        Column sub1 = new Column("sub-1", "Sub 1");
-        Column sub2 = new Column("sub-2", "Sub 2");
-        parent.addSubColumn(sub1);
-        parent.addSubColumn(sub2);
-        board.addColumn(parent);
-
-        long issueId = 50L;
-        Issue issue = new Issue(issueId, "Mover", "start");
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.find(issueId)).thenReturn(issue);
-
-        sut.moveIssueDnD(issueId, "sub-2");
-        verify(issueRepo).persist(issue);
-        assertEquals("sub-2", issue.getColumnKey());
-    }
-
-    @Test
-    void removeColumn_shouldIgnoreIssuesWithNullKey() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column col = new Column(100L, "remove-me", "Remove Me");
-        board.addColumn(col);
+    void showBoard_shouldNotFixRowKey_whenBoardHasNoRows() {
+        Board board = new Board("Default");
+        board.addColumn(new Column("backlog", "Backlog"));
         when(boardRepo.findAll()).thenReturn(List.of(board));
 
-        Issue nullKeyIssue = new Issue();
-        nullKeyIssue.setId(1L);
-        nullKeyIssue.setTitle("Ghost Issue");
-        when(issueRepo.findAll()).thenReturn(List.of(nullKeyIssue));
+        Issue orphan = new Issue(1L, "Orphan");
+        orphan.setRowKey(null);
+        orphan.setColumnKey(null);
+        when(issueRepo.findAll()).thenReturn(List.of(orphan));
 
-        RedirectAttributes redirectAttributes = new RedirectAttributesModelMap();
-        String view = sut.removeColumn(100L, redirectAttributes);
-        assertEquals("redirect:/board", view);
-        verify(boardRepo).save(board);
+        ModelAndView mv = sut.showBoard();
+
+        assertEquals("backlog", orphan.getColumnKey());
+        assertNull(orphan.getRowKey());
+        verify(issueRepo).persist(orphan);
+
+        Map<String, Map<String, List<Issue>>> data = (Map) mv.getModel().get("issuesByRowAndCol");
+        assertTrue(data.isEmpty());
     }
 
     @Test
-    void moveIssueDnD_shouldUseTargetColTitle_whenNoMainColumn() {
-        long issueId = 10L;
-        String targetKey = "simple-limited";
-        Board b = new Board(1L, BOARD_NAME);
-        Column simpleLimited = new Column(targetKey, "Simple Limited");
-        simpleLimited.setWipLimit(1);
-        b.addColumn(simpleLimited);
-
-        Issue issue = new Issue(issueId, "Mover", "start");
-        Issue blocker = new Issue(20L, "Blocker", targetKey);
-
-        when(boardRepo.findAll()).thenReturn(List.of(b));
-        when(issueRepo.find(issueId)).thenReturn(issue);
-        when(issueRepo.findAll()).thenReturn(List.of(blocker, issue));
-
-        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(issueId, targetKey);
-        assertNotNull(response.getBody());
-        String msg = (String) response.getBody().get("message");
-        assertTrue(msg.contains("Simple Limited"));
-    }
-
-    @Test
-    void moveIssueDnD_shouldSkipColumnsWithNoSubColumns() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column simple = new Column("simple", "Simple");
-        Column target = new Column("target", "Target");
-        board.addColumn(simple);
-        board.addColumn(target);
-
-        long issueId = 1L;
-        Issue issue = new Issue(issueId, "Story", "simple");
+    void showBoard_shouldIgnoreIssue_whenRowExistsButColumnKeyUnknown() {
+        Board board = new Board("Default");
+        board.addRow(new Row("r1", "Row 1"));
+        board.addColumn(new Column("backlog", "Backlog"));
         when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.find(issueId)).thenReturn(issue);
 
-        sut.moveIssueDnD(issueId, "target");
-        verify(issueRepo).persist(issue);
-    }
+        Issue ghost = new Issue(1L, "Ghost");
+        ghost.setRowKey("r1");
+        ghost.setColumnKey("ghost");
+        when(issueRepo.findAll()).thenReturn(List.of(ghost));
 
-    @Test
-    void moveIssueDnD_shouldSearchInSubColumnsAndContinueIfNotFound() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column parent = new Column("parent", "Parent");
-        parent.addSubColumn(new Column("sub-a", "Sub A"));
-        parent.addSubColumn(new Column("sub-b", "Sub B"));
-        Column target = new Column("target", "Target");
-        board.addColumn(parent);
-        board.addColumn(target);
+        ModelAndView mv = sut.showBoard();
 
-        long issueId = 1L;
-        Issue issue = new Issue(issueId, "Voyageur", "sub-a");
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.find(issueId)).thenReturn(issue);
-
-        sut.moveIssueDnD(issueId, "target");
-        verify(issueRepo).persist(issue);
-        assertEquals("target", issue.getColumnKey());
-    }
-
-    @Test
-    void coverage_moveIssueDnD_withNullKeysInBoardStructure() {
-        // SETUP : Créer une structure avec des clés NULL partout
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-
-        // 1. Colonne principale avec clé NULL
-        Column nullKeyMain = new Column(null, "NoKey Main");
-
-        // 2. Colonne parent avec sous-colonne clé NULL
-        Column parent = new Column("parent", "Parent");
-        Column nullKeySub = new Column(null, "NoKey Sub");
-        parent.addSubColumn(nullKeySub);
-
-        board.addColumn(nullKeyMain);
-        board.addColumn(parent);
-
-        Column target = new Column("target", "Target");
-        board.addColumn(target);
-
-        long issueId = 1L;
-        Issue issue = new Issue(issueId, "Story", "start");
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.find(issueId)).thenReturn(issue);
-
-        sut.moveIssueDnD(issueId, "target");
-
-        verify(issueRepo).persist(issue);
-    }
-
-    @Test
-    void coverage_moveIssueDnD_wipError_ForceMainNullPath() {
-        long issueId = 99L;
-        String targetKey = "simple-col";
-
-        // SETUP : Colonne SIMPLE (pas de parent) avec limite atteinte
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column simple = new Column(targetKey, "Simple");
-        simple.setWipLimit(1); // Limite stricte
-        board.addColumn(simple);
-
-        Issue issue = new Issue(issueId, "Mover", "start");
-        Issue blocker = new Issue(100L, "Blocker", targetKey);
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.find(issueId)).thenReturn(issue);
-        when(issueRepo.findAll()).thenReturn(List.of(blocker, issue)); // 2 issues > limite 1
-
-        // ACTION
-        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(issueId, targetKey);
-
-        // ASSERT
-        assertNotNull(response.getBody());
-        String msg = (String) response.getBody().get("message");
-        assertTrue(msg.contains("Simple"));
-    }
-    @Test
-    void coverage_board_orphanIssue_withNoDefaultColumn() {
-
-        Board emptyBoard = new Board(TEST_BOARD_ID, BOARD_NAME);
-        when(boardRepo.findAll()).thenReturn(List.of(emptyBoard));
-
-        Issue orphanIssue = new Issue(1L, "Lost", null);
-        when(issueRepo.findAll()).thenReturn(List.of(orphanIssue));
-
-        sut.board();
+        Map<String, Map<String, List<Issue>>> data = (Map) mv.getModel().get("issuesByRowAndCol");
+        assertNotNull(data.get("r1"));
+        assertTrue(data.get("r1").get("backlog").isEmpty());
         verify(issueRepo, never()).persist(any());
     }
 
     @Test
-    void coverage_updateColumn_structuralNullChecks() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-
-        // Cas A : Colonne avec clé NULL
-        board.addColumn(new Column(null, "NoKey Col"));
-
-        // Cas B : Colonne avec titre NULL (pour le anyMatch)
-        board.addColumn(new Column("key-null-title", null));
-
-        // Cas C : Parent avec sous-colonne clé NULL
-        Column parent = new Column("parent", "Parent");
-        parent.addSubColumn(new Column(null, "Sub NoKey"));
-        board.addColumn(parent);
-
-        // Cas D : Une colonne valide à modifier
-        Column valid = new Column(100L, "valid", "Valid");
-        board.addColumn(valid);
+    void showBoard_shouldCountZeroWip_whenColumnKeyIsNull() {
+        Board board = new Board("Default");
+        board.addRow(new Row("r1", "Row 1"));
+        Column corrupted = new Column(null, "Corrupted");
+        corrupted.setId(10L);
+        board.addColumn(corrupted);
 
         when(boardRepo.findAll()).thenReturn(List.of(board));
-        sut.updateColumn(100L, "New Name", 0, mock(RedirectAttributes.class));
+        when(issueRepo.findAll()).thenReturn(List.of(new Issue(1L, "X")));
 
-        verify(boardRepo).save(board);
+        ModelAndView mv = sut.showBoard();
+
+        Map<Long, Long> wip = (Map<Long, Long>) mv.getModel().get("wipUsageByColumnId");
+        assertEquals(0L, wip.get(10L));
     }
 
     @Test
-    void coverage_moveIssueDnD_wipError_onSimpleColumn_MainIsNull() {
-        long issueId = 99L;
-        String targetKey = "simple-limit";
+    void removeRow_shouldNotSave_whenRemoveRowByKeyReturnsFalse() {
+        Board board = spy(new Board("Default"));
+        board.addRow(new Row("r1", "Row 1"));
+        board.addRow(new Row("r2", "Row 2"));
+        when(boardRepo.findAll()).thenReturn(List.of(board));
+        when(issueRepo.findAll()).thenReturn(List.of());
 
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column simple = new Column(targetKey, "Simple Col");
-        simple.setWipLimit(1);
-        board.addColumn(simple);
+        doReturn(false).when(board).removeRowByKey("r1");
 
-        Issue moveIssue = new Issue(issueId, "Mover", "start");
-        Issue blocker = new Issue(100L, "Blocker", targetKey);
+        String view = sut.removeRow("r1", redirectAttributes);
+        assertEquals("redirect:/board", view);
+        verify(boardRepo, never()).save(any());
+    }
+
+    @Test
+    void updateColumn_shouldIgnoreNullTitlesInDuplicateCheck() {
+        Board board = new Board("Default");
+        board.setId(1L);
+
+        Column toEdit = new Column("a", "A");
+        toEdit.setId(10L);
+        board.addColumn(toEdit);
+
+        Column other = new Column("b", null);
+        other.setId(20L);
+        board.addColumn(other);
 
         when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.find(issueId)).thenReturn(moveIssue);
-        when(issueRepo.findAll()).thenReturn(List.of(blocker, moveIssue)); // 2 issues > limite 1
-        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(issueId, targetKey);
-        assertNotNull(response.getBody());
-        String msg = (String) response.getBody().get("message");
-        assertTrue(msg.contains("Simple Col"));
-    }
 
-    @Test
-    void coverage_board_ghostKey_shouldReassignToDefault() {
-        Board b = new Board(TEST_BOARD_ID, BOARD_NAME);
-        b.addColumn(new Column("todo", "Todo")); // Colonne par défaut
-
-        // Une issue avec une clé "deleted-column-key" qui N'EXISTE PAS dans le board
-        Issue ghostIssue = new Issue(1L, "Ghost", "deleted-column-key");
-
-        when(boardRepo.findAll()).thenReturn(List.of(b));
-        when(issueRepo.findAll()).thenReturn(List.of(ghostIssue));
-
-        // Action
-        sut.board();
-
-        // Vérif : Le code doit entrer dans le '|| !issuesByColumn.containsKey(key)'
-        // et réassigner la story à la colonne par défaut.
-        ArgumentCaptor<Issue> captor = ArgumentCaptor.forClass(Issue.class);
-        verify(issueRepo).persist(captor.capture());
-        assertEquals("todo", captor.getValue().getColumnKey());
-    }
-
-    @Test
-    void coverage_collectLogicalKeys_WithNullMainKey_Forced() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-
-        // 1. Une colonne orpheline avec clé NULL (Celle qu'on veut tester)
-        Column orphanNull = new Column(null, "Orphan Null");
-        board.addColumn(orphanNull);
-
-        // 2. IMPORTANT : Une cible avec une LIMITE WIP pour FORCER le scan des clés
-        Column target = new Column("target", "Target");
-        target.setWipLimit(5);
-        board.addColumn(target);
-
-        long issueId = 1L;
-        Issue issue = new Issue(issueId, "Story", "start");
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.find(issueId)).thenReturn(issue);
-        when(issueRepo.findAll()).thenReturn(List.of(issue));
-
-        // Action : moveIssueDnD -> resolveWipLimit -> countIssues -> collectLogicalColumnKeys
-        sut.moveIssueDnD(issueId, "target");
-
-        // On vérifie juste que ça ne plante pas et que ça a traversé le code
-        verify(issueRepo).persist(issue);
-    }
-
-    // --------------------------------------------------------
-    // TESTS "DIRTY DATA" POUR LE 100% DE COUVERTURE (FINALE)
-    // --------------------------------------------------------
-
-    @Test
-    void coverage_addColumn_Loop_WithNullKeys_ShouldIgnoreThem() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-
-        // 1. Colonne principale "sale" (Clé NULL)
-        board.addColumn(new Column(null, "Dirty Main"));
-
-        // 2. Colonne parent avec sous-colonne "sale" (Clé NULL)
-        Column parent = new Column("parent", "Parent");
-        parent.addSubColumn(new Column(null, "Dirty Sub"));
-        board.addColumn(parent);
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        RedirectAttributes attr = new RedirectAttributesModelMap();
-        sut.addColumn("New Clean Column", "simple", attr);
-
-        verify(boardRepo).addColumn(eq(TEST_BOARD_ID), any(Column.class));
-    }
-
-
-    @Test
-    void coverage_collectLogicalKeys_ForceNullKeyBranch() {
-        // CIBLE : collectLogicalColumnKeys (Branch missed)
-        // SCENARIO : Une colonne n'a PAS de sous-colonnes (on tombe dans le else)
-        // ET sa clé est NULL (on teste le false du else if).
-
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-
-        // 1. Colonne "Sale" : Pas de sous-colonne, Clé NULL
-        Column dirtyCol = new Column(null, "Dirty");
-        board.addColumn(dirtyCol);
-
-        // 2. Colonne Cible : Avec limite WIP (pour forcer le scan de tout le board)
-        Column target = new Column("target", "Target");
-        target.setWipLimit(5);
-        board.addColumn(target);
-
-        Issue issue = new Issue(1L, "Story", "start");
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.find(1L)).thenReturn(issue);
-        when(issueRepo.findAll()).thenReturn(List.of(issue));
-
-        // Action : Le déplacement déclenche le calcul WIP, qui scanne dirtyCol.
-        // Il voit que c'est une feuille (pas de sub), check la clé (null), et passe au suivant.
-        sut.moveIssueDnD(1L, "target");
-
-        verify(issueRepo).persist(issue);
-    }
-
-    @Test
-    void coverage_moveIssueDnD_WipLimit_RootColumn_MainIsNull() {
-        // CIBLE : moveIssueDnD (Branch missed sur le ternaire)
-        // SCENARIO : Erreur de limite WIP sur une colonne RACINE.
-        // findMainColumn va retourner NULL. Le code doit exécuter "targetCol.getTitle()".
-
-        String targetKey = "root-limit";
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-
-        // Colonne racine simple (pas de parent) avec limite stricte de 1
-        Column root = new Column(targetKey, "TITRE_RACINE");
-        root.setWipLimit(1);
-        board.addColumn(root);
-
-        Issue moveIssue = new Issue(1L, "Mover", "start");
-        Issue blocker = new Issue(2L, "Blocker", targetKey);
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.find(1L)).thenReturn(moveIssue);
-        // On simule qu'il y a déjà 2 issues (le bloqueur + celle qu'on déplace) -> Limite dépassée
-        when(issueRepo.findAll()).thenReturn(List.of(blocker, moveIssue));
-
-        // Action : Déclenche l'erreur
-        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(1L, targetKey);
-
-        // Vérif : Le message doit contenir le titre, prouvant qu'il est passé par le chemin "main == null"
-        assertNotNull(response.getBody());
-        String msg = (String) response.getBody().get("message");
-        assertTrue(msg.contains("TITRE_RACINE"));
-    }
-
-    // -------------------------------------------------------------
-    // TESTS FINAUX CORRIGÉS (AVEC IDs EXPLICITES)
-    // -------------------------------------------------------------
-
-    @Test
-    void coverage_collectLogicalKeys_RootColumn_NullKey() throws Exception {
-        // CIBLE : collectLogicalColumnKeys (Branche manquante else if main.getKey() != null -> FALSE)
-        // SCENARIO : Colonne racine, sans sous-colonne, et avec une clé NULL.
-        // On utilise la réflexion (invokePrivate) car moveIssueDnD rejette les clés nulles.
-
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column nullKeyCol = new Column(555L, null, "NullKey");
-        board.addColumn(nullKeyCol);
-
-        // Appel direct de la méthode privée
-        @SuppressWarnings("unchecked")
-        List<String> keys = (List<String>) invokePrivate(
-                sut,
-                "collectLogicalColumnKeys",
-                new Class<?>[]{Board.class, Column.class},
-                board,
-                nullKeyCol
-        );
-
-        // Vérif : La liste doit être vide (pas entrée dans le if, et else if faux)
-        assertTrue(keys.isEmpty(), "Une colonne sans clé et sans sous-colonnes ne doit retourner aucune clé logique");
-    }
-    @Test
-    void coverage_Ternary_SideA_RootColumn_MainIsNull() {
-        // CIBLE : Le côté "false" du ternaire (targetCol.getTitle())
-        // SCENARIO : Limite atteinte sur une colonne RACINE (donc main == null).
-
-        String key = "root-limit";
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-
-        Column root = new Column(100L, key, "TITRE_RACINE");
-        root.setWipLimit(1); // Limite stricte
-        board.addColumn(root);
-
-        Issue moveIssue = new Issue(1L, "Mover", "start");
-        Issue blocker = new Issue(2L, "Blocker", key);
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.find(1L)).thenReturn(moveIssue);
-        when(issueRepo.findAll()).thenReturn(List.of(blocker, moveIssue)); // 2 > 1
-
-        ResponseEntity<Map<String, Object>> res = sut.moveIssueDnD(1L, key);
-
-        // Vérif : On doit voir le titre de la racine
-        assertNotNull(res.getBody());
-        assertTrue(((String) res.getBody().get("message")).contains("TITRE_RACINE"));
-    }
-
-
-    @Test
-    void coverage_WipError_MainIsNotNull_SubColumn() {
-        // CIBLE : Partie GAUCHE du ternaire (main.getTitle() ?)
-        // SCENARIO : Erreur sur une SOUS-COLONNE (donc main == Parent).
-
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-
-        // 1. Structure Parent -> Enfant
-        Column parent = new Column(200L, "parent", "TITRE_PARENT");
-        Column sub = new Column(201L, "sub-key", "TITRE_SUB");
-
-        // On met la limite sur le PARENT
-        parent.setWipLimit(1);
-        parent.addSubColumn(sub);
-        board.addColumn(parent);
-
-        // 2. Mocks pour dépasser la limite (3 issues pour une limite de 1)
-        Issue moveIssue = new Issue(1L, "Mover", "start");
-        Issue blocker1 = new Issue(2L, "B1", "sub-key");
-        Issue blocker2 = new Issue(3L, "B2", "sub-key");
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.find(1L)).thenReturn(moveIssue);
-        when(issueRepo.findAll()).thenReturn(List.of(blocker1, blocker2, moveIssue));
-
-        // 3. Action
-        ResponseEntity<Map<String, Object>> res = sut.moveIssueDnD(1L, "sub-key");
-
-        // 4. Vérif : On doit voir le titre du PARENT
-        assertNotNull(res.getBody());
-        String msg = (String) res.getBody().get("message");
-        assertTrue(msg.contains("TITRE_PARENT"), "Le message doit contenir le titre du parent (main n'est pas null)");
-    }
-
-    // --- NOUVEAUX TESTS POUR LA DATE DE FERMETURE ET LE TRI ---
-
-    @Test
-    void moveIssueDnD_shouldSetClosedAt_whenMovedToClosed() {
-        long issueId = 1L;
-        String closedKey = "closed";
-        Issue issue = new Issue(issueId, "Task");
-
-        // Setup : colonne closed existe
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        board.addColumn(new Column("closed", "Closed"));
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.find(issueId)).thenReturn(issue);
-
-        // Action : Déplacement vers closed
-        sut.moveIssueDnD(issueId, closedKey);
-
-        // Vérification
-        assertNotNull(issue.getClosedAt(), "La date de fermeture doit être définie");
-        verify(issueRepo).persist(issue);
-    }
-
-    @Test
-    void moveIssueDnD_shouldClearClosedAt_whenMovedOutOfClosed() {
-        long issueId = 1L;
-        Issue issue = new Issue(issueId, "Task");
-        issue.setColumnKey("closed");
-        issue.setClosedAt(LocalDateTime.now()); // Déjà fermé
-
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        board.addColumn(new Column("todo", "To Do")); // Colonne destination
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.find(issueId)).thenReturn(issue);
-
-        // Action : Déplacement hors de closed
-        sut.moveIssueDnD(issueId, "todo");
-
-        // Vérification
-        assertNull(issue.getClosedAt(), "La date de fermeture doit être effacée (null)");
-        assertEquals("todo", issue.getColumnKey());
-    }
-
-    @Test
-    void board_shouldSortClosedIssuesByDateDescending() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        board.addColumn(new Column("closed", "Closed"));
-
-        // Issue 1: Fermée hier (Vieux)
-        Issue oldIssue = new Issue(1L, "Old", "closed");
-        oldIssue.setClosedAt(LocalDateTime.now().minusDays(1));
-
-        // Issue 2: Fermée maintenant (Récent)
-        Issue recentIssue = new Issue(2L, "Recent", "closed");
-        recentIssue.setClosedAt(LocalDateTime.now());
-
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        // Note: l'ordre retourné par le repo n'est pas trié
-        when(issueRepo.findAll()).thenReturn(List.of(oldIssue, recentIssue));
-
-        ModelAndView mv = sut.board();
-
-        @SuppressWarnings("unchecked")
-        Map<String, List<Issue>> issuesByCol = (Map<String, List<Issue>>) mv.getModel().get("issuesByColumn");
-        List<Issue> closedList = issuesByCol.get("closed");
-
-        // Vérification du tri
-        assertEquals(2, closedList.size());
-        assertEquals(recentIssue, closedList.get(0), "La story la plus récente doit être en premier (haut de colonne)");
-        assertEquals(oldIssue, closedList.get(1), "La story la plus ancienne doit être en dessous");
-    }
-
-    @Test
-    void collectLogicalColumnKeys_shouldCollectSubColumnKeys_whenMainColumnExists() throws Exception {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column parent = new Column("parent", "Parent");
-        Column sub1 = new Column("sub-1", "Sub 1");
-        parent.addSubColumn(sub1);
-
-        java.lang.reflect.Method m = BoardController.class
-                .getDeclaredMethod("collectLogicalColumnKeys", Board.class, Column.class);
-        m.setAccessible(true);
-
-        @SuppressWarnings("unchecked")
-        List<String> keys = (List<String>) m.invoke(sut, board, sub1);
-        assertTrue(keys.contains("sub-1"));
-        assertEquals(1, keys.size());
-    }
-
-    @Test
-    void moveIssueDnD_fullLoopCoverage_searchTraversal() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column simple = new Column("simple", "Simple");
-        Column parent = new Column("parent", "Parent");
-        parent.addSubColumn(new Column("sub-1", "Sub 1"));
-        parent.addSubColumn(new Column("sub-2", "Sub 2"));
-        Column target = new Column("target", "Target");
-        board.addColumn(simple);
-        board.addColumn(parent);
-        board.addColumn(target);
-
-        long issueId = 1L;
-        Issue issue = new Issue(issueId, "Traveler", "start");
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.find(issueId)).thenReturn(issue);
-
-        sut.moveIssueDnD(issueId, "target");
-        verify(issueRepo).persist(issue);
-        assertEquals("target", issue.getColumnKey());
-    }
-
-    @Test
-    void moveIssueDnD_shouldHandleIssueWithNullKey() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column target = new Column("target", "Target");
-        target.setWipLimit(1);
-        board.addColumn(target);
-
-        long issueId = 1L;
-        Issue issue = new Issue(issueId, "Null Key Issue", null);
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.find(issueId)).thenReturn(issue);
-        when(issueRepo.findAll()).thenReturn(List.of(issue));
-
-        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(issueId, "target");
-
-        assertNotNull(response.getBody());
-        assertTrue((Boolean) response.getBody().get("success"));
-        assertEquals("target", issue.getColumnKey());
-    }
-
-    @Test
-    void removeColumn_shouldIgnoreIssuesWithNullKey_inCheck() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column col = new Column(100L, "col", "Col");
-        board.addColumn(col);
-        when(boardRepo.findAll()).thenReturn(List.of(board));
-        Issue issueNull = new Issue(1L, "Ghost", null);
-        when(issueRepo.findAll()).thenReturn(List.of(issueNull));
-
-        RedirectAttributes attr = new RedirectAttributesModelMap();
-        String view = sut.removeColumn(100L, attr);
-
+        String view = sut.updateColumn(10L, "New", 0, redirectAttributes);
         assertEquals("redirect:/board", view);
         verify(boardRepo).save(board);
+        verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
     }
 
     @Test
-    void updateColumn_shouldHandleNegativeAndZeroLimits() {
-        long colId = 100L;
-        when(boardRepo.findAll()).thenReturn(List.of(testBoard));
+    void addColumn_shouldIgnoreExistingSubColumnsWithNullKeys() {
+        Board board = new Board("Default");
+        board.setId(1L);
 
-        // Test 0
-        sut.updateColumn(colId, "Title", 0, mock(RedirectAttributes.class));
-        ArgumentCaptor<Board> captor = ArgumentCaptor.forClass(Board.class);
-        verify(boardRepo).save(captor.capture());
-        assertEquals(0, captor.getValue().getColumns().getFirst().getWipLimit());
-
-        // Test Négatif
-        sut.updateColumn(colId, "Title", -5, mock(RedirectAttributes.class));
-        // (Mockito note: on capture la 2ème invocation)
-        verify(boardRepo, times(2)).save(captor.capture());
-        assertEquals(0, captor.getValue().getColumns().getFirst().getWipLimit());
-    }
-
-    @Test
-    void board_shouldHandleIssueWithNullKey_inDisplay() {
-        Board b = new Board(TEST_BOARD_ID, BOARD_NAME);
-        b.addColumn(new Column("default", "Def"));
-        Issue issueNull = new Issue(1L, "No Key", null);
-
-        when(boardRepo.findAll()).thenReturn(List.of(b));
-        when(issueRepo.findAll()).thenReturn(List.of(issueNull));
-
-        sut.board();
-        assertNotNull(issueNull.getColumnKey());
-    }
-
-    @Test
-    void moveIssueDnD_shouldHandleIssueWithNullKey_inWipCalculation() {
-        Board board = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column target = new Column("target", "Target");
-        target.setWipLimit(1);
-        board.addColumn(target);
-
-        long issueId = 1L;
-        Issue issue = new Issue(issueId, "Moving Story", "start");
-        Issue nullKeyIssue = new Issue(2L, "Corrupt", null);
-
+        Column parent = new Column("parent", "Parent");
+        parent.addSubColumn(new Column(null, "Broken Sub"));
+        board.addColumn(parent);
         when(boardRepo.findAll()).thenReturn(List.of(board));
-        when(issueRepo.find(issueId)).thenReturn(issue);
-        when(issueRepo.findAll()).thenReturn(List.of(nullKeyIssue, issue));
 
-        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(issueId, "target");
-        assertNotNull(response.getBody());
-        assertTrue((Boolean) response.getBody().get("success"));
-        assertEquals("target", issue.getColumnKey());
+        String view = sut.addColumn("New Col", "simple", 0, redirectAttributes);
+        assertEquals("redirect:/board", view);
+        verify(boardRepo).addColumn(eq(1L), any(Column.class));
+        verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
     }
-
-    @Test
-    void board_shouldReassignIssueWithNullKey() {
-        Board b = new Board(TEST_BOARD_ID, BOARD_NAME);
-        b.addColumn(new Column("default", "Def"));
-        Issue issueNull = new Issue(1L, "No Key", null);
-        when(boardRepo.findAll()).thenReturn(List.of(b));
-        when(issueRepo.findAll()).thenReturn(List.of(issueNull));
-
-        sut.board();
-
-        ArgumentCaptor<Issue> captor = ArgumentCaptor.forClass(Issue.class);
-        verify(issueRepo).persist(captor.capture());
-        assertNotNull(captor.getValue().getColumnKey());
-    }
-
-    @Test
-    void coverage_moveIssueDnD_wipLimitError_SimpleColumn_CheckMessage() {
-        long issueId = 10L;
-        String targetKey = "simple-limit";
-        String colTitle = "Simple Limit Col";
-
-        Board b = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column c = new Column(targetKey, colTitle);
-        c.setWipLimit(1);
-        b.addColumn(c);
-
-        Issue issueToMove = new Issue(issueId, "Move Me", "origin");
-        Issue blocker = new Issue(20L, "Blocker", targetKey);
-
-        when(boardRepo.findAll()).thenReturn(List.of(b));
-        when(issueRepo.find(issueId)).thenReturn(issueToMove);
-        when(issueRepo.findAll()).thenReturn(List.of(blocker, issueToMove));
-
-        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(issueId, targetKey);
-
-        assertEquals(200, response.getStatusCodeValue());
-        Map<String, Object> body = response.getBody();
-        assertNotNull(body);
-        assertFalse((Boolean) body.get("success"));
-        String msg = (String) body.get("message");
-        assertTrue(msg.contains("Limite atteinte (1)"));
-        assertTrue(msg.contains(colTitle));
-    }
-
-    @Test
-    void coverage_moveIssueDnD_wipLimitError_SubColumn_CheckParentTitle() {
-        long issueId = 11L;
-        String parentTitle = "Parent Col";
-
-        Board b = new Board(TEST_BOARD_ID, BOARD_NAME);
-        Column parent = new Column("parent", parentTitle);
-        parent.setWipLimit(1);
-
-        Column sub1 = new Column("sub1", "Sub 1");
-        Column sub2 = new Column("sub2", "Sub 2");
-        parent.addSubColumn(sub1);
-        parent.addSubColumn(sub2);
-        b.addColumn(parent);
-
-        Issue issueToMove = new Issue(issueId, "Move Me", "origin");
-        Issue blocker = new Issue(21L, "Blocker", "sub2");
-
-        when(boardRepo.findAll()).thenReturn(List.of(b));
-        when(issueRepo.find(issueId)).thenReturn(issueToMove);
-        when(issueRepo.findAll()).thenReturn(List.of(blocker, issueToMove));
-
-        ResponseEntity<Map<String, Object>> response = sut.moveIssueDnD(issueId, "sub1");
-
-        Map<String, Object> body = response.getBody();
-        assertNotNull(body);
-        assertFalse((Boolean) body.get("success"));
-
-        String msg = (String) body.get("message");
-        assertTrue(msg.contains(parentTitle));
-    }
-
 }

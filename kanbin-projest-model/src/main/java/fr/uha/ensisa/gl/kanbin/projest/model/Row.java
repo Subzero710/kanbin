@@ -3,26 +3,24 @@ package fr.uha.ensisa.gl.kanbin.projest.model;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Column {
+public class Row {
     private long id;
     private String key;
     private String title;
-    private int wipLimit =0;
     private Integer pos;
-    private String type = "simple";
 
     private boolean fixed = false;
-    private final List<Column> subColumns = new ArrayList<>();
+    private final List<Row> subRows = new ArrayList<>();
 
-    public Column() {}
+    public Row() {}
 
-    public Column(long id, String key, String title) {
+    public Row(long id, String key, String title) {
         this.id = id; this.key = key; this.title = title;
     }
 
-    public Column(String key, String title) { this(0L, key, title); }
+    public Row(String key, String title) { this(0L, key, title); }
 
-    public List<Column> getSubColumns() { return subColumns; }
+    public List<Row> getSubRows() { return subRows; }
 
     public long getId() { return id; }
     public void setId(long id) { this.id = id; }
@@ -30,28 +28,19 @@ public class Column {
     public void setKey(String key) { this.key = key; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
-    public Integer getWipLimit() {return wipLimit;}
-    public void setWipLimit(Integer wipLimit) {this.wipLimit = wipLimit;}
     public Integer getPos() { return pos; }
     public void setPos(Integer pos) { this.pos = pos; }
 
-    public void addSubColumn(Column sub) {
-        this.subColumns.add(sub);
+    public void addSubRow(Row sub) {
+        this.subRows.add(sub);
     }
 
     public boolean isFixed() { return fixed; }
     public void setFixed(boolean fixed) { this.fixed = fixed; }
-    public List<Column> getSubColumnsOrSelf() {
-        if (this.subColumns.isEmpty()) {
+    public List<Row> getSubRowsOrSelf() {
+        if (this.subRows.isEmpty()) {
             return List.of(this);
         }
-        return this.subColumns;
-    }
-    public String getType() {
-        return type;
-    }
-
-    public void setType(String type) {
-        this.type = type;
+        return this.subRows;
     }
 }

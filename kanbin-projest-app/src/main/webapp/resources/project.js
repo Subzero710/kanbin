@@ -1,338 +1,304 @@
-document.addEventListener("DOMContentLoaded", function() {
-    // 1. CONFIGURATION ROBUSTE (URL + CSRF (SI PRESENT))
-    const baseUrlMeta = document.querySelector('meta[name="api-base-url"]');
-    const csrfTokenMeta = document.querySelector('meta[name="_csrf"]');
-    const csrfHeaderMeta = document.querySelector('meta[name="_csrf_header"]');
+document.addEventListener("DOMContentLoaded", function () {
+    console.log("Kanbin Project JS Loaded");
 
-    // On s'assure que le chemin finit toujours par '/'
-    let rawPath = baseUrlMeta ? baseUrlMeta.getAttribute('content') : '/';
-    const CONTEXT_PATH = rawPath.endsWith('/') ? rawPath : rawPath + '/';
-
-    const CSRF_TOKEN = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : null;
-    const CSRF_HEADER = csrfHeaderMeta ? csrfHeaderMeta.getAttribute('content') : null;
-
-    /**
-     * Construit une URL API absolue et valide
-     * @param {string} endpoint - ex: "board/move-issue"
-     */
-    function getApiUrl(endpoint) {
-        // Retire le slash au début de l'endpoint pour éviter le double slash //
-        const cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-        return CONTEXT_PATH + cleanEndpoint;
-    }
-
-    /**
-     * Wrapper pour fetch qui ajoute automatiquement le token de sécurité CSRF
-     */
-    function secureFetch(endpoint, formData) {
-        const headers = {};
-        // Ajout du header CSRF si présent (obligatoire pour POST Spring Security)
-        if (CSRF_TOKEN && CSRF_HEADER) {
-            headers[CSRF_HEADER] = CSRF_TOKEN;
-        }
-
-        // Utilisation URLSearchParams qui envoie du application/x-www-form-urlencoded par défaut.
-
-        return fetch(getApiUrl(endpoint), {
+    function postFormUrlEncoded(url, params) {
+        return fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                ...headers // Injection du token
-            },
-            body: formData
-        }).then(response => {
-            if (!response.ok) {
-                // Si erreur 403 (Forbidden) ou 404 or 500, on lève une erreur explicite
-                throw new Error(`Erreur HTTP ${response.status} sur ${endpoint}`);
-            }
-            // On vérifie le type de contenu avant de parser JSON
-            const contentType = response.headers.get("content-type");
-            if (contentType && contentType.indexOf("application/json") !== -1) {
-                return response.json();
-            } else {
-                return response.text(); // Pour gérer les réponses "OK" brutes
-            }
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams(params).toString()
         });
     }
 
-    const columns = document.querySelectorAll('.kb-main-col');
-    const board = document.getElementById('board');
-    let draggedItem = null;
+    // ------------------------------------------------------------
+    // 1) DRAG COLONNES : persist sur /board/reorder-column + sync UI
+    // ------------------------------------------------------------
 
-    // ============================================================
-    // WIP COUNTERS (badges "X / Y" dans l'entête des colonnes)
-    // ============================================================
-    function initWipBadgeLimits() {
-        document.querySelectorAll('.kb-main-col').forEach(mainCol => {
-            const badge = mainCol.querySelector('.kb-col-header .badge');
-            if (!badge) return;
+    const headerContainer = document.querySelector('.column-headers-container');
+    const headerItems = Array.from(document.querySelectorAll('.col-header-item'));
 
-            // extrait le "Y" de "X / Y" pour le garder stable
-            const m = badge.textContent.match(/(\d+)\s*\/\s*(\d+)/);
-            if (m) {
-                badge.dataset.limit = m[2];
-            }
+    let draggedColumn = null;
+    let headerOrderBefore = null; // rollback (liste des data-column-id)
+
+    function getHeaderItems() {
+        return Array.from(document.querySelectorAll('.col-header-item'));
+    }
+
+    function getHeaderOrderIds() {
+        return getHeaderItems().map(el => el.getAttribute('data-column-id'));
+    }
+
+    function getHeaderOrderKeys() {
+        return getHeaderItems().map(el => el.getAttribute('data-col'));
+    }
+
+    function syncSwimlanesToHeader() {
+        const desiredKeys = getHeaderOrderKeys();
+        document.querySelectorAll('.swimlane-columns-container').forEach(container => {
+            const sections = Array.from(container.children);
+            const map = new Map();
+            sections.forEach(sec => {
+                const key = sec.getAttribute('data-col');
+                if (key) map.set(key, sec);
+            });
+
+            desiredKeys.forEach(key => {
+                const sec = map.get(key);
+                if (sec) container.appendChild(sec);
+            });
         });
     }
 
-    function refreshWipCounters() {
-        document.querySelectorAll('.kb-main-col').forEach(mainCol => {
-            const badge = mainCol.querySelector('.kb-col-header .badge');
-            if (!badge) return;
-            const limitStr = badge.dataset.limit;
-            if (!limitStr) return;
-
-            const limit = parseInt(limitStr, 10);
-            const usage = mainCol.querySelectorAll('.kb-col-body .issue-draggable').length;
-            badge.textContent = usage + " / " + limit;
+    function restoreHeaderOrderByIds(ids) {
+        if (!headerContainer) return;
+        const current = new Map();
+        getHeaderItems().forEach(el => current.set(el.getAttribute('data-column-id'), el));
+        ids.forEach(id => {
+            const el = current.get(id);
+            if (el) headerContainer.appendChild(el);
         });
     }
 
-    initWipBadgeLimits();
-    // synchronise au chargement (au cas où)
-    refreshWipCounters();
+    if (headerContainer) {
+        headerItems.forEach(item => {
 
+            // draggable seulement si draggable="true"
+            if (item.getAttribute('draggable') === 'true') {
+                item.addEventListener('dragstart', function (e) {
+                    draggedColumn = this;
+                    headerOrderBefore = getHeaderOrderIds();
+                    e.dataTransfer.effectAllowed = 'move';
+                    this.style.opacity = '0.4';
+                });
 
-    columns.forEach(col => {
-        // Restriction du drag à l'en-tête
-        let isCursorInHeader = false;
-
-        // 1. ÉTAPE DE DÉTECTION (Avant le drag)
-        col.addEventListener('mousedown', function(e) {
-            if (!col.classList.contains('kb-col-draggable')) {
-                isCursorInHeader = false;
-                return;
+                item.addEventListener('dragend', function () {
+                    this.style.opacity = '1';
+                    draggedColumn = null;
+                    headerItems.forEach(c => (c.style.border = ""));
+                });
             }
-            if (e.target.closest('.kb-col-header')) {
-                isCursorInHeader = true;
-            } else {
-                isCursorInHeader = false;
-            }
-        });
 
-        // 2. DÉMARRAGE DU DRAG
-        col.addEventListener('dragstart', function(e) {
-            if (!col.classList.contains('kb-col-draggable') || !isCursorInHeader) {
+            // tout header item peut être une target
+            item.addEventListener('dragover', function (e) {
+                if (!draggedColumn) return;
                 e.preventDefault();
-                return;
-            }
-
-            draggedItem = this;
-            setTimeout(() => this.style.opacity = '0.4', 0);
-            e.dataTransfer.effectAllowed = 'move';
-        });
-
-        // Fin du drag (nettoyage)
-        col.addEventListener('dragend', function() {
-            this.style.opacity = '1';
-            draggedItem = null;
-            document.querySelectorAll('.kb-col').forEach(c => c.style.border = "");
-        });
-
-        // Au survol d'une zone de dépôt
-        col.addEventListener('dragover', function(e) {
-            if (!draggedItem) return;
-            // On interdit explicitement le drop sur la colonne backlog
-            if (this.dataset.col === 'backlog') return;
-            e.preventDefault(); // Nécessaire pour autoriser le drop
-        });
-
-        col.addEventListener('dragenter', function(e) {
-            if (!draggedItem) return;
-            if (this === draggedItem || this.dataset.col === 'backlog') return;
-            e.preventDefault();
-            // On ne met une bordure que si ce n'est pas l'élément qu'on traine
-            this.style.border = "4px dashed #666";
-        });
-
-        col.addEventListener('dragleave', function() {
-            if (this.dataset.col === 'backlog') return;
-            this.style.border = "";
-        });
-
-        // Le relachement (DROP)
-        col.addEventListener('drop', function(e) {
-            this.style.border = "";
-            if (!draggedItem) return;
-            e.preventDefault();
-
-            // Sécurité : ne rien faire si on drop sur soi-même
-            if (this === draggedItem) return;
-            if (this.dataset.col === 'backlog') return;
-            const mainCols = Array.from(board.querySelectorAll('.kb-main-col'));
-
-            const draggedIndex = mainCols.indexOf(draggedItem);
-            const targetIndex = mainCols.indexOf(this);
-
-            if (draggedIndex === -1 || targetIndex === -1) {
-                console.error("Impossible de trouver l'index : élément non reconnu comme colonne principale.");
-                return;
-            }
-
-            if (targetIndex === 0) {
-                alert("Impossible de placer une colonne avant la colonne de départ.");
-                return;
-            }
-
-            if (draggedIndex < targetIndex) {
-                this.after(draggedItem);
-            } else {
-                this.before(draggedItem);
-            }
-
-            saveNewOrder(draggedItem, draggedItem.getAttribute('data-id'), targetIndex);
-        });
-    });
-
-    function saveNewOrder(element, columnId, newIndex) {
-        const formData = new URLSearchParams();
-        formData.append('columnId', columnId);
-        formData.append('newIndex', newIndex);
-
-        // UTILISATION DE secureFetch
-        secureFetch('board/reorder-column', formData)
-            .then(data => {
-                // data peut être "OK" (texte) ou un objet
-                if (data === "OK" || data.success) {
-                    element.classList.add('flash-success');
-                    setTimeout(() => element.classList.remove('flash-success'), 1500);
-                } else {
-                    console.error("Erreur logique:", data);
-                    handleError(element);
-                }
-            })
-            .catch(err => {
-                console.error("ERREUR CRITIQUE DND:", err);
-                handleError(element);
+                return false;
             });
-    }
 
-    function handleError(element) {
-        // En cas d'erreur, on secoue l'élément en rouge
-        element.classList.add('flash-error');
-        setTimeout(() => {
-            element.classList.remove('flash-error');
-            alert("Erreur lors de la sauvegarde du déplacement. La page va être rechargée.");
-            location.reload();
-        }, 500);
-    }
+            item.addEventListener('dragenter', function () {
+                if (!draggedColumn || this === draggedColumn) return;
+                this.style.border = "2px dashed #666";
+            });
 
-    // ============================================================
-    // GESTION DU DRAG & DROP DES STORIES (ISSUES)
-    // ============================================================
+            item.addEventListener('dragleave', function () {
+                this.style.border = "";
+            });
 
-    const draggableIssues = document.querySelectorAll('.issue-draggable');
-    let draggedIssue = null;
-    let sourceContainer = null; // Pour stocker la colonne d'origine en cas de rollback
+            item.addEventListener('drop', function (e) {
+                if (!draggedColumn) return false;
 
-    // 1. Début du drag sur une story
-    draggableIssues.forEach(issue => {
-        issue.addEventListener('dragstart', function(e) {
-            draggedIssue = this;
-            sourceContainer = this.parentNode; // On mémorise le parent actuel
+                e.preventDefault();
+                e.stopPropagation();
+                this.style.border = "";
 
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', this.getAttribute('data-id'));
-            setTimeout(() => this.style.opacity = '0.5', 0);
-            e.stopPropagation(); // Empêche la colonne de bouger
-        });
+                if (draggedColumn === this) return false;
 
-        issue.addEventListener('dragend', function() {
-            this.style.opacity = '1';
-            draggedIssue = null;
-            sourceContainer = null;
-            document.querySelectorAll('.kb-col-body').forEach(b => b.style.background = "");
-        });
-    });
+                const parent = this.parentNode;
+                if (!parent) return false;
 
-    // 2. Zone de dépôt (Corps des colonnes)
-    const issueDropZones = document.querySelectorAll('.kb-col-body');
+                const BACKLOG = 'backlog';
+                const CLOSED = 'closed';
 
-    issueDropZones.forEach(zone => {
-        zone.addEventListener('dragover', function(e) {
-            e.preventDefault();
-        });
+                const targetKey = this.getAttribute('data-col');
 
-        zone.addEventListener('dragenter', function(e) {
-            e.preventDefault();
-            if (draggedIssue && this !== sourceContainer) {
-                this.style.background = "#eef0f3";
-            }
-        });
-
-        zone.addEventListener('dragleave', function() {
-            this.style.background = "";
-        });
-
-        zone.addEventListener('drop', function(e) {
-            this.style.background = "";
-            if (!draggedIssue) return;
-
-            e.preventDefault();
-            e.stopPropagation();
-
-            const targetCol = this.closest('[data-col]');
-            if (!targetCol) return;
-
-            // Optimistic UI : On déplace tout de suite
-            if (this === sourceContainer) return; // Même colonne, rien à faire
-
-            const issueId = draggedIssue.getAttribute('data-id');
-            const targetKey = targetCol.getAttribute('data-col');
-
-            // --- MODIFICATION ICI : Tri visuel immédiat ---
-            // Si on dépose dans Closed, on met en haut (le plus récent)
-            if (targetKey === 'closed') {
-                this.prepend(draggedIssue);
-            } else {
-                this.appendChild(draggedIssue);
-            }
-
-            refreshWipCounters();
-
-            // Sauvegarde AJAX avec gestion d'erreur et Rollback
-            saveIssueMove(draggedIssue, issueId, targetKey, sourceContainer, this);
-        });
-    });
-
-    function saveIssueMove(element, issueId, targetColumnKey, oldParent, newParent) {
-        const formData = new URLSearchParams();
-        formData.append('issueId', issueId);
-        formData.append('targetColumnKey', targetColumnKey);
-
-        secureFetch('board/move-issue-dnd', formData)
-            .then(data => {
-                if (data && data.success) {
-                    // SUCCÈS
-                    element.classList.add('flash-success');
-                    setTimeout(() => element.classList.remove('flash-success'), 1500);
+                // garde-fous : pas avant backlog, pas après closed
+                if (targetKey === BACKLOG) {
+                    parent.insertBefore(draggedColumn, this.nextSibling);
+                } else if (targetKey === CLOSED) {
+                    parent.insertBefore(draggedColumn, this);
                 } else {
-                    // ECHEC (Limite atteinte)
-                    console.warn("Move rejected:", data.message);
+                    const all = Array.from(parent.children);
+                    const iDragged = all.indexOf(draggedColumn);
+                    const iTarget = all.indexOf(this);
+                    if (iDragged < iTarget) parent.insertBefore(draggedColumn, this.nextSibling);
+                    else parent.insertBefore(draggedColumn, this);
+                }
 
-                    // 1. ROLLBACK : On remet la carte dans sa colonne d'origine
-                    if (oldParent) {
-                        oldParent.appendChild(element);
+                // clamp avant closed si présent
+                const closedEl = parent.querySelector(`.col-header-item[data-col='${CLOSED}']`);
+                if (closedEl && draggedColumn !== closedEl) {
+                    const all = Array.from(parent.children);
+                    if (all.indexOf(draggedColumn) > all.indexOf(closedEl)) {
+                        parent.insertBefore(draggedColumn, closedEl);
                     }
-                    refreshWipCounters();
-                    // 2. Feedback visuel rouge + Message
-                    element.classList.add('flash-error');
-                    setTimeout(() => element.classList.remove('flash-error'), 1000);
+                }
 
-                    // On met un petit timeout pour laisser le temps au navigateur d'afficher le flash rouge avant
-                    setTimeout(() => {
-                        alert("Erreur : " + (data.message || "Limite atteinte"));
-                    }, 100);
-                }
-            })
-            .catch(err => {
-                console.error("Network error:", err);
-                // En cas de crash réseau, on annule aussi par sécurité
-                if (oldParent) {
-                    oldParent.appendChild(element);
-                }
-                refreshWipCounters();
-                alert("Erreur technique : " + err.message);
+                // aligner toutes les swimlanes immédiatement
+                syncSwimlanesToHeader();
+
+                // persist serveur
+                const columnId = draggedColumn.getAttribute('data-column-id');
+                const newIndex = Array.from(parent.children).indexOf(draggedColumn);
+
+                postFormUrlEncoded('/board/reorder-column', {
+                    columnId: String(columnId),
+                    newIndex: String(newIndex)
+                })
+                    .then(async (resp) => {
+                        const txt = await resp.text().catch(() => '');
+                        if (!resp.ok || txt.trim() !== 'OK') {
+                            throw new Error(txt || 'Erreur serveur');
+                        }
+                    })
+                    .catch((err) => {
+                        console.error('Erreur reorder-column:', err);
+                        if (headerOrderBefore) {
+                            restoreHeaderOrderByIds(headerOrderBefore);
+                            syncSwimlanesToHeader();
+                        }
+                        alert('Erreur serveur : impossible de réordonner les colonnes.');
+                    });
+
+                return false;
             });
+        });
     }
+
+    // ------------------------------------------------------------
+    // 2) DRAG STORIES : WIP logique (double) + 2 compteurs + rollback
+    // ------------------------------------------------------------
+
+    let draggedCard = null;
+    let sourceInfo = null; // {zone,parentId,nextSibling,rowKey,colKey}
+
+    const cards = document.querySelectorAll('.issue-draggable');
+    const dropZones = document.querySelectorAll('.droppable');
+
+    function countLogicalCards(parentId) {
+        if (!parentId) return 0;
+        const zones = document.querySelectorAll(`.droppable[data-parent-id='${parentId}']`);
+        let total = 0;
+        zones.forEach(z => { total += z.querySelectorAll('.kb-card').length; });
+        return total;
+    }
+
+    function updateCountersUI(parentId) {
+        const counterSpan = document.getElementById('counter-span-' + parentId);
+        if (!counterSpan) return;
+        const total = countLogicalCards(parentId);
+        const limit = counterSpan.getAttribute('data-limit');
+        counterSpan.innerText = ` ${total} / ${limit}`;
+    }
+
+    function placeCard(zone, card, colKey) {
+        if (!zone || !card) return;
+        if (colKey === 'backlog' || colKey === 'closed') zone.prepend(card);
+        else zone.appendChild(card);
+    }
+
+    function revertCard() {
+        if (!draggedCard || !sourceInfo || !sourceInfo.zone) return;
+
+        if (sourceInfo.nextSibling && sourceInfo.nextSibling.parentNode === sourceInfo.zone) {
+            sourceInfo.zone.insertBefore(draggedCard, sourceInfo.nextSibling);
+        } else {
+            placeCard(sourceInfo.zone, draggedCard, sourceInfo.colKey);
+        }
+    }
+
+    function saveMove(issueId, row, col) {
+        return postFormUrlEncoded('/board/move-issue-dnd', {
+            issueId: String(issueId),
+            targetRowKey: String(row),
+            targetColumnKey: String(col)
+        }).then(async (resp) => {
+            let data = null;
+            try { data = await resp.json(); } catch { /* ignore */ }
+
+            if (!resp.ok || (data && data.success === false)) {
+                const msg = (data && data.message) ? data.message : 'Impossible de déplacer';
+                throw new Error(msg);
+            }
+            return true;
+        });
+    }
+
+    cards.forEach(card => {
+        card.addEventListener('dragstart', function (e) {
+            draggedCard = this;
+            e.dataTransfer.effectAllowed = 'move';
+
+            const parentZone = this.closest('.droppable');
+            sourceInfo = {
+                zone: parentZone,
+                parentId: parentZone ? parentZone.getAttribute('data-parent-id') : null,
+                nextSibling: this.nextElementSibling,
+                rowKey: parentZone ? parentZone.getAttribute('data-row') : null,
+                colKey: parentZone ? parentZone.getAttribute('data-col') : null
+            };
+
+            setTimeout(() => { this.style.display = 'none'; }, 0);
+        });
+
+        card.addEventListener('dragend', function () {
+            setTimeout(() => { this.style.display = 'block'; }, 0);
+            draggedCard = null;
+            sourceInfo = null;
+        });
+    });
+
+    dropZones.forEach(zone => {
+        zone.addEventListener('dragover', function (e) {
+            if (!draggedCard) return;
+            e.preventDefault();
+        });
+
+        zone.addEventListener('dragenter', function () {
+            if (!draggedCard) return;
+            this.style.backgroundColor = 'rgba(0,0,0,0.05)';
+        });
+
+        zone.addEventListener('dragleave', function () {
+            this.style.backgroundColor = '';
+        });
+
+        zone.addEventListener('drop', function (e) {
+            if (!draggedCard) return;
+
+            e.preventDefault();
+            this.style.backgroundColor = '';
+
+            const targetParentId = this.getAttribute('data-parent-id');
+            const limit = parseInt(this.getAttribute('data-limit') || '0', 10);
+
+            // WIP check logique : colonne double = parentId identique
+            if (!isNaN(limit) && limit > 0 && targetParentId) {
+                const total = countLogicalCards(targetParentId);
+                const alreadyInLogical = sourceInfo && sourceInfo.parentId && sourceInfo.parentId === targetParentId;
+                const afterMove = total + (alreadyInLogical ? 0 : 1);
+                if (afterMove > limit) {
+                    alert('⚠ Le nombre maximum de tâches pour cette colonne est atteint !');
+                    return;
+                }
+            }
+
+            const issueId = draggedCard.getAttribute('data-issue-id');
+            const newRow = this.getAttribute('data-row');
+            const newCol = this.getAttribute('data-col');
+
+            // move optimiste
+            placeCard(this, draggedCard, newCol);
+
+            // maj compteurs : source + target
+            if (sourceInfo && sourceInfo.parentId) updateCountersUI(sourceInfo.parentId);
+            if (targetParentId) updateCountersUI(targetParentId);
+
+            // persist serveur + rollback sans refresh
+            saveMove(issueId, newRow, newCol).catch(err => {
+                alert('Erreur serveur : ' + (err && err.message ? err.message : 'Impossible de déplacer'));
+                revertCard();
+                if (sourceInfo && sourceInfo.parentId) updateCountersUI(sourceInfo.parentId);
+                if (targetParentId) updateCountersUI(targetParentId);
+            });
+        });
+    });
 });
