@@ -28,7 +28,7 @@ public class IssueController {
     }
 
     // Helper pour récupérer le board (comme dans BoardController)
-    private Board getOrCreateDefaultBoard() {
+    protected Board getOrCreateDefaultBoard() {
         final String preferredName = "Default";
 
         Collection<Board> all = boardRepo.findAll();

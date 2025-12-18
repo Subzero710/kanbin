@@ -36,6 +36,20 @@ class IssueControllerTest {
         // Nouveau constructeur avec 2 arguments
         sut = new IssueController(issueRepo, boardRepo);
     }
+    static class IssueControllerForcedBoard extends IssueController {
+        private final Board forced;
+
+        IssueControllerForcedBoard(IssueRepo issueRepo, BoardRepo boardRepo, Board forced) {
+            super(issueRepo, boardRepo);
+            this.forced = forced;
+        }
+
+        @Override
+        protected Board getOrCreateDefaultBoard() {
+            return forced;
+        }
+    }
+
 
     @Test
     void listIssues_shouldReturnAllIssues() {
@@ -245,8 +259,243 @@ class IssueControllerTest {
         verify(issueRepo).persist(update);
     }
 
+    @Test
+    void getOrCreateDefaultBoard_shouldCreateNewBoard_whenRepoEmpty_andSaveReturnsNull() {
+        when(boardRepo.findAll()).thenReturn(Collections.emptyList());
+        // boardRepo.save(...) retourne null par défaut (mock) => couvre la branche saved == null
+        ModelAndView mv = sut.newIssue();
+        assertEquals("create-issue", mv.getViewName());
+        assertNotNull(mv.getModel().get("rows"));
 
+        // Capture du board créé pour vérifier colonnes + row système
+        org.mockito.ArgumentCaptor<Board> captor = org.mockito.ArgumentCaptor.forClass(Board.class);
+        verify(boardRepo).save(captor.capture());
+        Board created = captor.getValue();
 
+        assertEquals("Default", created.getName());
+        assertTrue(created.getColumns().stream().anyMatch(c -> "backlog".equals(c.getKey()) && c.isFixed()));
+        assertTrue(created.getColumns().stream().anyMatch(c -> "closed".equals(c.getKey()) && c.isFixed()));
+        assertFalse(created.getRows().isEmpty());
+        assertEquals("default", created.getRows().get(0).getKey());
+        assertTrue(created.getRows().get(0).isFixed());
+    }
 
+    @Test
+    void getOrCreateDefaultBoard_shouldCreateNewBoard_whenRepoEmpty_andSaveReturnsNonNull() {
+        when(boardRepo.findAll()).thenReturn(Collections.emptyList());
+        when(boardRepo.save(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0)); // saved != null
+        ModelAndView mv = sut.newIssue();
+
+        assertEquals("create-issue", mv.getViewName());
+        verify(boardRepo).save(org.mockito.ArgumentMatchers.any(Board.class));
+    }
+
+    @Test
+    void getOrCreateDefaultBoard_shouldPreferBoardNamedDefault_whenPresent() {
+        Board other = new Board("Other");
+        other.addRow(new Row("r1", "Row 1"));
+
+        Board def = new Board("Default");
+        def.addRow(new Row("rDef", "Default Row"));
+
+        when(boardRepo.findAll()).thenReturn(List.of(other, def));
+
+        ModelAndView mv = sut.newIssue();
+        List<Row> rows = (List<Row>) mv.getModel().get("rows");
+
+        assertEquals(1, rows.size());
+        assertEquals("rDef", rows.get(0).getKey());
+        verify(boardRepo, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void getOrCreateDefaultBoard_shouldFallbackToFirstBoard_whenNoDefaultPresent() {
+        Board first = new Board("First");
+        first.addRow(new Row("rFirst", "First Row"));
+
+        Board second = new Board("Second");
+        second.addRow(new Row("rSecond", "Second Row"));
+
+        when(boardRepo.findAll()).thenReturn(List.of(first, second));
+
+        ModelAndView mv = sut.newIssue();
+        List<Row> rows = (List<Row>) mv.getModel().get("rows");
+
+        assertEquals(1, rows.size());
+        assertEquals("rFirst", rows.get(0).getKey());
+        verify(boardRepo, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void getOrCreateDefaultBoard_shouldAddDefaultRow_andSave_whenExistingBoardHasNoRows() {
+        Board def = new Board("Default"); // rows vides => doit ajouter la row "default"
+        when(boardRepo.findAll()).thenReturn(List.of(def));
+        when(boardRepo.save(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
+        ModelAndView mv = sut.newIssue();
+        List<Row> rows = (List<Row>) mv.getModel().get("rows");
+
+        assertNotNull(rows);
+        assertFalse(rows.isEmpty());
+        assertEquals("default", rows.get(0).getKey());
+        verify(boardRepo).save(def);
+    }
+    @Test
+    void getOrCreateDefaultBoard_shouldCreateNewBoard_whenFindAllReturnsNull() {
+        when(boardRepo.findAll()).thenReturn(null);
+        when(boardRepo.save(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ModelAndView mv = sut.newIssue();
+        assertEquals("create-issue", mv.getViewName());
+        assertNotNull(mv.getModel().get("rows"));
+        verify(boardRepo).save(org.mockito.ArgumentMatchers.any(Board.class));
+    }
+
+    @Test
+    void getOrCreateDefaultBoard_shouldHandleNullRowsGetter_andSave() {
+        Board def = org.mockito.Mockito.spy(new Board("Default"));
+        org.mockito.Mockito.doReturn(null)
+                .doCallRealMethod()
+                .when(def).getRows();
+
+        when(boardRepo.findAll()).thenReturn(List.of(def));
+        when(boardRepo.save(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ModelAndView mv = sut.newIssue();
+        List<Row> rows = (List<Row>) mv.getModel().get("rows");
+
+        assertNotNull(rows);
+        assertFalse(rows.isEmpty());
+        assertEquals("default", rows.get(0).getKey());
+        verify(boardRepo).save(def);
+    }
+
+    @Test
+    void createIssue_ExistingId_ShouldRestoreOldColumnKey_WhenColumnKeyEmpty() {
+        long id = 123L;
+        Issue oldIssue = new Issue(id, "Old");
+        oldIssue.setColumnKey("old_col");
+        oldIssue.setRowKey("old_row");
+        when(issueRepo.find(id)).thenReturn(oldIssue);
+        when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
+
+        Issue formIssue = new Issue();
+        formIssue.setId(id);
+        formIssue.setColumnKey("");
+        formIssue.setRowKey("row_new");
+
+        sut.createIssue(formIssue, redirectAttributes);
+
+        assertEquals("old_col", formIssue.getColumnKey());
+        assertEquals("row_new", formIssue.getRowKey());
+        verify(issueRepo).persist(formIssue);
+    }
+
+    @Test
+    void createIssue_ExistingId_ShouldRestoreOldRowKey_WhenRowKeyNull() {
+        long id = 124L;
+        Issue oldIssue = new Issue(id, "Old");
+        oldIssue.setColumnKey("old_col");
+        oldIssue.setRowKey("old_row");
+        when(issueRepo.find(id)).thenReturn(oldIssue);
+        when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
+
+        Issue formIssue = new Issue();
+        formIssue.setId(id);
+        formIssue.setColumnKey("col_new");
+        formIssue.setRowKey(null);
+
+        sut.createIssue(formIssue, redirectAttributes);
+
+        assertEquals("col_new", formIssue.getColumnKey());
+        assertEquals("old_row", formIssue.getRowKey());
+        verify(issueRepo).persist(formIssue);
+    }
+    @Test
+    void newIssue_whenBoardNull_shouldNotAddRows() {
+        IssueController ctrl = new IssueControllerForcedBoard(issueRepo, boardRepo, null);
+
+        ModelAndView mv = ctrl.newIssue();
+
+        assertEquals("create-issue", mv.getViewName());
+        assertTrue(mv.getModel().get("issue") instanceof Issue);
+        assertFalse(mv.getModel().containsKey("rows")); // couvre if (board != null) -> false
+    }
+
+    @Test
+    void editIssue_whenBoardNull_shouldNotAddRows() {
+        long id = 1L;
+        when(issueRepo.find(id)).thenReturn(new Issue(id, "To Edit"));
+
+        IssueController ctrl = new IssueControllerForcedBoard(issueRepo, boardRepo, null);
+
+        ModelAndView mv = ctrl.editIssue(id);
+
+        assertEquals("edit-issue", mv.getViewName());
+        assertFalse(mv.getModel().containsKey("rows")); // couvre if (board != null) -> false
+    }
+
+    @Test
+    void createIssue_whenBoardNull_andRowKeyMissing_shouldNotSetDefaultRow() {
+        IssueController ctrl = new IssueControllerForcedBoard(issueRepo, boardRepo, null);
+
+        Issue issue = new Issue();
+        issue.setTitle("X");
+        issue.setRowKey(null);
+
+        ctrl.createIssue(issue, redirectAttributes);
+
+        assertNull(issue.getRowKey()); // couvre (board != null && ...) -> false via board == null
+        verify(issueRepo).persist(issue);
+    }
+
+    @Test
+    void createIssue_whenRowKeyEmpty_shouldAssignDefaultRow() {
+        Board board = new Board("Default");
+        board.addRow(new Row("row_def", "Default Row"));
+
+        IssueController ctrl = new IssueControllerForcedBoard(issueRepo, boardRepo, board);
+
+        Issue issue = new Issue();
+        issue.setTitle("X");
+        issue.setRowKey(""); // force (rowKey == null) false, (isEmpty) true
+
+        ctrl.createIssue(issue, redirectAttributes);
+
+        assertEquals("row_def", issue.getRowKey()); // couvre issue.getRowKey().isEmpty()
+        verify(issueRepo).persist(issue);
+    }
+
+    @Test
+    void createIssue_whenBoardRowsEmpty_shouldNotSetDefaultRow() {
+        Board board = new Board("Default"); // getRows() non-null mais vide
+
+        IssueController ctrl = new IssueControllerForcedBoard(issueRepo, boardRepo, board);
+
+        Issue issue = new Issue();
+        issue.setTitle("X");
+        issue.setRowKey(null);
+
+        ctrl.createIssue(issue, redirectAttributes);
+
+        assertNull(issue.getRowKey()); // couvre board.getRows()!=null true, !isEmpty false
+        verify(issueRepo).persist(issue);
+    }
+
+    @Test
+    void createIssue_whenBoardRowsNull_shouldNotSetDefaultRow() {
+        Board board = spy(new Board("Default"));
+        doReturn(null).when(board).getRows(); // force board.getRows() == null
+
+        IssueController ctrl = new IssueControllerForcedBoard(issueRepo, boardRepo, board);
+
+        Issue issue = new Issue();
+        issue.setTitle("X");
+        issue.setRowKey(null);
+
+        ctrl.createIssue(issue, redirectAttributes);
+
+        assertNull(issue.getRowKey()); // couvre board.getRows()==null => inner if false (short-circuit)
+        verify(issueRepo).persist(issue);
+    }
 
 }
