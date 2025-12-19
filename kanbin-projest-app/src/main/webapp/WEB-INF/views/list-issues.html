@@ -37,7 +37,7 @@
             <td th:text="${issue.title}">Titre de l'Issue</td>
             <td style="max-width: 250px;"> <!-- Column Detail -->
                 <div class="story-detail-truncate">
-                    <span th:text="${issue.detail}">Détail de la story...</span>
+                    <span th:text="${#strings.abbreviate(issue.detail, 50)}">Détail de la story...</span>
                 </div>
             </td>
             <td>
