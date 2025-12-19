@@ -10,20 +10,20 @@
 
 <nav class="kb-navbar">
     <div class="kb-brand">Kanbin</div>
-
     <form th:action="@{/board/add-column}" method="post" class="inline-form">
-        <input type="text" name="title" class="form-control" placeholder="Nom colonne..." required>
+        <input type="text" name="title" class="form-control" placeholder="Titre court (Max 30 car.)"
+               maxlength="30" required>
         <select name="type" class="form-control" style="width: 90px;">
             <option value="simple">Simple</option>
             <option value="double">Double</option>
         </select>
         <input type="submit" value="Ajouter Colonne" class="btn btn-col">
     </form>
-
     <a th:href="@{/issues/new}" class="btn btn-story" style="margin-left: 15px;">+ Ajouter Story</a>
-
     <form th:action="@{/board/add-row}" method="post" class="inline-form" style="margin-left: 15px;">
-        <input type="text" name="title" class="form-control" placeholder="Nom Swimlane..." required>
+        <input type="text" name="title" class="form-control"
+               placeholder="Nom Swimlane (Max 30 car.)"
+               maxlength="30" required>
         <input type="submit" value="Ajouter Ligne" class="btn btn-row">
     </form>
 
