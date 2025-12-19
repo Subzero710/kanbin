@@ -271,8 +271,8 @@ class IssueControllerTest {
         assertTrue(created.getColumns().stream().anyMatch(c -> "backlog".equals(c.getKey()) && c.isFixed()));
         assertTrue(created.getColumns().stream().anyMatch(c -> "closed".equals(c.getKey()) && c.isFixed()));
         assertFalse(created.getRows().isEmpty());
-        assertEquals("default", created.getRows().get(0).getKey());
-        assertTrue(created.getRows().get(0).isFixed());
+        assertEquals("default", created.getRows().getFirst().getKey());
+        assertTrue(created.getRows().getFirst().isFixed());
     }
 
     @Test
@@ -299,7 +299,7 @@ class IssueControllerTest {
         List<Row> rows = (List<Row>) mv.getModel().get("rows");
 
         assertEquals(1, rows.size());
-        assertEquals("rDef", rows.get(0).getKey());
+        assertEquals("rDef", rows.getFirst().getKey());
         verify(boardRepo, never()).save(org.mockito.ArgumentMatchers.any());
     }
 
@@ -317,7 +317,7 @@ class IssueControllerTest {
         List<Row> rows = (List<Row>) mv.getModel().get("rows");
 
         assertEquals(1, rows.size());
-        assertEquals("rFirst", rows.get(0).getKey());
+        assertEquals("rFirst", rows.getFirst().getKey());
         verify(boardRepo, never()).save(org.mockito.ArgumentMatchers.any());
     }
 
@@ -332,8 +332,8 @@ class IssueControllerTest {
 
         assertNotNull(rows);
         assertFalse(rows.isEmpty());
-        assertEquals("default", rows.get(0).getKey());
-        assertTrue(rows.get(0).isFixed());
+        assertEquals("default", rows.getFirst().getKey());
+        assertTrue(rows.getFirst().isFixed());
         verify(boardRepo).save(def);
     }
     @Test
@@ -362,7 +362,7 @@ class IssueControllerTest {
 
         assertNotNull(rows);
         assertFalse(rows.isEmpty());
-        assertEquals("default", rows.get(0).getKey());
+        assertEquals("default", rows.getFirst().getKey());
         verify(boardRepo).save(def);
     }
 
@@ -508,4 +508,90 @@ class IssueControllerTest {
         verify(issueRepo).persist(issue);
     }
 
+    @Test
+    void updateIssue_shouldSetClosedAt_whenMovingIntoClosed() {
+        long id = 1L;
+        Issue existing = new Issue(id, "Tâche");
+        existing.setColumnKey("todo");
+        existing.setClosedAt(null);
+        when(issueRepo.find(id)).thenReturn(existing);
+
+        Issue update = new Issue();
+        update.setColumnKey("closed");
+
+        sut.updateIssue(id, update, redirectAttributes);
+
+        assertNotNull(update.getClosedAt(), "La date de clôture doit être générée");
+        verify(issueRepo).persist(update);
+    }
+
+    @Test
+    void updateIssue_shouldClearClosedAt_whenMovingOutOfClosed() {
+        long id = 2L;
+        Issue existing = new Issue(id, "Tâche");
+        existing.setColumnKey("closed");
+        existing.setClosedAt(LocalDateTime.now());
+        when(issueRepo.find(id)).thenReturn(existing);
+
+        Issue update = new Issue();
+        update.setColumnKey("todo");
+
+        sut.updateIssue(id, update, redirectAttributes);
+
+        assertNull(update.getClosedAt(), "La date de clôture doit être supprimée");
+        verify(issueRepo).persist(update);
+    }
+
+    @Test
+    void updateIssue_UnknownId_ShouldSetClosedAt_IfInClosedColumn() {
+        long unknownId = 999L;
+        when(issueRepo.find(unknownId)).thenReturn(null);
+
+        Issue update = new Issue();
+        update.setColumnKey("closed");
+
+        sut.updateIssue(unknownId, update, redirectAttributes);
+
+        assertNotNull(update.getClosedAt(), "La date doit être générée même pour un ID inconnu");
+        verify(issueRepo).persist(update);
+    }
+
+    @Test
+    void updateIssue_shouldSetClosedAt_whenMovingIntoClosed_CoverTransition() {
+        long id = 1L;
+        Issue existing = new Issue(id, "Tâche");
+        existing.setColumnKey("todo");
+        when(issueRepo.find(id)).thenReturn(existing);
+
+        Issue update = new Issue();
+        update.setColumnKey("closed");
+
+        sut.updateIssue(id, update, redirectAttributes);
+        assertNotNull(update.getClosedAt());
+    }
+
+    @Test
+    void updateIssue_shouldClearClosedAt_whenMovingOutOfClosed_CoverTransition() {
+        long id = 2L;
+        Issue existing = new Issue(id, "Tâche");
+        existing.setColumnKey("closed");
+        existing.setClosedAt(LocalDateTime.now());
+        when(issueRepo.find(id)).thenReturn(existing);
+
+        Issue update = new Issue();
+        update.setColumnKey("todo");
+
+        sut.updateIssue(id, update, redirectAttributes);
+        assertNull(update.getClosedAt());
+    }
+
+    @Test
+    void createIssue_DirectlyInClosed_ShouldSetDate_CoverBranch() {
+        when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
+        Issue issue = new Issue();
+        issue.setColumnKey("closed");
+
+        sut.createIssue(issue, redirectAttributes);
+        assertNotNull(issue.getClosedAt());
+    }
 }

@@ -1,4 +1,5 @@
 package fr.uha.ensisa.gl.kanbin.controller;
+
 import fr.uha.ensisa.gl.kanbin.projest.model.Column;
 import fr.uha.ensisa.gl.kanbin.projest.model.Row;
 import fr.uha.ensisa.gl.kanbin.projest.model.Board;
@@ -27,7 +28,6 @@ public class IssueController {
         this.boardRepo = boardRepo;
     }
 
-    // Helper pour récupérer le board (comme dans BoardController)
     protected Board getOrCreateDefaultBoard() {
         final String preferredName = "Default";
 
@@ -83,7 +83,6 @@ public class IssueController {
         ModelAndView modelAndView = new ModelAndView("create-issue");
         modelAndView.addObject("issue", new Issue());
 
-        // On envoie la liste des lignes pour le selecteur dans la vue (si besoin)
         if (board != null) {
             modelAndView.addObject("rows", board.getRows());
         }
@@ -94,7 +93,7 @@ public class IssueController {
     public String createIssue(Issue issue, RedirectAttributes redirectAttributes) {
         Board board = getOrCreateDefaultBoard();
 
-        // 1) Si on édite une issue existante, restaurer d'abord ses clés
+        // 1. Restaurer clés existantes si ID fourni (Upsert)
         if (issue.getId() > 0) {
             Issue oldIssue = issueRepo.find(issue.getId());
             if (oldIssue != null) {
@@ -107,11 +106,16 @@ public class IssueController {
             }
         }
 
-        // 2) Ensuite seulement appliquer la row par défaut si toujours vide
+        // 2. Assigner Row par défaut si nécessaire
         if (board != null && (issue.getRowKey() == null || issue.getRowKey().isEmpty())) {
             if (board.getRows() != null && !board.getRows().isEmpty()) {
-                issue.setRowKey(board.getRows().get(0).getKey());
+                issue.setRowKey(board.getRows().getFirst().getKey());
             }
+        }
+
+        // 3. Initialiser la date si création directe dans Closed
+        if ("closed".equals(issue.getColumnKey())) {
+            issue.setClosedAt(java.time.LocalDateTime.now());
         }
 
         issueRepo.persist(issue);
@@ -139,17 +143,36 @@ public class IssueController {
     @PostMapping("/issues/{id}")
     public String updateIssue(@PathVariable long id, Issue issue, RedirectAttributes redirectAttributes) {
         Issue existing = issueRepo.find(id);
+
         if (existing != null) {
-            // On préserve la colonne si non modifiée
-            if (issue.getColumnKey() == null) {
+            // 1. Fusion (Merge) : Restauration des clés si le formulaire ne les envoie pas
+            if (issue.getColumnKey() == null || issue.getColumnKey().isEmpty()) {
                 issue.setColumnKey(existing.getColumnKey());
             }
-
             if (issue.getRowKey() == null || issue.getRowKey().isEmpty()) {
                 issue.setRowKey(existing.getRowKey());
             }
 
-            issue.setClosedAt(existing.getClosedAt());
+            // 2. Gestion intelligente de la date (Machine à états)
+            boolean wasClosed = "closed".equals(existing.getColumnKey());
+            boolean isNowClosed = "closed".equals(issue.getColumnKey());
+
+            if (isNowClosed && !wasClosed) {
+                // Transition -> Entrée dans Closed : on date
+                issue.setClosedAt(java.time.LocalDateTime.now());
+            } else if (!isNowClosed && wasClosed) {
+                // Transition -> Sortie de Closed : on efface la date
+                issue.setClosedAt(null);
+            } else {
+                // Pas de transition (reste ouvert OU reste fermé) : on garde la date existante
+                // Cela permet de préserver la date originale lors d'une simple modif de titre
+                issue.setClosedAt(existing.getClosedAt());
+            }
+        } else {
+            // Cas rare (Upsert avec ID inconnu) : on applique une règle simple
+            if ("closed".equals(issue.getColumnKey()) && issue.getClosedAt() == null) {
+                issue.setClosedAt(java.time.LocalDateTime.now());
+            }
         }
 
         issueRepo.persist(issue);
@@ -157,9 +180,9 @@ public class IssueController {
         return "redirect:/board";
     }
 
-    @PostMapping("/issues/{id}/delete") // L'URL doit correspondre à ce que le test attend
+    @PostMapping("/issues/{id}/delete")
     public String deleteIssue(@PathVariable long id, RedirectAttributes redirectAttributes) {
-        fr.uha.ensisa.gl.kanbin.projest.model.Issue issue = issueRepo.find(id);
+        Issue issue = issueRepo.find(id);
         if (issue != null) {
             issueRepo.remove(id);
             redirectAttributes.addFlashAttribute("message", "Story supprimée avec succès");
