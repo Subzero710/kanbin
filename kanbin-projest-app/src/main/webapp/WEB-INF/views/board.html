@@ -10,7 +10,8 @@
 
 <nav class="kb-navbar">
     <div class="kb-brand">Kanbin</div>
-    <form action="/board/add-column" method="post" class="inline-form">
+
+    <form th:action="@{/board/add-column}" method="post" class="inline-form">
         <input type="text" name="title" class="form-control" placeholder="Nom colonne..." required>
         <select name="type" class="form-control" style="width: 90px;">
             <option value="simple">Simple</option>
@@ -18,12 +19,15 @@
         </select>
         <input type="submit" value="Ajouter Colonne" class="btn btn-col">
     </form>
-    <a href="/issues/new" class="btn btn-story" style="margin-left: 15px;">+ Ajouter Story</a>
-    <form action="/board/add-row" method="post" class="inline-form" style="margin-left: 15px;">
+
+    <a th:href="@{/issues/new}" class="btn btn-story" style="margin-left: 15px;">+ Ajouter Story</a>
+
+    <form th:action="@{/board/add-row}" method="post" class="inline-form" style="margin-left: 15px;">
         <input type="text" name="title" class="form-control" placeholder="Nom Swimlane..." required>
         <input type="submit" value="Ajouter Ligne" class="btn btn-row">
     </form>
-    <a href="/issues" id="btn-to-issues" class="btn btn-manage" style="margin-left: auto;">Gérer les Stories</a>
+
+    <a th:href="@{/issues}" id="btn-to-issues" class="btn btn-manage" style="margin-left: auto;">Gérer les Stories</a>
 </nav>
 
 <div th:if="${message}" class="alert alert-success" th:text="${message}"></div>
