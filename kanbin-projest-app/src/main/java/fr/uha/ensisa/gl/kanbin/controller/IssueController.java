@@ -110,7 +110,7 @@ public class IssueController {
         // 2) Ensuite seulement appliquer la row par défaut si toujours vide
         if (board != null && (issue.getRowKey() == null || issue.getRowKey().isEmpty())) {
             if (board.getRows() != null && !board.getRows().isEmpty()) {
-                issue.setRowKey(board.getRows().get(0).getKey());
+                issue.setRowKey(board.getRows().getFirst().getKey());
             }
         }
 
@@ -139,19 +139,41 @@ public class IssueController {
     @PostMapping("/issues/{id}")
     public String updateIssue(@PathVariable long id, Issue issue, RedirectAttributes redirectAttributes) {
         Issue existing = issueRepo.find(id);
+
+        // 1. PHASE DE FUSION (Merge)
+        // On restaure les données manquantes dans l'objet 'issue' depuis la base
         if (existing != null) {
-            // On préserve la colonne si non modifiée
-            if (issue.getColumnKey() == null) {
+            if (issue.getColumnKey() == null || issue.getColumnKey().isEmpty()) {
                 issue.setColumnKey(existing.getColumnKey());
             }
-
             if (issue.getRowKey() == null || issue.getRowKey().isEmpty()) {
                 issue.setRowKey(existing.getRowKey());
             }
+            // Important pour le test : on préserve la date existante par défaut
+            if (issue.getClosedAt() == null) {
+                issue.setClosedAt(existing.getClosedAt());
+            }
 
-            issue.setClosedAt(existing.getClosedAt());
+            // 2. LOGIQUE DE TRANSITION D'ÉTAT
+            boolean wasClosed = "closed".equals(existing.getColumnKey());
+            boolean isClosed = "closed".equals(issue.getColumnKey());
+
+            if (isClosed && !wasClosed) {
+                // Transition : Entrée dans la colonne Closed
+                issue.setClosedAt(java.time.LocalDateTime.now());
+            } else if (!isClosed && wasClosed) {
+                // Transition : Sortie de la colonne Closed
+                issue.setClosedAt(null);
+            }
+            // Sinon : on ne touche pas à la date (on préserve l'existant)
+        } else {
+            // Cas d'un Upsert (ID inconnu) : on applique une règle simple
+            if ("closed".equals(issue.getColumnKey()) && issue.getClosedAt() == null) {
+                issue.setClosedAt(java.time.LocalDateTime.now());
+            }
         }
 
+        // 3. PERSISTANCE
         issueRepo.persist(issue);
         redirectAttributes.addFlashAttribute("message", "Story mise à jour");
         return "redirect:/board";

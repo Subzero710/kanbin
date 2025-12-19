@@ -2,9 +2,22 @@ document.addEventListener("DOMContentLoaded", function () {
     console.log("Kanbin Project JS Loaded");
 
     function postFormUrlEncoded(url, params) {
+        // 1. Récupération des tokens de sécurité depuis le HTML
+        const metaToken = document.querySelector('meta[name="_csrf"]');
+        const metaHeader = document.querySelector('meta[name="_csrf_header"]');
+
+        const headers = {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        };
+
+        // 2. Injection du token dans les headers si les balises existent
+        if (metaToken && metaHeader) {
+            headers[metaHeader.getAttribute('content')] = metaToken.getAttribute('content');
+        }
+
         return fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: headers, // Utilisation des headers sécurisés
             body: new URLSearchParams(params).toString()
         });
     }
