@@ -261,37 +261,56 @@ body {
     margin-right: 8px;
     display: block;
 
-.swimlane-title-text { line-height: 1.2; }
-/* Fallback Bootstrap-like badge (si Bootstrap n'est pas inclus) */
-.badge{
-    display: inline-block;
-    padding: .35em .65em;
-    font-size: .75em;
-    font-weight: 600;
-    line-height: 1;
-    border-radius: .375rem;
-    vertical-align: middle;
+    .swimlane-title-text {
+        line-height: 1.2;
+    }
+
+    /* Fallback Bootstrap-like badge (si Bootstrap n'est pas inclus) */
+
+    .badge {
+        display: inline-block;
+        padding: .35em .65em;
+        font-size: .75em;
+        font-weight: 600;
+        line-height: 1;
+        border-radius: .375rem;
+        vertical-align: middle;
+    }
+
+    .bg-secondary {
+        background-color: #6c757d !important;
+        color: #fff !important;
+    }
+
+    .ms-2 {
+        margin-left: .5rem !important;
+    }
+
+    .kb-col-header {
+        padding: .6rem .8rem;
+        border-bottom: 1px solid var(--border-color);
+        font-weight: 600;
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+        hyphens: auto;
+    }
+
+    /* évite que .col-header-top impose sa typo/couleur au badge */
+
+    .col-header-top {
+        font-weight: inherit;
+        color: inherit;
+    }
+
+    .story-detail-truncate {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-height: none;
+        display: block;
+        -webkit-box-orient: unset;
+        word-wrap: normal;
+        overflow-wrap: normal;
+
+    }
 }
-
-.bg-secondary{
-    background-color: #6c757d !important;
-    color: #fff !important;
-}
-
-.ms-2{ margin-left: .5rem !important; }
-
-.kb-col-header{
-    padding: .6rem .8rem;
-    border-bottom: 1px solid var(--border-color);
-    font-weight: 600;
-    overflow-wrap: break-word;
-    word-wrap: break-word;
-    hyphens: auto;
-}
-
-/* évite que .col-header-top impose sa typo/couleur au badge */
-.col-header-top{
-    font-weight: inherit;
-    color: inherit;
-}
-
