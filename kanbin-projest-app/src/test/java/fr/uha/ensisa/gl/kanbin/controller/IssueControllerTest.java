@@ -556,4 +556,42 @@ class IssueControllerTest {
         verify(issueRepo).persist(update);
     }
 
+    @Test
+    void updateIssue_shouldSetClosedAt_whenMovingIntoClosed_CoverTransition() {
+        long id = 1L;
+        Issue existing = new Issue(id, "Tâche");
+        existing.setColumnKey("todo");
+        when(issueRepo.find(id)).thenReturn(existing);
+
+        Issue update = new Issue();
+        update.setColumnKey("closed");
+
+        sut.updateIssue(id, update, redirectAttributes);
+        assertNotNull(update.getClosedAt());
+    }
+
+    @Test
+    void updateIssue_shouldClearClosedAt_whenMovingOutOfClosed_CoverTransition() {
+        long id = 2L;
+        Issue existing = new Issue(id, "Tâche");
+        existing.setColumnKey("closed");
+        existing.setClosedAt(LocalDateTime.now());
+        when(issueRepo.find(id)).thenReturn(existing);
+
+        Issue update = new Issue();
+        update.setColumnKey("todo");
+
+        sut.updateIssue(id, update, redirectAttributes);
+        assertNull(update.getClosedAt());
+    }
+
+    @Test
+    void createIssue_DirectlyInClosed_ShouldSetDate_CoverBranch() {
+        when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
+        Issue issue = new Issue();
+        issue.setColumnKey("closed");
+
+        sut.createIssue(issue, redirectAttributes);
+        assertNotNull(issue.getClosedAt());
+    }
 }
