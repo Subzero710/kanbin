@@ -1,295 +1,597 @@
 package fr.uha.ensisa.gl.kanbin.controller;
 
+import fr.uha.ensisa.gl.kanbin.projest.model.Board;
 import fr.uha.ensisa.gl.kanbin.projest.model.Issue;
+import fr.uha.ensisa.gl.kanbin.projest.repo.BoardRepo;
 import fr.uha.ensisa.gl.kanbin.projest.repo.IssueRepo;
+import fr.uha.ensisa.gl.kanbin.projest.model.Row;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import java.time.LocalDateTime;
 
-import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class IssueControllerTest {
+class IssueControllerTest {
 
     @Mock
     private IssueRepo issueRepo;
-
+    @Mock
+    private BoardRepo boardRepo;
     @Mock
     private RedirectAttributes redirectAttributes;
 
-    @InjectMocks
     private IssueController sut;
 
+    @BeforeEach
+    void setUp() {
+        sut = new IssueController(issueRepo, boardRepo);
+    }
+    static class IssueControllerForcedBoard extends IssueController {
+        private final Board forced;
+
+        IssueControllerForcedBoard(IssueRepo issueRepo, BoardRepo boardRepo, Board forced) {
+            super(issueRepo, boardRepo);
+            this.forced = forced;
+        }
+
+        @Override
+        protected Board getOrCreateDefaultBoard() {
+            return forced;
+        }
+    }
+
+
     @Test
-    void listIssues_shouldReturnListViewWithIssues() {
-        when(issueRepo.findAll()).thenReturn(List.of(
-                new Issue(1L, "Story A"),
-                new Issue(2L, "Story B")
-        ));
+    void listIssues_shouldReturnAllIssues() {
+        when(issueRepo.findAll()).thenReturn(List.of(new Issue(1, "A"), new Issue(2, "B")));
         ModelAndView mv = sut.listIssues();
         assertEquals("list-issues", mv.getViewName());
-        @SuppressWarnings("unchecked")
-        Collection<Issue> issues = (Collection<Issue>) mv.getModel().get("issues");
-        assertEquals(2, issues.size());
-        verify(issueRepo).findAll();
+        assertNotNull(mv.getModel().get("issues"));
     }
 
     @Test
-    void createIssue_withExistingIdAndNullKey_shouldRestoreOldKey() {
-        long id = 50L;
-        String originalKey = "col-doing";
-        Issue oldIssue = new Issue(id, "Old Story");
-        oldIssue.setColumnKey(originalKey);
-        Issue newVersion = new Issue(id, "Updated Story");
-        newVersion.setColumnKey(null);
-        when(issueRepo.find(id)).thenReturn(oldIssue);
-        sut.createIssue(newVersion, redirectAttributes);
-        assertEquals(originalKey, newVersion.getColumnKey());
-        verify(issueRepo).persist(newVersion);
-    }
+    void newIssue_shouldReturnFormWithRows() {
+        when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
 
-    @Test
-    void createIssue_withExistingIdAndNewKey_shouldKeepNewKey() {
-        long id = 51L;
-        Issue oldIssue = new Issue(id, "Old Story");
-        oldIssue.setColumnKey("col-todo");
-        Issue newVersion = new Issue(id, "Moved Story");
-        newVersion.setColumnKey("col-done");
-        when(issueRepo.find(id)).thenReturn(oldIssue);
-        sut.createIssue(newVersion, redirectAttributes);
-        assertEquals("col-done", newVersion.getColumnKey());
-        verify(issueRepo).persist(newVersion);
-    }
-
-    @Test
-    void createIssue_whenNew_shouldAddCreationMessageAndRedirectToBoard() {
-        Issue newIssue = new Issue();
-        newIssue.setId(0L);
-        newIssue.setTitle("Ma Nouvelle Story");
-
-        // On récupère le résultat
-        String viewName = sut.createIssue(newIssue, redirectAttributes);
-
-        verify(redirectAttributes).addFlashAttribute(
-                eq("message"),
-                eq("La nouvelle story a été ajoutée.")
-        );
-        // On vérifie la nouvelle destination
-        assertEquals("redirect:/board", viewName);
-    }
-
-    // Le test pour la limite de 30 caractères
-    @Test
-    void createIssue_withLongTitle_shouldTruncateAndPersist() {
-        Issue longIssue = new Issue();
-        longIssue.setTitle("Un titre vraiment super long qui fait plus de trente caractères");
-
-        sut.createIssue(longIssue, redirectAttributes);
-
-        ArgumentCaptor<Issue> captor = ArgumentCaptor.forClass(Issue.class);
-        verify(issueRepo).persist(captor.capture());
-
-        Issue capturedIssue = captor.getValue();
-        assertEquals(30, capturedIssue.getTitle().length());
-    }
-
-    @Test
-    void deleteIssue_shouldRemoveAndRedirect() {
-        long idToDelete = 123L;
-        String viewName = sut.deleteIssue(idToDelete, redirectAttributes);
-        verify(issueRepo).remove(idToDelete);
-        verify(redirectAttributes).addFlashAttribute(eq("message"), anyString());
-        assertEquals("redirect:/issues", viewName);
-    }
-
-    @Test
-    void newIssue_shouldShowCreateForm() {
         ModelAndView mv = sut.newIssue();
         assertEquals("create-issue", mv.getViewName());
-        assertTrue(mv.getModel().containsKey("issue"));
+        assertTrue(mv.getModel().get("issue") instanceof Issue);
+        assertNotNull(mv.getModel().get("rows"));
     }
 
     @Test
-    void editIssueForm_shouldShowEditView_whenIssueExists() {
-        long id = 5L;
-        Issue existing = new Issue(id, "Old Title");
-        when(issueRepo.find(id)).thenReturn(existing);
-        ModelAndView mv = sut.editIssueForm(id);
+    void createIssue_shouldPersistAndRedirect() {
+        Issue issue = new Issue();
+        issue.setTitle("Test");
+        when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
+
+        String view = sut.createIssue(issue, redirectAttributes);
+
+        verify(issueRepo).persist(issue);
+        assertEquals("redirect:/board", view);
+    }
+
+    @Test
+    void editIssue_whenFound_shouldReturnForm() {
+        long id = 1L;
+        when(issueRepo.find(id)).thenReturn(new Issue(id, "To Edit"));
+        when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
+        ModelAndView mv = sut.editIssue(id);
+
         assertEquals("edit-issue", mv.getViewName());
-        assertEquals(existing, mv.getModel().get("issue"));
+        assertEquals(id, ((Issue) mv.getModel().get("issue")).getId());
     }
 
     @Test
-    void editIssueForm_shouldRedirect_whenIssueDoesNotExist() {
+    void editIssue_whenNotFound_shouldRedirect() {
         long id = 99L;
         when(issueRepo.find(id)).thenReturn(null);
-        ModelAndView mv = sut.editIssueForm(id);
+
+        ModelAndView mv = sut.editIssue(id);
+
         assertEquals("redirect:/issues", mv.getViewName());
     }
 
     @Test
     void updateIssue_shouldUpdateAndRedirect() {
         long id = 10L;
-        Issue existing = new Issue(id, "Old Title");
+        LocalDateTime closedDate = LocalDateTime.now();
+        Issue existing = new Issue(id, "Old");
         existing.setColumnKey("todo");
+        existing.setRowKey("urgent");
+        existing.setClosedAt(closedDate);
+
         when(issueRepo.find(id)).thenReturn(existing);
-        Issue updatedData = new Issue();
-        updatedData.setTitle("New Title");
-        String viewName = sut.updateIssue(id, updatedData, redirectAttributes);
-        assertEquals("redirect:/board", viewName);
-        verify(issueRepo).persist(updatedData);
-        assertEquals(id, updatedData.getId());
-        assertEquals("todo", updatedData.getColumnKey());
-        verify(redirectAttributes).addFlashAttribute(eq("message"), anyString());
-    }
 
-    @Test
-    void updateIssue_shouldPreserveColumnKey_whenUpdating() {
-        long id = 15L;
-        Issue existing = new Issue(id, "Title", "done");
-        existing.setDetail("Detail");
-        when(issueRepo.find(id)).thenReturn(existing);
-        Issue updatedData = new Issue();
-        updatedData.setTitle("Updated Title");
-        updatedData.setDetail("Updated Detail");
-        sut.updateIssue(id, updatedData, redirectAttributes);
-        verify(issueRepo).persist(any(Issue.class));
-        assertEquals("done", updatedData.getColumnKey());
-    }
+        Issue update = new Issue();
+        update.setTitle("New");
 
-    @Test
-    void updateIssue_whenIssueNotFound_shouldStillPersist_butWithoutOldKeyLogic() {
+        String view = sut.updateIssue(id, update, redirectAttributes);
 
-        long id = 999L;
-        Issue issue = new Issue(id, "Ghost Issue");
-        issue.setColumnKey("new-key");
-
-        when(issueRepo.find(id)).thenReturn(null);
-
-        String view = sut.updateIssue(id, issue, redirectAttributes);
-
+        verify(issueRepo).persist(update);
+        assertEquals("todo", update.getColumnKey());
+        assertEquals("urgent", update.getRowKey());
+        assertEquals(closedDate, update.getClosedAt());
         assertEquals("redirect:/board", view);
-        verify(issueRepo).persist(issue);
-        assertEquals("new-key", issue.getColumnKey()); // La clé n'a pas été écrasée
     }
 
     @Test
-    void createIssue_withIdButNotFound_shouldPersistAsIs() {
-        // Cas : Création avec un ID forcé qui n'existe pas
-        long id = 888L;
-        Issue issue = new Issue(id, "New With ID");
-        issue.setColumnKey("key-A");
+    void deleteIssue_shouldRemoveAndRedirect() {
+        long id = 5L;
+        when(issueRepo.find(id)).thenReturn(new Issue(id, "To Delete"));
 
-        when(issueRepo.find(id)).thenReturn(null);
+        String view = sut.deleteIssue(id, redirectAttributes);
+
+        verify(issueRepo).remove(id);
+        assertEquals("redirect:/board", view);
+    }
+
+    @Test
+    void createIssue_NoRowKey_ShouldAssignDefaultRow() {
+        Board mockBoard = new Board("Default Board");
+        fr.uha.ensisa.gl.kanbin.projest.model.Row defaultRow = new fr.uha.ensisa.gl.kanbin.projest.model.Row("row_def", "Default Row");
+        mockBoard.getRows().add(defaultRow);
+
+        when(boardRepo.findAll()).thenReturn(List.of(mockBoard));
+
+        Issue issue = new Issue();
+        issue.setTitle("Ticket sans ligne");
+        issue.setRowKey(null);
 
         sut.createIssue(issue, redirectAttributes);
+        assertEquals("row_def", issue.getRowKey());
+    }
 
+    @Test
+    void createIssue_ExistingId_ShouldPreserveOldKeys() {
+        long id = 50L;
+        Issue oldIssue = new Issue(id, "Vieux Titre");
+        oldIssue.setColumnKey("old_col");
+        oldIssue.setRowKey("old_row");
+        when(issueRepo.find(id)).thenReturn(oldIssue);
+
+        when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
+
+
+        Issue formIssue = new Issue();
+        formIssue.setId(id);
+        formIssue.setTitle("Nouveau Titre");
+        formIssue.setColumnKey(null);
+        formIssue.setRowKey("");
+
+        sut.createIssue(formIssue, redirectAttributes);
+
+        assertEquals("old_col", formIssue.getColumnKey());
+        assertEquals("old_row", formIssue.getRowKey());
+        verify(issueRepo).persist(formIssue);
+    }
+
+    @Test
+    void deleteIssue_UnknownId_ShouldNotCrash() {
+        long id = 999L;
+        when(issueRepo.find(id)).thenReturn(null); // L'ID n'existe pas
+        String view = sut.deleteIssue(id, redirectAttributes);
+        verify(issueRepo, never()).remove(anyLong());
+        assertEquals("redirect:/board", view);
+    }
+
+    @Test
+    void createIssue_WithExplicitRowKey_ShouldNotUseDefault() {
+        Issue issue = new Issue();
+        issue.setTitle("Tache avec ligne forcée");
+        issue.setRowKey("row_custom"); // L'utilisateur choisit sa ligne
+        when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
+        sut.createIssue(issue, redirectAttributes);
+        assertEquals("row_custom", issue.getRowKey());
+    }
+
+    @Test
+    void createIssue_ExistingId_WithNewKeys_ShouldNotUseOldKeys() {
+        long id = 5L;
+        Issue oldIssue = new Issue(id, "Old Title");
+        oldIssue.setColumnKey("col_old");
+        oldIssue.setRowKey("row_old");
+        when(issueRepo.find(id)).thenReturn(oldIssue);
+        when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
+
+        Issue formIssue = new Issue();
+        formIssue.setId(id);
+        formIssue.setColumnKey("col_new");
+        formIssue.setRowKey("row_new");
+
+        sut.createIssue(formIssue, redirectAttributes);
+
+        assertEquals("col_new", formIssue.getColumnKey());
+        assertEquals("row_new", formIssue.getRowKey());
+    }
+
+    @Test
+    void createIssue_WithIdButNotFound_ShouldIgnoreOldValues() {
+
+        long id = 77L;
+        Issue formIssue = new Issue();
+        formIssue.setId(id);
+
+        when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
+        when(issueRepo.find(id)).thenReturn(null);
+        sut.createIssue(formIssue, redirectAttributes);
+        verify(issueRepo).persist(formIssue);
+    }
+
+    @Test
+    void updateIssue_WithExplicitKeys_ShouldKeepThem() {
+        long id = 10L;
+        Issue existing = new Issue(id, "Old");
+        existing.setColumnKey("col_old");
+        existing.setRowKey("row_old");
+        when(issueRepo.find(id)).thenReturn(existing);
+
+        Issue update = new Issue();
+        update.setColumnKey("col_new");
+        update.setRowKey("row_new");
+        sut.updateIssue(id, update, redirectAttributes);
+        assertEquals("col_new", update.getColumnKey());
+        assertEquals("row_new", update.getRowKey());
+    }
+
+    @Test
+    void updateIssue_UnknownId_ShouldJustPersist() {
+
+        long id = 999L;
+        when(issueRepo.find(id)).thenReturn(null);
+        Issue update = new Issue();
+        update.setTitle("Forced Update");
+        sut.updateIssue(id, update, redirectAttributes);
+        verify(issueRepo).persist(update);
+    }
+
+    @Test
+    void getOrCreateDefaultBoard_shouldCreateNewBoard_whenRepoEmpty_andSaveReturnsNull() {
+        when(boardRepo.findAll()).thenReturn(Collections.emptyList());
+        ModelAndView mv = sut.newIssue();
+        assertEquals("create-issue", mv.getViewName());
+        assertNotNull(mv.getModel().get("rows"));
+
+        // Capture du board créé pour vérifier colonnes + row système
+        org.mockito.ArgumentCaptor<Board> captor = org.mockito.ArgumentCaptor.forClass(Board.class);
+        verify(boardRepo).save(captor.capture());
+        Board created = captor.getValue();
+
+        assertEquals("Default", created.getName());
+        assertTrue(created.getColumns().stream().anyMatch(c -> "backlog".equals(c.getKey()) && c.isFixed()));
+        assertTrue(created.getColumns().stream().anyMatch(c -> "closed".equals(c.getKey()) && c.isFixed()));
+        assertFalse(created.getRows().isEmpty());
+        assertEquals("default", created.getRows().getFirst().getKey());
+        assertTrue(created.getRows().getFirst().isFixed());
+    }
+
+    @Test
+    void getOrCreateDefaultBoard_shouldCreateNewBoard_whenRepoEmpty_andSaveReturnsNonNull() {
+        when(boardRepo.findAll()).thenReturn(Collections.emptyList());
+        when(boardRepo.save(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0)); // saved != null
+        ModelAndView mv = sut.newIssue();
+
+        assertEquals("create-issue", mv.getViewName());
+        verify(boardRepo).save(org.mockito.ArgumentMatchers.any(Board.class));
+    }
+
+    @Test
+    void getOrCreateDefaultBoard_shouldPreferBoardNamedDefault_whenPresent() {
+        Board other = new Board("Other");
+        other.addRow(new Row("r1", "Row 1"));
+
+        Board def = new Board("Default");
+        def.addRow(new Row("rDef", "Default Row"));
+
+        when(boardRepo.findAll()).thenReturn(List.of(other, def));
+
+        ModelAndView mv = sut.newIssue();
+        List<Row> rows = (List<Row>) mv.getModel().get("rows");
+
+        assertEquals(1, rows.size());
+        assertEquals("rDef", rows.getFirst().getKey());
+        verify(boardRepo, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void getOrCreateDefaultBoard_shouldFallbackToFirstBoard_whenNoDefaultPresent() {
+        Board first = new Board("First");
+        first.addRow(new Row("rFirst", "First Row"));
+
+        Board second = new Board("Second");
+        second.addRow(new Row("rSecond", "Second Row"));
+
+        when(boardRepo.findAll()).thenReturn(List.of(first, second));
+
+        ModelAndView mv = sut.newIssue();
+        List<Row> rows = (List<Row>) mv.getModel().get("rows");
+
+        assertEquals(1, rows.size());
+        assertEquals("rFirst", rows.getFirst().getKey());
+        verify(boardRepo, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void getOrCreateDefaultBoard_shouldAddDefaultRow_andSave_whenExistingBoardHasNoRows() {
+        Board def = new Board("Default");
+        when(boardRepo.findAll()).thenReturn(List.of(def));
+        when(boardRepo.save(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ModelAndView mv = sut.newIssue();
+        List<Row> rows = (List<Row>) mv.getModel().get("rows");
+
+        assertNotNull(rows);
+        assertFalse(rows.isEmpty());
+        assertEquals("default", rows.getFirst().getKey());
+        assertTrue(rows.getFirst().isFixed());
+        verify(boardRepo).save(def);
+    }
+    @Test
+    void getOrCreateDefaultBoard_shouldCreateNewBoard_whenFindAllReturnsNull() {
+        when(boardRepo.findAll()).thenReturn(null);
+        when(boardRepo.save(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ModelAndView mv = sut.newIssue();
+        assertEquals("create-issue", mv.getViewName());
+        assertNotNull(mv.getModel().get("rows"));
+        verify(boardRepo).save(org.mockito.ArgumentMatchers.any(Board.class));
+    }
+
+    @Test
+    void getOrCreateDefaultBoard_shouldHandleNullRowsGetter_andSave() {
+        Board def = org.mockito.Mockito.spy(new Board("Default"));
+        org.mockito.Mockito.doReturn(null)
+                .doCallRealMethod()
+                .when(def).getRows();
+
+        when(boardRepo.findAll()).thenReturn(List.of(def));
+        when(boardRepo.save(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ModelAndView mv = sut.newIssue();
+        List<Row> rows = (List<Row>) mv.getModel().get("rows");
+
+        assertNotNull(rows);
+        assertFalse(rows.isEmpty());
+        assertEquals("default", rows.getFirst().getKey());
+        verify(boardRepo).save(def);
+    }
+
+    @Test
+    void createIssue_ExistingId_ShouldRestoreOldColumnKey_WhenColumnKeyEmpty() {
+        long id = 123L;
+        Issue oldIssue = new Issue(id, "Old");
+        oldIssue.setColumnKey("old_col");
+        oldIssue.setRowKey("old_row");
+        when(issueRepo.find(id)).thenReturn(oldIssue);
+        when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
+
+        Issue formIssue = new Issue();
+        formIssue.setId(id);
+        formIssue.setColumnKey("");
+        formIssue.setRowKey("row_new");
+
+        sut.createIssue(formIssue, redirectAttributes);
+
+        assertEquals("old_col", formIssue.getColumnKey());
+        assertEquals("row_new", formIssue.getRowKey());
+        verify(issueRepo).persist(formIssue);
+    }
+
+    @Test
+    void createIssue_ExistingId_ShouldRestoreOldRowKey_WhenRowKeyNull() {
+        long id = 124L;
+        Issue oldIssue = new Issue(id, "Old");
+        oldIssue.setColumnKey("old_col");
+        oldIssue.setRowKey("old_row");
+        when(issueRepo.find(id)).thenReturn(oldIssue);
+        when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
+
+        Issue formIssue = new Issue();
+        formIssue.setId(id);
+        formIssue.setColumnKey("col_new");
+        formIssue.setRowKey(null);
+
+        sut.createIssue(formIssue, redirectAttributes);
+
+        assertEquals("col_new", formIssue.getColumnKey());
+        assertEquals("old_row", formIssue.getRowKey());
+        verify(issueRepo).persist(formIssue);
+    }
+    @Test
+    void newIssue_whenBoardNull_shouldNotAddRows() {
+        IssueController ctrl = new IssueControllerForcedBoard(issueRepo, boardRepo, null);
+
+        ModelAndView mv = ctrl.newIssue();
+
+        assertEquals("create-issue", mv.getViewName());
+        assertTrue(mv.getModel().get("issue") instanceof Issue);
+        assertFalse(mv.getModel().containsKey("rows")); // couvre if (board != null) -> false
+    }
+
+    @Test
+    void editIssue_whenBoardNull_shouldNotAddRows() {
+        long id = 1L;
+        when(issueRepo.find(id)).thenReturn(new Issue(id, "To Edit"));
+
+        IssueController ctrl = new IssueControllerForcedBoard(issueRepo, boardRepo, null);
+
+        ModelAndView mv = ctrl.editIssue(id);
+
+        assertEquals("edit-issue", mv.getViewName());
+        assertFalse(mv.getModel().containsKey("rows")); // couvre if (board != null) -> false
+    }
+
+    @Test
+    void createIssue_whenBoardNull_andRowKeyMissing_shouldNotSetDefaultRow() {
+        IssueController ctrl = new IssueControllerForcedBoard(issueRepo, boardRepo, null);
+
+        Issue issue = new Issue();
+        issue.setTitle("X");
+        issue.setRowKey(null);
+
+        ctrl.createIssue(issue, redirectAttributes);
+
+        assertNull(issue.getRowKey()); // couvre (board != null && ...) -> false via board == null
         verify(issueRepo).persist(issue);
-        assertEquals("key-A", issue.getColumnKey());
     }
 
     @Test
-    void createIssue_withOldIssueButKeyNotNull_shouldNotOverwriteKey() {
+    void createIssue_whenRowKeyEmpty_shouldAssignDefaultRow() {
+        Board board = new Board("Default");
+        board.addRow(new Row("row_def", "Default Row"));
 
-        long id = 50L;
-        Issue oldIssue = new Issue(id, "Old");
-        oldIssue.setColumnKey("old-key");
+        IssueController ctrl = new IssueControllerForcedBoard(issueRepo, boardRepo, board);
 
-        Issue newIssue = new Issue(id, "New");
-        newIssue.setColumnKey("new-user-key");
+        Issue issue = new Issue();
+        issue.setTitle("X");
+        issue.setRowKey(""); // force (rowKey == null) false, (isEmpty) true
 
-        when(issueRepo.find(id)).thenReturn(oldIssue);
+        ctrl.createIssue(issue, redirectAttributes);
 
-        sut.createIssue(newIssue, redirectAttributes);
-
-        assertEquals("new-user-key", newIssue.getColumnKey());
+        assertEquals("row_def", issue.getRowKey()); // couvre issue.getRowKey().isEmpty()
+        verify(issueRepo).persist(issue);
     }
 
     @Test
-    void createIssue_withOldIssueAndEmptyKey_shouldRestoreOldKey() {
-        // Couvre la branche : if (... || issue.getColumnKey().isEmpty())
-        long id = 50L;
-        String oldKey = "col-old";
-        Issue oldIssue = new Issue(id, "Old");
-        oldIssue.setColumnKey(oldKey);
+    void createIssue_whenBoardRowsEmpty_shouldNotSetDefaultRow() {
+        Board board = new Board("Default"); // getRows() non-null mais vide
 
-        Issue newIssue = new Issue(id, "New");
-        newIssue.setColumnKey("");
+        IssueController ctrl = new IssueControllerForcedBoard(issueRepo, boardRepo, board);
 
-        when(issueRepo.find(id)).thenReturn(oldIssue);
+        Issue issue = new Issue();
+        issue.setTitle("X");
+        issue.setRowKey(null);
 
-        sut.createIssue(newIssue, redirectAttributes);
+        ctrl.createIssue(issue, redirectAttributes);
 
-        assertEquals(oldKey, newIssue.getColumnKey());
+        assertNull(issue.getRowKey()); // couvre board.getRows()!=null true, !isEmpty false
+        verify(issueRepo).persist(issue);
     }
 
     @Test
-    void deleteIssue_whenIdDoesNotExist_shouldRedirectWithoutError() {
+    void createIssue_whenBoardRowsNull_shouldNotSetDefaultRow() {
+        Board board = spy(new Board("Default"));
+        doReturn(null).when(board).getRows(); // force board.getRows() == null
 
-        long ghostId = 9999L;
+        IssueController ctrl = new IssueControllerForcedBoard(issueRepo, boardRepo, board);
 
-        String view = sut.deleteIssue(ghostId, redirectAttributes);
+        Issue issue = new Issue();
+        issue.setTitle("X");
+        issue.setRowKey(null);
 
-        assertEquals("redirect:/issues", view);
-        verify(issueRepo).remove(ghostId);
+        ctrl.createIssue(issue, redirectAttributes);
 
-        verify(redirectAttributes).addFlashAttribute(eq("message"), anyString());
+        assertNull(issue.getRowKey()); // couvre board.getRows()==null => inner if false (short-circuit)
+        verify(issueRepo).persist(issue);
     }
 
     @Test
-    void listIssues_whenRepoEmpty_shouldReturnEmptyList() {
-        when(issueRepo.findAll()).thenReturn(List.of());
+    void createIssue_withIdZero_shouldNotLookUpOldIssue() {
+        Issue issue = new Issue();
+        issue.setId(0L);
+        issue.setTitle("New Issue");
 
-        ModelAndView mv = sut.listIssues();
+        when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
 
-        @SuppressWarnings("unchecked")
-        Collection<Issue> issues = (Collection<Issue>) mv.getModel().get("issues");
-        assertTrue(issues.isEmpty());
-        assertEquals("list-issues", mv.getViewName());
+        sut.createIssue(issue, redirectAttributes);
+        verify(issueRepo, never()).find(0L);
+        verify(issueRepo).persist(issue);
     }
 
     @Test
-    void updateIssue_shouldRestoreKey_whenKeyIsEmptyString() {
-        long id = 50L;
-        Issue oldIssue = new Issue(id, "Old");
-        oldIssue.setColumnKey("old-key");
+    void updateIssue_shouldSetClosedAt_whenMovingIntoClosed() {
+        long id = 1L;
+        Issue existing = new Issue(id, "Tâche");
+        existing.setColumnKey("todo");
+        existing.setClosedAt(null);
+        when(issueRepo.find(id)).thenReturn(existing);
 
-        Issue newIssue = new Issue(id, "New");
-        newIssue.setColumnKey(""); // VIDE
+        Issue update = new Issue();
+        update.setColumnKey("closed");
 
-        when(issueRepo.find(id)).thenReturn(oldIssue);
+        sut.updateIssue(id, update, redirectAttributes);
 
-        sut.updateIssue(id, newIssue, redirectAttributes);
-
-        assertEquals("old-key", newIssue.getColumnKey());
+        assertNotNull(update.getClosedAt(), "La date de clôture doit être générée");
+        verify(issueRepo).persist(update);
     }
 
     @Test
-    void createIssue_withEmptyKeyString_shouldRestoreOldKey() {
-        long id = 50L;
-        Issue oldIssue = new Issue(id, "Old");
-        oldIssue.setColumnKey("safe-key");
+    void updateIssue_shouldClearClosedAt_whenMovingOutOfClosed() {
+        long id = 2L;
+        Issue existing = new Issue(id, "Tâche");
+        existing.setColumnKey("closed");
+        existing.setClosedAt(LocalDateTime.now());
+        when(issueRepo.find(id)).thenReturn(existing);
 
-        Issue newIssue = new Issue(id, "New");
-        newIssue.setColumnKey("");
+        Issue update = new Issue();
+        update.setColumnKey("todo");
 
-        when(issueRepo.find(id)).thenReturn(oldIssue);
+        sut.updateIssue(id, update, redirectAttributes);
 
-        sut.createIssue(newIssue, redirectAttributes);
+        assertNull(update.getClosedAt(), "La date de clôture doit être supprimée");
+        verify(issueRepo).persist(update);
+    }
 
-        assertEquals("safe-key", newIssue.getColumnKey());
+    @Test
+    void updateIssue_UnknownId_ShouldSetClosedAt_IfInClosedColumn() {
+        long unknownId = 999L;
+        when(issueRepo.find(unknownId)).thenReturn(null);
+
+        Issue update = new Issue();
+        update.setColumnKey("closed");
+
+        sut.updateIssue(unknownId, update, redirectAttributes);
+
+        assertNotNull(update.getClosedAt(), "La date doit être générée même pour un ID inconnu");
+        verify(issueRepo).persist(update);
+    }
+
+    @Test
+    void updateIssue_shouldSetClosedAt_whenMovingIntoClosed_CoverTransition() {
+        long id = 1L;
+        Issue existing = new Issue(id, "Tâche");
+        existing.setColumnKey("todo");
+        when(issueRepo.find(id)).thenReturn(existing);
+
+        Issue update = new Issue();
+        update.setColumnKey("closed");
+
+        sut.updateIssue(id, update, redirectAttributes);
+        assertNotNull(update.getClosedAt());
+    }
+
+    @Test
+    void updateIssue_shouldClearClosedAt_whenMovingOutOfClosed_CoverTransition() {
+        long id = 2L;
+        Issue existing = new Issue(id, "Tâche");
+        existing.setColumnKey("closed");
+        existing.setClosedAt(LocalDateTime.now());
+        when(issueRepo.find(id)).thenReturn(existing);
+
+        Issue update = new Issue();
+        update.setColumnKey("todo");
+
+        sut.updateIssue(id, update, redirectAttributes);
+        assertNull(update.getClosedAt());
+    }
+
+    @Test
+    void createIssue_DirectlyInClosed_ShouldSetDate_CoverBranch() {
+        when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
+        Issue issue = new Issue();
+        issue.setColumnKey("closed");
+
+        sut.createIssue(issue, redirectAttributes);
+        assertNotNull(issue.getClosedAt());
     }
 }

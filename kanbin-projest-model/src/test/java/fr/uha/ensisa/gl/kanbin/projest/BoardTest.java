@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import fr.uha.ensisa.gl.kanbin.projest.model.Board;
 import fr.uha.ensisa.gl.kanbin.projest.model.Column;
+import fr.uha.ensisa.gl.kanbin.projest.model.Row;
 
 
 public class BoardTest {
@@ -117,6 +118,33 @@ public class BoardTest {
         assertFalse(removed);
         assertEquals(1, board.getColumns().size());
         assertSame(col1, board.getColumns().get(0));
+    }
+    @Test
+    public void removeRowByKey_shouldRemoveMatchingRowAndReturnTrue() {
+        Board board = new Board("Test Board");
+        Row r1 = new Row("r1", "Row 1");
+        Row r2 = new Row("r2", "Row 2");
+        board.addRow(r1);
+        board.addRow(r2);
+
+        boolean removed = board.removeRowByKey("r1");
+
+        assertTrue(removed);
+        assertEquals(1, board.getRows().size());
+        assertSame(r2, board.getRows().get(0));
+    }
+
+    @Test
+    public void removeRowByKey_nullKey_shouldRemoveNothingAndReturnFalse() {
+        Board board = new Board("Test Board");
+        Row r1 = new Row("r1", "Row 1");
+        board.addRow(r1);
+
+        boolean removed = board.removeRowByKey(null);
+
+        assertFalse(removed);
+        assertEquals(1, board.getRows().size());
+        assertSame(r1, board.getRows().get(0));
     }
 
 }

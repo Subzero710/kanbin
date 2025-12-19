@@ -130,7 +130,7 @@ public class StoryFeatureIT extends AbstractIT {
         // 4. Drag
         String storyTitle = "DnD-";
         WebElement issueCard = wait.until(ExpectedConditions.presenceOfElementLocated(
-                By.xpath("//article[contains(@class, 'issue-draggable') and .//div[contains(text(), '" + storyTitle + "')]]")
+                By.xpath("//article[contains(@class, 'issue-draggable') and .//*[contains(text(), '" + storyTitle + "')]]")
         ));
         String fullTitle = issueCard.findElement(By.className("kb-card-title")).getText();
 
@@ -215,7 +215,7 @@ public class StoryFeatureIT extends AbstractIT {
             String alertText = alert.getText();
 
             assertFalse(alertText.contains("supprimer"), "ERREUR: Le test a cliqué sur Supprimer au lieu d'Éditer !");
-            assertTrue(alertText.contains("Limite atteinte"), "Message incorrect: " + alertText);
+            assertTrue(alertText.contains("nombre maximum de tâches"), "Message incorrect: " + alertText);
             alert.accept();
 
             // 9. Vérif Finale (Rollback)

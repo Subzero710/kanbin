@@ -1,116 +1,166 @@
 <!DOCTYPE html>
-<html lang="fr" xmlns:th="http://www.thymeleaf.org">
-<head th:include="../fragments/template :: head(~{::title})">
-    <title>Kanbin Board</title>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Kanbin Project</title>
+
+    <meta name="api-base-url" th:content="@{/}" />
+
+    <meta th:if="${_csrf}" name="_csrf" th:content="${_csrf.token}" />
+    <meta th:if="${_csrf}" name="_csrf_header" th:content="${_csrf.headerName}" />
+
+    <link rel="stylesheet" th:href="@{/resources/style.css}" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <script th:src="@{/resources/project.js}" defer></script>
 </head>
 <body>
-<div class="main-wrapper">
 
-    <div style="margin-bottom: 15px;">
-        <a th:href="@{/issues}" class="btn btn-secondary" id="btn-to-issues">
-            Gérer les Stories
-        </a>
-    </div>
+<nav class="kb-navbar">
+    <div class="kb-brand">Kanbin</div>
 
-    <form th:action="@{/board/add-column}" method="post" accept-charset="UTF-8" style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
+    <form th:action="@{/board/add-column}" method="post" class="inline-form" accept-charset="UTF-8">
         <label>
-            <input type="text" name="title" placeholder="Titre de la nouvelle colonne" required maxlength="30" style="padding: 5px;"/>
+            <input type="text" name="title" class="form-control" placeholder="Titre court (Max 30 car.)"
+                   maxlength="30" required>
         </label>
 
         <label>
-            <select name="type" style="padding: 5px;">
+            <select name="type" class="form-control" style="width: 90px;">
                 <option value="simple">Simple</option>
-                <option value="double" selected>Double</option>
+                <option value="double">Double</option>
             </select>
         </label>
 
-        <input type="submit" value="Ajouter Colonne" class="btn btn-primary btn-sm"/>
-        <a th:href="@{/issues/new}" class="btn btn-success btn-sm" style="margin-left: 10px;">
-            + Ajouter une Story </a>
+        <input type="submit" value="Ajouter Colonne" class="btn btn-col">
     </form>
 
-    <h1 class="page-title">Kanbin</h1>
-    <div th:if="${errorMessage}" class="alert alert-danger" th:text="${errorMessage}"></div>
+    <a th:href="@{/issues/new}" class="btn btn-story" style="margin-left: 15px;">+ Ajouter Story</a>
 
-    <div class="board" id="board">
-        <section class="kb-col kb-main-col"
-                 th:each="c, iterStat : ${columns}"
-                 th:attr="data-col=${c.key}, data-id=${c.id}"
-                 th:classappend="${c.fixed} ? 'kb-col-fixed' : 'kb-col-draggable'"
-                 th:draggable="${!c.fixed}"
-                 th:style="'width:' + (${c.subColumns.isEmpty() ? 260 : (260 * c.subColumns.size()) + 20}) + 'px;'">
+    <form th:action="@{/board/add-row}" method="post" class="inline-form" style="margin-left: 15px;" accept-charset="UTF-8">
+        <label>
+            <input type="text" name="title" class="form-control"
+                   placeholder="Nom Swimlane (Max 30 car.)"
+                   maxlength="30" required>
+        </label>
 
-            <header class="kb-col-header">
-                <span th:id="'col-title-' + ${c.key}">
-                    <span th:text="${c.title}">Column</span>
-                    <span th:if="${c.wipLimit != null and c.wipLimit > 0}"
-                          class="badge bg-secondary ms-2"
-                          th:text="${wipUsageByColumnId[c.id]} + ' / ' + ${c.wipLimit}">
-                        0 / 0
-                    </span>
-		        </span>
+        <input type="submit" value="Ajouter Ligne" class="btn btn-row">
+    </form>
 
-                <div style="display:inline-block; float:right;">
-                    <a th:if="${!c.fixed}"
-                       th:href="@{/board/columns/{id}/edit(id=${c.id})}"
-                       class="btn btn-warning btn-sm"
-                       style="padding: 0 5px; margin-right: 5px;"
-                       title="Renommer">edit</a>
+    <a th:href="@{/issues}" id="btn-to-issues" class="btn btn-manage" style="margin-left: auto;">Gérer les Stories</a>
+</nav>
 
-                    <form th:if="${!c.fixed}"
-                          th:action="@{/board/remove-column}" method="post" style="display:inline;">
-                        <input type="hidden" name="columnId" th:value="${c.id}"/>
-                        <button type="submit" class="btn btn-danger btn-sm"
-                                onclick="return confirm('Êtes-vous sûr de vouloir supprimer cette colonne ?')"
-                                value="Remove column"
-                                style="padding: 0 5px;">
-                            X
-                        </button>
-                    </form>
-                </div>
-            </header>
+<div th:if="${message}" class="alert alert-success" th:text="${message}"></div>
+<div th:if="${errorMessage}" class="alert alert-error" th:text="${errorMessage}"></div>
 
-            <div class="kb-sub-wrapper">
-                <div class="kb-col sub-col"
-                     th:each="sub : ${c.subColumnsOrSelf}"
-                     th:attr="data-col=${sub.key}">
+<main id="board" class="kanban-board">
 
-                    <header class="kb-col-header sub-header" th:unless="${c.subColumns.isEmpty()}">
-                        <span th:text="${sub.title}">Sous-titre</span>
+    <div class="board-header-row">
+        <div class="header-corner-placeholder"></div>
+        <div class="column-headers-container" style="display:flex;">
+            <section th:each="col : ${columns}"
+                     class="col-header-item"
+                     th:classappend="(${col.subColumns.isEmpty()} ? 'col-width-simple' : 'col-width-double') + (${col.fixed} ? ' fixed-col' : '')"
+                     th:attr="data-column-id=${col.id}, data-col=${col.key}, draggable=${!col.fixed}">
+
+                <div class="col-header-top kb-col-header">
+                    <header>
+                        <div>
+                            <span th:id="'col-title-' + ${col.id}" th:text="${col.title}">Titre</span>
+
+                            <span th:if="${col.wipLimit > 0}"
+                                  th:id="'counter-span-' + ${col.id}"
+                                  th:attr="data-limit=${col.wipLimit}"
+                                  th:text="' ' + ${wipUsageByColumnId[col.id]} + ' / ' + ${col.wipLimit}"
+                                  class="badge bg-secondary ms-2">
+                            </span>
+                        </div>
+
+                        <div th:unless="${col.fixed}" style="display:flex;">
+                            <a th:href="@{'/board/columns/' + ${col.id} + '/edit'}" class="btn btn-warning" title="Renommer" style="padding: 2px 6px;">
+                                <i class="bi bi-pencil-fill"></i>
+                            </a>
+                            <form th:action="@{/board/remove-column}" method="post" onsubmit="return confirm('Supprimer ?');">
+                                <input type="hidden" name="columnId" th:value="${col.id}"/>
+                                <button type="submit" class="btn btn-danger" title="Supprimer" style="padding: 2px 6px;">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </form>
+                        </div>
                     </header>
+                </div>
 
-                    <div class="kb-col-body">
+                <div th:if="${!col.subColumns.isEmpty()}" style="display:flex; margin-top:5px; border-top:1px solid #ccc; padding-top:5px;">
+                    <div th:each="sub : ${col.subColumns}" style="flex:1; text-align:center; font-size:12px; color:#5e6c84;">
+                        <span th:text="${sub.title}"></span>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
 
-                        <article class="kb-card issue-draggable"
-                                 draggable="true"
-                                 th:attr="data-id=${issue.id}"
-                                 th:each="issue : ${issuesByColumn[sub.key]}">
+    <div th:each="row : ${rows}" class="kb-swimlane">
+        <div class="swimlane-title-sidebar">
+            <div class="swimlane-title-sidebar" th:text="${#strings.abbreviate(row.title, 50)}" th:title="${row.title}">Urgent</div>
 
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+            <form th:if="${!row.fixed}" th:action="@{/board/remove-row}" method="post"
+                  onsubmit="return confirm('Supprimer la swimlane ?');" style="margin:0;">
+                <input type="hidden" name="rowKey" th:value="${row.key}"/>
+                <button type="submit" class="btn btn-danger" title="Supprimer" style="padding: 2px 6px;">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </form>
+        </div>
 
-                                <div class="kb-card-title" th:text="${issue.title}" style="margin-right: 5px;">
-                                    Titre de la story
-                                </div>
+        <div class="swimlane-columns-container">
+            <section th:each="col : ${columns}"
+                     th:classappend="${col.subColumns.isEmpty()} ? 'col-width-simple' : 'col-width-double'"
+                     th:attr="data-row=${row.key}, data-col=${col.key}">
 
-                                <a th:href="@{/issues/{id}/edit(id=${issue.id})}"
-                                   class="btn btn-outline-secondary btn-sm"
-                                   title="Modifier"
-                                   style="padding: 0px 5px; border: none;">
+                <span style="display:none;" th:text="${col.title}"></span>
+
+                <div th:if="${col.subColumns.isEmpty()}"
+                     class="kb-col-body droppable"
+                     style="height:100%; width:100%;"
+                     th:attr="data-row=${row.key}, data-col=${col.key}, data-limit=${col.wipLimit}, data-parent-id=${col.id}">
+
+                    <article th:each="issue : ${issuesByRowAndCol.get(row.key).get(col.key)}"
+                             class="kb-card issue-draggable" draggable="true" th:attr="data-issue-id=${issue.id}">
+                        <div class="card-header">
+                            <strong th:text="${issue.title}" class="kb-card-title">Titre</strong>
+                            <a th:href="@{'/issues/' + ${issue.id} + '/edit'}" class="btn-edit-card" style="text-decoration: none; color: #555;">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </div>
+                        <div th:if="${issue.detail}" th:text="${issue.detail}"
+                             style="font-size: 0.85em; color: #555; margin-top: 5px;
+                                    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word;">
+                        </div>
+                    </article>
+                </div>
+
+                <div th:if="${!col.subColumns.isEmpty()}" style="display:flex; height:100%; width:100%;">
+                    <div th:each="sub : ${col.subColumns}" class="sub-col-item droppable"
+                         th:attr="data-row=${row.key}, data-col=${sub.key}, data-limit=${col.wipLimit}, data-parent-id=${col.id}">
+
+                        <article th:each="issue : ${issuesByRowAndCol.get(row.key).get(sub.key)}"
+                                 class="kb-card issue-draggable" draggable="true" th:attr="data-issue-id=${issue.id}">
+                            <div class="card-header">
+                                <strong th:text="${issue.title}" class="kb-card-title">Titre</strong>
+                                <a th:href="@{'/issues/' + ${issue.id} + '/edit'}" class="btn-edit-card" style="text-decoration: none; color: #555;">
                                     <i class="bi bi-pencil"></i>
                                 </a>
                             </div>
-
-                            <div class="kb-card-detail">
-                                <span th:text="${issue.detail}">Détail de la story...</span>
+                            <div th:if="${issue.detail}" th:text="${issue.detail}"
+                                 style="font-size: 0.85em; color: #555; margin-top: 5px;
+                                        display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word;">
                             </div>
                         </article>
                     </div>
                 </div>
-            </div>
-        </section>
-    </div>
-</div>
 
-<div th:replace="../fragments/template :: footer"></div>
+            </section>
+        </div>
+    </div>
+</main>
 </body>
 </html>

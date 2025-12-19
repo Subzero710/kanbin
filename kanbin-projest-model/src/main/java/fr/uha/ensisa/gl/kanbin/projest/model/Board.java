@@ -22,4 +22,15 @@ public class Board {
     public boolean removeColumn(long columnId) {
         return columns.removeIf(c -> c.getId() == columnId);
     }
+    private final List<Row> rows = new ArrayList<>();
+    public List<Row> getRows() {
+        return rows;
+    }
+
+    public void addRow(Row row) {
+        this.rows.add(row);
+    }
+    public boolean removeRowByKey(String rowKey) {
+        return rows.removeIf(r -> rowKey != null && rowKey.equals(r.getKey()));
+    }
 }
