@@ -1,10 +1,38 @@
 document.addEventListener("DOMContentLoaded", function () {
     console.log("Kanbin Project JS Loaded");
 
-    function postFormUrlEncoded(url, params) {
-        return fetch(url, {
+    function postFormUrlEncoded(endpoint, params) {
+        // 1. Récupération des balises meta
+        const metaBase = document.querySelector('meta[name="api-base-url"]');
+        const metaToken = document.querySelector('meta[name="_csrf"]');
+        const metaHeader = document.querySelector('meta[name="_csrf_header"]');
+
+        // 2. Construction de l'URL absolue (Fix pour le staging qui est dans un sous-dossier)
+        let baseUrl = metaBase ? metaBase.getAttribute('content') : '/';
+        // Si baseUrl ne finit pas par '/' et endpoint ne commence pas par '/', on ajoute '/'
+        // Si baseUrl finit par '/' et endpoint commence par '/', on retire l'un des deux.
+        // Méthode robuste : on retire le slash final de baseUrl s'il existe
+        if (baseUrl.endsWith('/')) {
+            baseUrl = baseUrl.slice(0, -1);
+        }
+        // on s'assure que l'endpoint commence par un slash
+        if (!endpoint.startsWith('/')) {
+            endpoint = '/' + endpoint;
+        }
+
+        const finalUrl = baseUrl + endpoint;
+
+        // 3. Préparation des headers (Fix CSRF 403)
+        const headers = {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        };
+        if (metaToken && metaHeader) {
+            headers[metaHeader.getAttribute('content')] = metaToken.getAttribute('content');
+        }
+
+        return fetch(finalUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: headers,
             body: new URLSearchParams(params).toString()
         });
     }
