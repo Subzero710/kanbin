@@ -127,4 +127,14 @@ public class ColumnTest {
         column.setType("swimlane");
         assertEquals("swimlane", column.getType());
     }
+    @Test
+    public void testWipLimitManagement() {
+        Column c = new Column();
+        assertEquals(0, c.getWipLimit(), "La limite WIP par défaut doit être 0");
+        c.setWipLimit(5);
+        assertEquals(5, c.getWipLimit(), "Le getter doit retourner la valeur définie (5)");
+        c.setWipLimit(10);
+        assertEquals(10, c.getWipLimit());
+    }
+
 }

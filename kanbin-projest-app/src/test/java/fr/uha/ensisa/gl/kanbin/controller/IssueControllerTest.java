@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import java.time.LocalDateTime;
 
 import java.util.Collections;
 import java.util.List;
@@ -25,7 +26,7 @@ class IssueControllerTest {
     @Mock
     private IssueRepo issueRepo;
     @Mock
-    private BoardRepo boardRepo; // Mock du BoardRepo ajouté
+    private BoardRepo boardRepo;
     @Mock
     private RedirectAttributes redirectAttributes;
 
@@ -33,7 +34,6 @@ class IssueControllerTest {
 
     @BeforeEach
     void setUp() {
-        // Nouveau constructeur avec 2 arguments
         sut = new IssueController(issueRepo, boardRepo);
     }
     static class IssueControllerForcedBoard extends IssueController {
@@ -61,13 +61,11 @@ class IssueControllerTest {
 
     @Test
     void newIssue_shouldReturnFormWithRows() {
-        // On simule la présence d'un board pour avoir les rows
         when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
 
         ModelAndView mv = sut.newIssue();
         assertEquals("create-issue", mv.getViewName());
         assertTrue(mv.getModel().get("issue") instanceof Issue);
-        // Vérifie qu'on passe bien les rows à la vue
         assertNotNull(mv.getModel().get("rows"));
     }
 
@@ -75,8 +73,6 @@ class IssueControllerTest {
     void createIssue_shouldPersistAndRedirect() {
         Issue issue = new Issue();
         issue.setTitle("Test");
-
-        // Simulation board pour rowKey par défaut
         when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
 
         String view = sut.createIssue(issue, redirectAttributes);
@@ -90,8 +86,6 @@ class IssueControllerTest {
         long id = 1L;
         when(issueRepo.find(id)).thenReturn(new Issue(id, "To Edit"));
         when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
-
-        // Correction du nom de méthode : editIssue au lieu de editIssueForm
         ModelAndView mv = sut.editIssue(id);
 
         assertEquals("edit-issue", mv.getViewName());
@@ -111,9 +105,11 @@ class IssueControllerTest {
     @Test
     void updateIssue_shouldUpdateAndRedirect() {
         long id = 10L;
+        LocalDateTime closedDate = LocalDateTime.now();
         Issue existing = new Issue(id, "Old");
         existing.setColumnKey("todo");
-        existing.setRowKey("urgent"); // Simulation row existante
+        existing.setRowKey("urgent");
+        existing.setClosedAt(closedDate);
 
         when(issueRepo.find(id)).thenReturn(existing);
 
@@ -123,9 +119,9 @@ class IssueControllerTest {
         String view = sut.updateIssue(id, update, redirectAttributes);
 
         verify(issueRepo).persist(update);
-        // Vérifie qu'on garde les anciennes clés si nulles
         assertEquals("todo", update.getColumnKey());
         assertEquals("urgent", update.getRowKey());
+        assertEquals(closedDate, update.getClosedAt());
         assertEquals("redirect:/board", view);
     }
 
@@ -262,7 +258,6 @@ class IssueControllerTest {
     @Test
     void getOrCreateDefaultBoard_shouldCreateNewBoard_whenRepoEmpty_andSaveReturnsNull() {
         when(boardRepo.findAll()).thenReturn(Collections.emptyList());
-        // boardRepo.save(...) retourne null par défaut (mock) => couvre la branche saved == null
         ModelAndView mv = sut.newIssue();
         assertEquals("create-issue", mv.getViewName());
         assertNotNull(mv.getModel().get("rows"));
@@ -328,15 +323,17 @@ class IssueControllerTest {
 
     @Test
     void getOrCreateDefaultBoard_shouldAddDefaultRow_andSave_whenExistingBoardHasNoRows() {
-        Board def = new Board("Default"); // rows vides => doit ajouter la row "default"
+        Board def = new Board("Default");
         when(boardRepo.findAll()).thenReturn(List.of(def));
         when(boardRepo.save(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
+
         ModelAndView mv = sut.newIssue();
         List<Row> rows = (List<Row>) mv.getModel().get("rows");
 
         assertNotNull(rows);
         assertFalse(rows.isEmpty());
         assertEquals("default", rows.get(0).getKey());
+        assertTrue(rows.get(0).isFixed());
         verify(boardRepo).save(def);
     }
     @Test
@@ -495,6 +492,19 @@ class IssueControllerTest {
         ctrl.createIssue(issue, redirectAttributes);
 
         assertNull(issue.getRowKey()); // couvre board.getRows()==null => inner if false (short-circuit)
+        verify(issueRepo).persist(issue);
+    }
+
+    @Test
+    void createIssue_withIdZero_shouldNotLookUpOldIssue() {
+        Issue issue = new Issue();
+        issue.setId(0L);
+        issue.setTitle("New Issue");
+
+        when(boardRepo.findAll()).thenReturn(List.of(new Board("Default")));
+
+        sut.createIssue(issue, redirectAttributes);
+        verify(issueRepo, never()).find(0L);
         verify(issueRepo).persist(issue);
     }
 

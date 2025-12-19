@@ -77,7 +77,7 @@
 
     <div th:each="row : ${rows}" class="kb-swimlane">
         <div class="swimlane-title-sidebar">
-            <div class="swimlane-title-text" th:text="${row.title}">Urgent</div>
+            <div class="swimlane-title-sidebar" th:text="${#strings.abbreviate(row.title, 50)}" th:title="${row.title}">Urgent</div>
 
             <form th:if="${!row.fixed}" th:action="@{/board/remove-row}" method="post"
                   onsubmit="return confirm('Supprimer la swimlane ?');" style="margin:0;">

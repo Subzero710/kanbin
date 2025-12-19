@@ -1,5 +1,7 @@
 package fr.uha.ensisa.gl.kanbin.projest.repo.mem;
 
+import fr.uha.ensisa.gl.kanbin.projest.model.Board;
+import fr.uha.ensisa.gl.kanbin.projest.model.Row;
 import fr.uha.ensisa.gl.kanbin.projest.repo.BoardRepo;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -19,6 +21,16 @@ class RepoFactoryMemTest {
 
         assertFalse(boardRepo.findAll().isEmpty(),
                 "Le BoardRepo doit contenir des données par défaut (seed appelé)");
-        assertEquals("Default", boardRepo.findAll().getFirst().getName());
+
+        Board defaultBoard = boardRepo.findAll().getFirst();
+        assertEquals("Default", defaultBoard.getName());
+
+        assertFalse(defaultBoard.getRows().isEmpty(),
+                "Le board doit contenir la swimlane par défaut 'Non catégorisé'");
+
+        Row defaultRow = defaultBoard.getRows().get(0);
+        assertEquals("default", defaultRow.getKey());
+        assertTrue(defaultRow.isFixed(),
+                "La swimlane par défaut doit être marquée comme FIXE");
     }
 }
