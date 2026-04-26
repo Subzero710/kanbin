@@ -56,9 +56,9 @@ mvn clean test
 ```
 
 Accéder aux dashboards :
-Prometheus (métriques brutes) : http://localhost:9090
-Grafana (visualisation) : http://localhost:3000 (login: admin/admin)
-cAdvisor (détails conteneurs) : http://localhost:8081
+- Prometheus (métriques brutes) : http://localhost:9090
+- Grafana (visualisation) : http://localhost:3000 (login: admin/admin)
+- cAdvisor (détails conteneurs) : http://localhost:8081
 
 ```bash
 # Arrêter les services
