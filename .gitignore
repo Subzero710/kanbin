@@ -4,6 +4,8 @@ target/
 !**/src/test/**/target/
 .kotlin
 
+testbench/gatling/
+
 ### IntelliJ IDEA ###
 .idea/
 *.iws

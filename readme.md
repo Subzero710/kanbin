@@ -36,3 +36,7 @@ Puis ouvrir, pour chaque module :
 ```bash
 mvn clean verify
 ```
+
+## Tests de Benchmark Éco-Conception
+
+Le testbench pour les mesures d'éco-conception est un projet séparé et doit être exécuté indépendamment. Consultez le fichier `testbench/README.md` pour les instructions détaillées d'exécution.

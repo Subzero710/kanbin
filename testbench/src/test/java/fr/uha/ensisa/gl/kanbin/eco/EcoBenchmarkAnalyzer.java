@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /**
  * Analyse et compare plusieurs résultats de benchmark JSON
@@ -100,7 +101,7 @@ public class EcoBenchmarkAnalyzer {
             System.out.printf("  %s :\n", actionName);
 
             for (int i = 0; i < results.size(); i++) {
-                long duration = results.get(i).getAsJsonArray("actions").stream()
+                long duration = StreamSupport.stream(results.get(i).getAsJsonArray("actions").spliterator(), false)
                         .map(JsonElement::getAsJsonObject)
                         .filter(a -> a.get("name").getAsString().equals(actionName))
                         .findFirst()

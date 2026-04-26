@@ -43,11 +43,10 @@ import java.util.*;
 @EcoDocker(network = "kanbin-metrologie", clean = false)
 @EcoDockerContainer(id = "kanbin-app-eco", port = 8080)
 @EcoMonitor(containerId = "kanbin-app-eco")
-@EcoWebDriver(remote = false)
+@EcoWebDriver(remote = true)
 @ExtendWith(EcoExtension.class)
 public class KanbinEcoScenarioIT {
 
-    private static final String BASE_URL = "http://localhost:8080/";
     private static final DateTimeFormatter TIMESTAMP_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
 
@@ -66,7 +65,7 @@ public class KanbinEcoScenarioIT {
      */
     @Test
     @EcoRunConfig(warmupRepetitions = 0)
-    public void testCompleteKanbinScenarioWithMetrics(WebDriver webDriver) throws IOException, InterruptedException {
+    public void testCompleteKanbinScenarioWithMetrics(WebDriver webDriver) throws Exception {
         this.driver = webDriver;
         this.actionMetrics = new LinkedHashMap<>();
         this.scenarioMetrics = new JsonObject();
@@ -83,15 +82,11 @@ public class KanbinEcoScenarioIT {
             System.out.println("  • Place sur disque (volumes)");
             System.out.println("=".repeat(70) + "\n");
 
-            // === INITIALISATION ===
-            recordAction("00_initialization", () -> {
-                setupBrowser();
-            });
 
             // === 1. CONSULTATION DU BOARD ===
             recordAction("01_board_consultation", () -> {
                 System.out.println("  📋 Consultation du Board...");
-                driver.get(BASE_URL + "board");
+                driver.get("/board");
                 WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
                 wait.until(ExpectedConditions.presenceOfElementLocated(By.id("board")));
             });
@@ -134,7 +129,7 @@ public class KanbinEcoScenarioIT {
             String storyTitle = "Eco-Story-" + System.currentTimeMillis();
             recordAction("04_create_story", () -> {
                 System.out.println("  📝 Création story (issue)...");
-                driver.get(BASE_URL + "issues/new");
+                driver.get("/issues/new");
                 driver.findElement(By.name("title")).sendKeys(storyTitle);
                 driver.findElement(By.cssSelector("button[type='submit']")).click();
 
@@ -147,7 +142,7 @@ public class KanbinEcoScenarioIT {
             String updatedDetail = "Description détaillée mise à jour pour éco-conception";
             recordAction("05_edit_story", () -> {
                 System.out.println("  ✏️  Modification story (édition)...");
-                driver.get(BASE_URL + "board");
+                driver.get("/board");
                 new WebDriverWait(driver, Duration.ofSeconds(5))
                         .until(ExpectedConditions.presenceOfElementLocated(By.id("board")));
 
@@ -170,7 +165,7 @@ public class KanbinEcoScenarioIT {
             // === 6. DRAG & DROP STORY ===
             recordAction("06_drag_and_drop_story", () -> {
                 System.out.println("  🎯 Drag & Drop story entre colonnes...");
-                driver.get(BASE_URL + "board");
+                driver.get("/board");
                 new WebDriverWait(driver, Duration.ofSeconds(5))
                         .until(ExpectedConditions.presenceOfElementLocated(By.id("board")));
 
@@ -191,7 +186,7 @@ public class KanbinEcoScenarioIT {
             String reorderColName = "Reorder-Test-" + System.currentTimeMillis();
             recordAction("07_reorder_columns", () -> {
                 System.out.println("  🔄 Réorganisation des colonnes...");
-                driver.get(BASE_URL + "board");
+                driver.get("/board");
                 new WebDriverWait(driver, Duration.ofSeconds(5))
                         .until(ExpectedConditions.presenceOfElementLocated(By.id("board")));
 
@@ -208,7 +203,7 @@ public class KanbinEcoScenarioIT {
             // === 8. PASSAGE EN CLOSED ===
             recordAction("08_move_to_closed", () -> {
                 System.out.println("  ✅ Passage en 'Closed' (complétée)...");
-                driver.get(BASE_URL + "board");
+                driver.get("/board");
                 new WebDriverWait(driver, Duration.ofSeconds(5))
                         .until(ExpectedConditions.presenceOfElementLocated(By.id("board")));
 
@@ -226,7 +221,7 @@ public class KanbinEcoScenarioIT {
             // === 9. SUPPRESSION STORY & COLONNE ===
             recordAction("09_delete_story_and_column", () -> {
                 System.out.println("  🗑️  Suppression story + colonne...");
-                driver.get(BASE_URL + "issues");
+                driver.get("/issues");
                 new WebDriverWait(driver, Duration.ofSeconds(5))
                         .until(ExpectedConditions.presenceOfElementLocated(By.tagName("table")));
 
@@ -288,19 +283,6 @@ public class KanbinEcoScenarioIT {
         System.out.println("    ✓ Durée: " + metric.duration + "ms | Δ Mémoire: " + metric.memoryDelta + "KB | Total: " + metric.totalMemory + "MB");
     }
 
-    /**
-     * Configure le navigateur
-     */
-    private void setupBrowser() {
-        WebDriverManager.chromedriver().setup();
-        ChromeOptions options = new ChromeOptions();
-        options.addArguments("--no-sandbox");
-        options.addArguments("--disable-dev-shm-usage");
-        options.addArguments("--disable-gpu");
-        options.addArguments("--window-size=1920,1080");
-        this.driver = new ChromeDriver(options);
-        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(2));
-    }
 
     /**
      * Simule le Drag & Drop HTML5
@@ -346,7 +328,6 @@ public class KanbinEcoScenarioIT {
         // En-tête
         root.addProperty("timestamp", LocalDateTime.now().format(TIMESTAMP_FORMATTER));
         root.addProperty("scenario", "Kanbin Eco-Conception - Scénario Complet");
-        root.addProperty("target_url", BASE_URL);
         root.addProperty("version", "1.0");
 
         // Métriques globales calculées

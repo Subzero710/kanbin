@@ -23,20 +23,7 @@ Ce benchmark exécute un scénario complet d'utilisation de Kanbin Projest et me
 - Docker et Docker Compose (pour les mesures conteneurisées)
 - Chrome/Chromium installé localement
 
-### Mode local (sans Docker)
-
-```bash
-# 1. Démarrer l'application Kanbin
-mvn -pl kanbin-projest-app org.eclipse.jetty:jetty-maven-plugin:11.0.25:run
-
-# 2. Dans un autre terminal, lancer le benchmark
-cd testbench
-mvn clean test
-
-# 3. Les résultats sont dans target/eco-benchmark-*.json
-```
-
-### Mode conteneurisé ( Docker avec monitoring complet)
+### Mode conteneurisé (Docker avec monitoring complet)
 
 ```bash
 # À la racine du projet
