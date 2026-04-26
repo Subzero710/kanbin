@@ -17,6 +17,15 @@ import java.util.*;
 
 @Controller
 public class BoardController {
+    private static final Comparator<Issue> BACKLOG_COMPARATOR =
+            Comparator.comparingLong(Issue::getId).reversed();
+    private static final Comparator<Issue> DEFAULT_COMPARATOR =
+            Comparator.comparingLong(Issue::getId);
+    private static final Comparator<Issue> CLOSED_COMPARATOR = (i1, i2) -> {
+        if (i1.getClosedAt() == null) return 1;
+        if (i2.getClosedAt() == null) return -1;
+        return i2.getClosedAt().compareTo(i1.getClosedAt());
+    };
 
     private final BoardRepo boards;
     private final IssueRepo issues;
@@ -68,29 +77,52 @@ public class BoardController {
     @GetMapping("/board")
     public ModelAndView showBoard() {
         Board b = getOrCreateDefaultBoard();
+        BoardViewModel boardView = buildBoardViewModel(b);
         ModelAndView mv = new ModelAndView("board");
         mv.addObject("board", b);
-        mv.addObject("columns", b.getColumns());
-        mv.addObject("rows", b.getRows());
+        mv.addObject("boardView", boardView);
+        mv.addObject("columns", boardView.columns());
+        mv.addObject("rows", boardView.rows());
+        mv.addObject("issuesByRowAndCol", buildLegacyIssuesMatrix(boardView));
+        mv.addObject("wipUsageByColumnId", buildLegacyWipUsage(boardView));
 
-        Map<String, Map<String, List<Issue>>> issuesByRowAndCol = new LinkedHashMap<>();
+        return mv;
+    }
 
-        for (Row row : b.getRows()) {
-            Map<String, List<Issue>> colMap = new LinkedHashMap<>();
-            for (Column col : b.getColumns()) {
-                if (col.getSubColumns().isEmpty()) {
-                    colMap.put(col.getKey(), new ArrayList<>());
-                } else {
-                    for (Column sub : col.getSubColumns()) {
-                        colMap.put(sub.getKey(), new ArrayList<>());
+    private BoardViewModel buildBoardViewModel(Board board) {
+        List<Row> rows = board.getRows();
+        List<Column> columns = board.getColumns();
+
+        String defaultRowKey = rows.isEmpty() ? null : rows.getFirst().getKey();
+        String defaultColKey = "backlog";
+
+        Set<String> validRowKeys = new HashSet<>();
+        for (Row row : rows) {
+            if (row.getKey() != null) {
+                validRowKeys.add(row.getKey());
+            }
+        }
+
+        Set<String> validDisplayColumnKeys = new HashSet<>();
+        Map<String, Long> logicalColumnIdByDisplayKey = new HashMap<>();
+        for (Column column : columns) {
+            if (column.getSubColumns().isEmpty()) {
+                if (column.getKey() != null) {
+                    validDisplayColumnKeys.add(column.getKey());
+                    logicalColumnIdByDisplayKey.put(column.getKey(), column.getId());
+                }
+            } else {
+                for (Column subColumn : column.getSubColumns()) {
+                    if (subColumn.getKey() != null) {
+                        validDisplayColumnKeys.add(subColumn.getKey());
+                        logicalColumnIdByDisplayKey.put(subColumn.getKey(), column.getId());
                     }
                 }
             }
-            issuesByRowAndCol.put(row.getKey(), colMap);
         }
 
-        String defaultRowKey = b.getRows().isEmpty() ? null : b.getRows().getFirst().getKey();
-        String defaultColKey = "backlog";
+        Map<String, Map<String, List<Issue>>> issuesByRowAndCol = new LinkedHashMap<>();
+        Map<Long, Long> wipUsageByColumnId = new HashMap<>();
 
         for (Issue issue : issues.findAll()) {
             boolean changed = false;
@@ -104,48 +136,84 @@ public class BoardController {
                 changed = true;
             }
 
-            if (changed) issues.persist(issue);
+            if (changed) {
+                issues.persist(issue);
+            }
 
-            if (issue.getRowKey() != null && issue.getColumnKey() != null) {
-                Map<String, List<Issue>> rowMap = issuesByRowAndCol.get(issue.getRowKey());
-                if (rowMap != null) {
-                    List<Issue> list = rowMap.get(issue.getColumnKey());
-                    if (list != null) {
-                        list.add(issue);
+            String rowKey = issue.getRowKey();
+            String columnKey = issue.getColumnKey();
+            if (rowKey == null || columnKey == null) {
+                continue;
+            }
+            if (!validRowKeys.contains(rowKey) || !validDisplayColumnKeys.contains(columnKey)) {
+                continue;
+            }
+
+            issuesByRowAndCol
+                    .computeIfAbsent(rowKey, ignored -> new LinkedHashMap<>())
+                    .computeIfAbsent(columnKey, ignored -> new ArrayList<>())
+                    .add(issue);
+
+            Long logicalColumnId = logicalColumnIdByDisplayKey.get(columnKey);
+            if (logicalColumnId != null) {
+                wipUsageByColumnId.merge(logicalColumnId, 1L, Long::sum);
+            }
+        }
+
+        for (Map<String, List<Issue>> issuesByColumn : issuesByRowAndCol.values()) {
+            for (Map.Entry<String, List<Issue>> entry : issuesByColumn.entrySet()) {
+                entry.getValue().sort(comparatorForColumn(entry.getKey()));
+            }
+        }
+
+        return new BoardViewModel(rows, columns, issuesByRowAndCol, wipUsageByColumnId);
+    }
+
+    private Comparator<Issue> comparatorForColumn(String columnKey) {
+        if ("backlog".equals(columnKey)) {
+            return BACKLOG_COMPARATOR;
+        }
+        if ("closed".equals(columnKey)) {
+            return CLOSED_COMPARATOR;
+        }
+        return DEFAULT_COMPARATOR;
+    }
+
+    private Map<String, Map<String, List<Issue>>> buildLegacyIssuesMatrix(BoardViewModel boardView) {
+        Map<String, Map<String, List<Issue>>> legacyMatrix = new LinkedHashMap<>();
+
+        for (Row row : boardView.rows()) {
+            if (row.getKey() == null) {
+                continue;
+            }
+
+            Map<String, List<Issue>> columnMap = new LinkedHashMap<>();
+            for (Column column : boardView.columns()) {
+                if (column.getSubColumns().isEmpty()) {
+                    if (column.getKey() != null) {
+                        columnMap.put(column.getKey(), boardView.issues(row.getKey(), column.getKey()));
+                    }
+                } else {
+                    for (Column subColumn : column.getSubColumns()) {
+                        if (subColumn.getKey() != null) {
+                            columnMap.put(subColumn.getKey(), boardView.issues(row.getKey(), subColumn.getKey()));
+                        }
                     }
                 }
             }
+
+            legacyMatrix.put(row.getKey(), columnMap);
         }
 
-        for (Map<String, List<Issue>> colMap : issuesByRowAndCol.values()) {
-            for (Map.Entry<String, List<Issue>> entry : colMap.entrySet()) {
-                String colKey = entry.getKey();
-                List<Issue> list = entry.getValue();
+        return legacyMatrix;
+    }
 
-                if ("backlog".equals(colKey)) {
-                    list.sort(Comparator.comparingLong(Issue::getId).reversed());
-                } else if ("closed".equals(colKey)) {
-                    list.sort((i1, i2) -> {
-                        if (i1.getClosedAt() == null) return 1;
-                        if (i2.getClosedAt() == null) return -1;
-                        return i2.getClosedAt().compareTo(i1.getClosedAt());
-                    });
-                } else {
-                    list.sort(Comparator.comparingLong(Issue::getId));
-                }
-            }
+    private Map<Long, Long> buildLegacyWipUsage(BoardViewModel boardView) {
+        Map<Long, Long> legacyWipUsage = new LinkedHashMap<>();
+        for (Column column : boardView.columns()) {
+            legacyWipUsage.put(column.getId(), boardView.wipCount(column.getId()));
         }
-
-        mv.addObject("issuesByRowAndCol", issuesByRowAndCol);
-
-        Map<Long, Long> wipUsageByColumnId = new HashMap<>();
-        for (Column mainCol : b.getColumns()) {
-            long count = countIssuesInColumn(b, mainCol);
-            wipUsageByColumnId.put(mainCol.getId(), count);
-        }
-        mv.addObject("wipUsageByColumnId", wipUsageByColumnId);
-
-        return mv;
+        return legacyWipUsage;
     }
 
     @PostMapping("/board/add-column")
@@ -483,5 +551,24 @@ public class BoardController {
         List<String> keys = collectLogicalColumnKeys(board, targetCol);
         String currentKey = issue.getColumnKey();
         return currentKey != null && keys.contains(currentKey);
+    }
+
+    static record BoardViewModel(
+            List<Row> rows,
+            List<Column> columns,
+            Map<String, Map<String, List<Issue>>> issuesByRowAndCol,
+            Map<Long, Long> wipUsageByColumnId) {
+
+        public List<Issue> issues(String rowKey, String columnKey) {
+            Map<String, List<Issue>> row = issuesByRowAndCol.get(rowKey);
+            if (row == null) {
+                return Collections.emptyList();
+            }
+            return row.getOrDefault(columnKey, Collections.emptyList());
+        }
+
+        public long wipCount(long columnId) {
+            return wipUsageByColumnId.getOrDefault(columnId, 0L);
+        }
     }
 }

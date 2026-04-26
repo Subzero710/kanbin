@@ -57,7 +57,7 @@
     <div class="board-header-row">
         <div class="header-corner-placeholder"></div>
         <div class="column-headers-container" style="display:flex;">
-            <section th:each="col : ${columns}"
+            <section th:each="col : ${boardView.columns}"
                      class="col-header-item"
                      th:classappend="(${col.subColumns.isEmpty()} ? 'col-width-simple' : 'col-width-double') + (${col.fixed} ? ' fixed-col' : '')"
                      th:attr="data-column-id=${col.id}, data-col=${col.key}, draggable=${!col.fixed}">
@@ -70,7 +70,7 @@
                             <span th:if="${col.wipLimit > 0}"
                                   th:id="'counter-span-' + ${col.id}"
                                   th:attr="data-limit=${col.wipLimit}"
-                                  th:text="' ' + ${wipUsageByColumnId[col.id]} + ' / ' + ${col.wipLimit}"
+                                  th:text="' ' + ${boardView.wipCount(col.id)} + ' / ' + ${col.wipLimit}"
                                   class="badge bg-secondary ms-2">
                             </span>
                         </div>
@@ -98,7 +98,7 @@
         </div>
     </div>
 
-    <div th:each="row : ${rows}" class="kb-swimlane">
+    <div th:each="row : ${boardView.rows}" class="kb-swimlane">
         <div class="swimlane-title-sidebar">
             <div class="swimlane-title-sidebar" th:text="${#strings.abbreviate(row.title, 50)}" th:title="${row.title}">Urgent</div>
 
@@ -112,7 +112,7 @@
         </div>
 
         <div class="swimlane-columns-container">
-            <section th:each="col : ${columns}"
+            <section th:each="col : ${boardView.columns}"
                      th:classappend="${col.subColumns.isEmpty()} ? 'col-width-simple' : 'col-width-double'"
                      th:attr="data-row=${row.key}, data-col=${col.key}">
 
@@ -123,7 +123,7 @@
                      style="height:100%; width:100%;"
                      th:attr="data-row=${row.key}, data-col=${col.key}, data-limit=${col.wipLimit}, data-parent-id=${col.id}">
 
-                    <article th:each="issue : ${issuesByRowAndCol.get(row.key).get(col.key)}"
+                    <article th:each="issue : ${boardView.issues(row.key, col.key)}"
                              class="kb-card issue-draggable" draggable="true" th:attr="data-issue-id=${issue.id}">
                         <div class="card-header">
                             <strong th:text="${issue.title}" class="kb-card-title">Titre</strong>
@@ -142,7 +142,7 @@
                     <div th:each="sub : ${col.subColumns}" class="sub-col-item droppable"
                          th:attr="data-row=${row.key}, data-col=${sub.key}, data-limit=${col.wipLimit}, data-parent-id=${col.id}">
 
-                        <article th:each="issue : ${issuesByRowAndCol.get(row.key).get(sub.key)}"
+                        <article th:each="issue : ${boardView.issues(row.key, sub.key)}"
                                  class="kb-card issue-draggable" draggable="true" th:attr="data-issue-id=${issue.id}">
                             <div class="card-header">
                                 <strong th:text="${issue.title}" class="kb-card-title">Titre</strong>
