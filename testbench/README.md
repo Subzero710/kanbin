@@ -42,13 +42,13 @@ mvn clean test
 # À la racine du projet
 
 # Démarrer les services
-docker-compose up -d
+docker compose up -d
 
 # Attendre que l'application soit prête (~30s)
 sleep 30
 
 # Vérifier que tous les services sont up
-docker-compose ps
+docker compose ps
 
 # Lancer le benchmark
 cd testbench
@@ -56,11 +56,11 @@ mvn clean test
 ```
 
 Accéder aux dashboards :
-Prometheus (métriques brutes) : http://localhost:9090
-Grafana (visualisation) : http://localhost:3000 (login: admin/admin)
-cAdvisor (détails conteneurs) : http://localhost:8081
+- Prometheus (métriques brutes) : http://localhost:9090
+- Grafana (visualisation) : http://localhost:3000 (login: admin/admin)
+- cAdvisor (détails conteneurs) : http://localhost:8081
 
 ```bash
 # Arrêter les services
-docker-compose down
+docker compose down
 ```
