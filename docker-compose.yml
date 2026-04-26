@@ -1,15 +1,78 @@
+version: '3.8'
+
 services:
   kanbin-app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: kanbin-app
+    container_name: kanbin-app-eco
     ports:
       - "8080:8080"
     restart: unless-stopped
     networks:
-      - kanbin-net
+      - kanbin-metrologie
+    environment:
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    labels:
+      - "com.example.description=Kanbin Application"
+
+  # cAdvisor - Mesure les ressources des conteneurs (CPU, mémoire, réseau, disque)
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor-eco
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - kanbin-metrologie
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg
+
+  # Prometheus - Collecte et stocke les métriques (CPU, mémoire, réseau, disque)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus-eco
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+    networks:
+      - kanbin-metrologie
+    restart: unless-stopped
+
+  # Grafana - Visualisation des métriques (optionnel, pour analyse)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana-eco
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-storage:/var/lib/grafana
+    networks:
+      - kanbin-metrologie
+    restart: unless-stopped
+    depends_on:
+      - prometheus
 
 networks:
-  kanbin-net:
-    name: kanbin-net
+  kanbin-metrologie:
+    name: kanbin-metrologie
+
+volumes:
+  prometheus-data:
+  grafana-storage:
+
