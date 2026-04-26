@@ -64,7 +64,7 @@ public class KanbinEcoScenarioIT {
      * - Consommation énergétique (via EcoExtension si PowerSpy disponible)
      */
     @Test
-    @EcoRunConfig(warmupRepetitions = 0)
+    @EcoRunConfig(warmupRepetitions = 0, initIdle = 10000)
     public void testCompleteKanbinScenarioWithMetrics(WebDriver webDriver) throws Exception {
         this.driver = webDriver;
         this.actionMetrics = new LinkedHashMap<>();
@@ -266,7 +266,9 @@ public class KanbinEcoScenarioIT {
             action.run();
         } catch (Exception e) {
             System.err.println("⚠️  Action " + actionName + " échouée: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("🔍 URL ACTUELLE : " + driver.getCurrentUrl());
+            System.err.println("📄 CONTENU DE LA PAGE : \n" + driver.getPageSource());
+            throw e;
         }
 
         long endTime = System.currentTimeMillis();

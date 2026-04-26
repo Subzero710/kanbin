@@ -11,6 +11,5 @@ RUN mvn -B -pl kanbin-projest-app -am -DskipTests package
 
 FROM jetty:11.0-jre21
 
-COPY --from=build /app/kanbin-projest-app/target/kanbin-projest-app-*.war /var/lib/jetty/webapps/ROOT.war
-
+COPY --chown=jetty:jetty --from=build /app/kanbin-projest-app/target/*.war /var/lib/jetty/webapps/ROOT.war
 EXPOSE 8080
