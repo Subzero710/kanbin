@@ -14,6 +14,7 @@ import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
@@ -79,8 +80,10 @@ public class KanbinEcoScenarioIT {
 
             titleInput.clear();
             titleInput.sendKeys(simpleColName);
+            WebElement boardBefore = driver.findElement(By.id("board"));
             driver.findElement(By.cssSelector("input[type='submit'][value='Ajouter Colonne']")).click();
 
+            waitForBoardRefresh(boardBefore);
             waitUntilTextInBoard(simpleColName);
             sleep(300);
         });
@@ -92,8 +95,10 @@ public class KanbinEcoScenarioIT {
 
             titleInput.clear();
             titleInput.sendKeys(doubleColName);
+            WebElement boardBefore = driver.findElement(By.id("board"));
             driver.findElement(By.cssSelector("input[type='submit'][value='Ajouter Colonne']")).click();
 
+            waitForBoardRefresh(boardBefore);
             waitUntilTextInBoard(doubleColName);
             sleep(300);
         });
@@ -149,8 +154,10 @@ public class KanbinEcoScenarioIT {
             WebElement titleInput = driver.findElement(By.name("title"));
             titleInput.clear();
             titleInput.sendKeys(reorderColName);
+            WebElement boardBefore = driver.findElement(By.id("board"));
             driver.findElement(By.cssSelector("input[type='submit'][value='Ajouter Colonne']")).click();
 
+            waitForBoardRefresh(boardBefore);
             waitUntilTextInBoard(reorderColName);
             sleep(300);
         });
@@ -207,6 +214,8 @@ public class KanbinEcoScenarioIT {
 
         Instant endedAt = Instant.now();
         long endMemory = usedJvmMemoryBytes();
+
+        sleep(1500);
 
         PrometheusMetricsClient.ActionContainerMetrics containerMetrics =
                 prometheusMetricsClient.collectForWindow(startedAt, endedAt);
@@ -310,8 +319,21 @@ public class KanbinEcoScenarioIT {
     }
 
     private void waitUntilTextInBoard(String text) {
+        String safe = text.replace("\"", "\\\"");
         new WebDriverWait(driver, Duration.ofSeconds(5))
-                .until(ExpectedConditions.textToBePresentInElementLocated(By.id("board"), text));
+                .ignoring(StaleElementReferenceException.class)
+                .until(d -> !d.findElements(
+                        By.xpath("//*[@id='board']//*[contains(normalize-space(), \"" + safe + "\")]")
+                ).isEmpty());
+    }
+
+    private void waitForBoardRefresh(WebElement previousBoard) {
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
+        try {
+            wait.until(ExpectedConditions.stalenessOf(previousBoard));
+        } catch (Exception ignored) {
+        }
+        waitFor(By.id("board"));
     }
 
     private void simulateDragAndDrop(WebElement source, WebElement target) {
