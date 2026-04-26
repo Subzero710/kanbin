@@ -1,53 +1,61 @@
-# Benchmark Éco-Conception - Kanbin Projest
-
-## 📋 Scénario mesuré
-
-Ce benchmark exécute un scénario complet d'utilisation de Kanbin Projest et mesure :
-
-1. **Consultation du Board** - Chargement de la page principale
-2. **Création colonne simple** - Ajout d'une colonne de base
-3. **Création colonne double** - Ajout d'une colonne avec sous-colonnes
-4. **Création story** - Création d'une nouvelle tâche
-5. **Modification story** - Édition des détails de la tâche
-6. **Drag & Drop story** - Déplacement d'une tâche entre colonnes
-7. **Reordering colonnes** - Réorganisation des colonnes
-8. **Passage en Closed** - Marquage d'une tâche comme complétée
-9. **Suppression** - Suppression de story et colonne
-
-## 🚀 Exécution
-
-### Prérequis
-
-- Java 21+
-- Maven 3.9+
-- Docker et Docker Compose (pour les mesures conteneurisées)
-- Chrome/Chromium installé localement
-
-### Mode conteneurisé (Docker avec monitoring complet)
-
+Benchmark Éco-Conception - Kanbin Projest
+Objectif
+Ce module fige un scénario fonctionnel Selenium et produit un benchmark reproductible pour comparer avant et après une amélioration.
+Le rôle de chaque brique :
+KanbinEcoScenarioIT : décrit le scénario métier
+EcoExtension : orchestre l'exécution JUnit/Selenium et la campagne de benchmark
+Prometheus + cAdvisor : fournissent les métriques conteneur
+EcoGatling : exécute une montée en charge
+EcoBenchmarkAnalyzer : compare plusieurs runs
+Scénario mesuré
+Consultation du Board
+Création colonne simple
+Création colonne double
+Création story
+Modification story
+Drag & Drop story
+Réorganisation colonnes
+Passage en Closed
+Suppression
+Exécution
+Prérequis
+Java 21+
+Maven 3.9+
+Docker + Docker Compose
+Lancement standard
 ```bash
-# À la racine du projet
-
-# Démarrer les services
-docker compose up -d
-
-# Attendre que l'application soit prête (~30s)
-sleep 30
-
-# Vérifier que tous les services sont up
-docker compose ps
-
-# Lancer le benchmark
+docker compose up -d --build
 cd testbench
-mvn clean test
+export POD_IP=127.0.0.1
+mvn -Dtest=KanbinEcoScenarioIT test
 ```
-
-Accéder aux dashboards :
-- Prometheus (métriques brutes) : http://localhost:9090
-- Grafana (visualisation) : http://localhost:3000 (login: admin/admin)
-- cAdvisor (détails conteneurs) : http://localhost:8081
-
+Lancement en une commande
 ```bash
-# Arrêter les services
-docker compose down
+./run-eco-benchmark.sh
 ```
+Résultats
+Rapports EcoExtension
+Les rapports EcoExtension sont générés sous :
+```text
+testbench/target/ecoconception/
+```
+JSON de benchmark
+Le scénario exporte aussi un JSON sous :
+```text
+testbench/target/eco-benchmark-YYYY-MM-DD_HH-mm-ss.json
+```
+Contenu :
+durée par action
+mémoire JVM
+CPU conteneur
+mémoire moyenne/pic du conteneur
+réseau RX/TX
+Comparer plusieurs runs
+```bash
+cd testbench
+mvn exec:java   -Dexec.mainClass="fr.uha.ensisa.gl.kanbin.eco.EcoBenchmarkAnalyzer"   -Dexec.args="target/eco-benchmark-run1.json target/eco-benchmark-run2.json"
+```
+Dashboards
+Prometheus : http://localhost:9090
+cAdvisor : http://localhost:8081
+Grafana : http://localhost:3000

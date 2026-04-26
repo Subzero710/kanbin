@@ -16,9 +16,8 @@ services:
     labels:
       - "com.example.description=Kanbin Application"
 
-  # cAdvisor - Mesure les ressources des conteneurs (CPU, mémoire, réseau, disque)
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
+    image: gcr.io/cadvisor/cadvisor:v0.52.1
     container_name: cadvisor-eco
     ports:
       - "8081:8080"
@@ -35,9 +34,8 @@ services:
     devices:
       - /dev/kmsg
 
-  # Prometheus - Collecte et stocke les métriques (CPU, mémoire, réseau, disque)
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.53.4
     container_name: prometheus-eco
     ports:
       - "9090:9090"
@@ -52,7 +50,6 @@ services:
       - kanbin-metrologie
     restart: unless-stopped
 
-  # Grafana - Visualisation des métriques (optionnel, pour analyse)
   grafana:
     image: grafana/grafana:latest
     container_name: grafana-eco
@@ -75,4 +72,3 @@ networks:
 volumes:
   prometheus-data:
   grafana-storage:
-

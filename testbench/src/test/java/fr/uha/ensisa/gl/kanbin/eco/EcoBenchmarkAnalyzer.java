@@ -1,120 +1,130 @@
 package fr.uha.ensisa.gl.kanbin.eco;
 
-import com.google.gson.*;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
-/**
- * Analyse et compare plusieurs résultats de benchmark JSON
- * Usage: mvn exec:java -Dexec.mainClass="fr.uha.ensisa.gl.kanbin.eco.EcoBenchmarkAnalyzer" -Dexec.args="file1.json file2.json ..."
- */
 public class EcoBenchmarkAnalyzer {
 
     public static void main(String[] args) throws IOException {
         if (args.length == 0) {
-            System.out.println("❌ Utilisation: java EcoBenchmarkAnalyzer <fichier.json> [fichier2.json ...]");
+            System.out.println("Usage: mvn exec:java -Dexec.mainClass=\"fr.uha.ensisa.gl.kanbin.eco.EcoBenchmarkAnalyzer\" -Dexec.args=\"target/eco-benchmark-1.json target/eco-benchmark-2.json\"");
             System.exit(1);
         }
 
         List<JsonObject> results = new ArrayList<>();
         for (String filename : args) {
-            try {
-                String content = Files.readString(Paths.get(filename));
-                results.add(JsonParser.parseString(content).getAsJsonObject());
-                System.out.println("✓ Chargé: " + filename);
-            } catch (IOException e) {
-                System.err.println("⚠️ Erreur lecture: " + filename + " - " + e.getMessage());
-            }
+            String content = Files.readString(Paths.get(filename));
+            results.add(JsonParser.parseString(content).getAsJsonObject());
+            System.out.println("✓ Chargé: " + filename);
         }
 
-        if (results.isEmpty()) {
-            System.err.println("❌ Aucun fichier valide trouvé.");
-            System.exit(1);
-        }
-
-        analyzeResults(results);
-    }
-
-    private static void analyzeResults(List<JsonObject> results) {
-        System.out.println("\n" + "═".repeat(70));
-        System.out.println("  🌱 ANALYSE ECO-BENCHMARK - KANBIN PROJEST");
-        System.out.println("═".repeat(70) + "\n");
-
-        for (int i = 0; i < results.size(); i++) {
-            JsonObject result = results.get(i);
-            System.out.printf("📊 RÉSULTAT %d : %s\n", i + 1, result.get("timestamp").getAsString());
-            System.out.println("───────────────────────────────────────────────────────────────");
-
-            JsonObject global = result.getAsJsonObject("global_metrics");
-            long totalDuration = global.get("total_duration_ms").getAsLong();
-            long maxMemory = global.get("max_memory_mb").getAsLong();
-            long memoryDelta = global.get("total_memory_delta_kb").getAsLong();
-
-            System.out.printf("  ⏱️  Durée totale      : %,d ms (%.2f s)\n", totalDuration, totalDuration / 1000.0);
-            System.out.printf("  💾 Pic mémoire       : %d MB\n", maxMemory);
-            System.out.printf("  📈 Δ mémoire total   : %+d KB\n", memoryDelta);
-            System.out.printf("  🎯 Actions exécutées : %d\n", global.get("actions_count").getAsInt());
-
-            // Détails par action
-            JsonArray actions = result.getAsJsonArray("actions");
-            System.out.println("\n  📋 Action par action :");
-            actions.forEach(elem -> {
-                JsonObject action = elem.getAsJsonObject();
-                long duration = action.get("duration_ms").getAsLong();
-                long memDelta = action.get("memory_delta_kb").getAsLong();
-                long totalMem = action.get("total_memory_mb").getAsLong();
-
-                System.out.printf("    • %-30s : %5d ms, Δ %+7d KB, Total: %4d MB\n",
-                        action.get("name").getAsString(),
-                        duration,
-                        memDelta,
-                        totalMem);
-            });
-
-            System.out.println();
-        }
-
-        // Comparaison si plusieurs résultats
+        printResults(results);
         if (results.size() > 1) {
             compareResults(results);
         }
     }
 
+    private static void printResults(List<JsonObject> results) {
+        System.out.println("\n" + "═".repeat(90));
+        System.out.println("  🌱 ANALYSE ECO-BENCHMARK - KANBIN PROJEST");
+        System.out.println("═".repeat(90) + "\n");
+
+        for (int i = 0; i < results.size(); i++) {
+            JsonObject result = results.get(i);
+            JsonObject global = result.getAsJsonObject("global_metrics");
+
+            System.out.printf("📊 RÉSULTAT %d : %s%n", i + 1, result.get("timestamp").getAsString());
+            System.out.println("──────────────────────────────────────────────────────────────────────────────");
+            System.out.printf("  ⏱️  Durée totale             : %,d ms (%.2f s)%n",
+                    global.get("total_duration_ms").getAsLong(),
+                    global.get("total_duration_ms").getAsLong() / 1000.0);
+            System.out.printf("  💾 Pic mémoire JVM          : %d MB%n", global.get("max_jvm_memory_mb").getAsLong());
+            System.out.printf("  📈 Δ mémoire JVM totale     : %+d KB%n", global.get("total_jvm_memory_delta_kb").getAsLong());
+            System.out.printf("  ⚙️  CPU total conteneur      : %.4f s%n", global.get("total_cpu_seconds").getAsDouble());
+            System.out.printf("  🧠 Pic mémoire conteneur    : %.2f MB%n", global.get("max_container_memory_peak_mb").getAsDouble());
+            System.out.printf("  🌐 Réseau RX total          : %.0f B%n", global.get("total_network_rx_bytes").getAsDouble());
+            System.out.printf("  🌐 Réseau TX total          : %.0f B%n", global.get("total_network_tx_bytes").getAsDouble());
+            System.out.printf("  🎯 Actions exécutées        : %d%n", global.get("actions_count").getAsInt());
+
+            JsonArray actions = result.getAsJsonArray("actions");
+            System.out.println("\n  📋 Action par action :");
+            actions.asList().stream()
+                    .map(e -> e.getAsJsonObject())
+                    .sorted(Comparator.comparing(a -> a.get("name").getAsString()))
+                    .forEach(action -> System.out.printf(
+                            "    • %-28s : %5d ms | CPU %7.4f s | Mem avg %7.2f MB | Mem peak %7.2f MB | RX %10.0f B | TX %10.0f B%n",
+                            action.get("name").getAsString(),
+                            action.get("duration_ms").getAsLong(),
+                            action.get("cpu_seconds").getAsDouble(),
+                            action.get("container_memory_avg_mb").getAsDouble(),
+                            action.get("container_memory_peak_mb").getAsDouble(),
+                            action.get("network_rx_bytes").getAsDouble(),
+                            action.get("network_tx_bytes").getAsDouble()
+                    ));
+            System.out.println();
+        }
+    }
+
     private static void compareResults(List<JsonObject> results) {
-        System.out.println("\n" + "═".repeat(70));
+        JsonObject baseline = results.get(0);
+        JsonArray baselineActions = baseline.getAsJsonArray("actions");
+
+        System.out.println("\n" + "═".repeat(90));
         System.out.println("  📊 COMPARAISON ENTRE RÉSULTATS");
-        System.out.println("═".repeat(70) + "\n");
+        System.out.println("═".repeat(90) + "\n");
 
-        // Récupérer les actions du premier résultat
-        JsonArray firstActions = results.get(0).getAsJsonArray("actions");
+        baselineActions.asList().stream()
+                .map(e -> e.getAsJsonObject())
+                .sorted(Comparator.comparing(a -> a.get("name").getAsString()))
+                .forEach(baseAction -> {
+                    String actionName = baseAction.get("name").getAsString();
+                    long baseDuration = baseAction.get("duration_ms").getAsLong();
+                    double baseCpu = baseAction.get("cpu_seconds").getAsDouble();
+                    double baseMemPeak = baseAction.get("container_memory_peak_mb").getAsDouble();
 
-        firstActions.forEach(elem -> {
-            JsonObject firstAction = elem.getAsJsonObject();
-            String actionName = firstAction.get("name").getAsString();
-            long firstDuration = firstAction.get("duration_ms").getAsLong();
+                    System.out.printf("  %s%n", actionName);
+                    for (int i = 0; i < results.size(); i++) {
+                        JsonObject runAction = findAction(results.get(i), actionName);
+                        long duration = runAction.get("duration_ms").getAsLong();
+                        double cpu = runAction.get("cpu_seconds").getAsDouble();
+                        double memPeak = runAction.get("container_memory_peak_mb").getAsDouble();
 
-            System.out.printf("  %s :\n", actionName);
+                        double durationVar = percentage(baseDuration, duration);
+                        double cpuVar = percentage(baseCpu, cpu);
+                        double memVar = percentage(baseMemPeak, memPeak);
 
-            for (int i = 0; i < results.size(); i++) {
-                long duration = StreamSupport.stream(results.get(i).getAsJsonArray("actions").spliterator(), false)
-                        .map(JsonElement::getAsJsonObject)
-                        .filter(a -> a.get("name").getAsString().equals(actionName))
-                        .findFirst()
-                        .map(a -> a.get("duration_ms").getAsLong())
-                        .orElse(0L);
+                        System.out.printf(
+                                "    Run %d: durée %,d ms (%+.1f%%) | CPU %.4f s (%+.1f%%) | pic mémoire %.2f MB (%+.1f%%)%n",
+                                i + 1, duration, durationVar, cpu, cpuVar, memPeak, memVar
+                        );
+                    }
+                });
 
-                double variance = firstDuration != 0 ? ((duration - firstDuration) / (double) firstDuration) * 100 : 0;
-                String indicator = variance > 10 ? "⚠️ " : (variance < -10 ? "✅" : "  ");
-                System.out.printf("    %s Run %d: %,d ms (%+.1f%%)\n",
-                        indicator, i + 1, duration, variance);
-            }
-        });
+        System.out.println("\n" + "═".repeat(90) + "\n");
+    }
 
-        System.out.println("\n" + "═".repeat(70) + "\n");
+    private static JsonObject findAction(JsonObject result, String actionName) {
+        return result.getAsJsonArray("actions")
+                .asList()
+                .stream()
+                .map(e -> e.getAsJsonObject())
+                .filter(a -> a.get("name").getAsString().equals(actionName))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Action not found: " + actionName));
+    }
+
+    private static double percentage(double baseline, double value) {
+        if (baseline == 0d) {
+            return 0d;
+        }
+        return ((value - baseline) / baseline) * 100d;
     }
 }
